@@ -1,0 +1,6 @@
+{
+  "name": "Snooker Championship Manager",
+  "description": "Manage the snooker player registration process and competition process with an interactive 32-player knockout bracket, a scoreboard simulator, and a live TV display screen showing player photos and points gained per match.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
