@@ -154,12 +154,18 @@ async function uploadBase64ToSupabase(
         "image/jpeg": "jpg",
         "image/jpg": "jpg",
         "image/webp": "webp",
+        "image/svg+xml": "svg",
         "application/pdf": "pdf",
       };
       ext = mimeToExt[contentType] || "bin";
     }
 
-    const buffer = Buffer.from(base64Data, "base64");
+    let buffer: Buffer;
+    if (metadataPart.includes("base64")) {
+      buffer = Buffer.from(base64Data, "base64");
+    } else {
+      buffer = Buffer.from(decodeURIComponent(base64Data), "utf-8");
+    }
     const fileName = `${userId}_${prefix}_${Date.now()}.${ext}`;
 
     // Upload to bucket
@@ -208,15 +214,114 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: "15mb" }));
 
+  let lastSupabaseFetchTime = 0;
+  let cachedProfiles: any[] = [];
+
   // API Endpoints
-  app.get("/api/state", (req, res) => {
-    res.json(readState());
+  app.get("/api/state", async (req, res) => {
+    const state = readState();
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+    const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+    if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+      const now = Date.now();
+      if (now - lastSupabaseFetchTime > 3000) {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+          const { data: dbProfiles, error: fetchError } = await supabase
+            .from('profiles')
+            .select('*');
+
+          if (fetchError) {
+            console.error('[Supabase DB Sync Error] Failed to fetch profiles:', fetchError.message);
+          } else if (dbProfiles) {
+            console.log(`[Supabase DB Sync Success] Fetched ${dbProfiles.length} profiles from database.`);
+            const mappedApps = dbProfiles.map((p: any) => ({
+              id: p.id,
+              fullName: p.full_name || '',
+              nickname: p.nickname || '',
+              club: p.club || '',
+              phoneNumber: p.phone_number || '',
+              whatsappNumber: p.whatsapp_number || '',
+              socialMediaPage: p.social_media_page || '',
+              photoUrl: p.photo_url || '',
+              documentUrl: p.document_url || '',
+              documentName: p.document_name || '',
+              status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
+              appliedAt: p.created_at || p.applied_at || new Date().toISOString()
+            }));
+            cachedProfiles = mappedApps;
+            lastSupabaseFetchTime = now;
+          }
+        } catch (err: any) {
+          console.error('[Supabase DB Sync Exception] Failed to fetch or merge profiles:', err?.message || err);
+        }
+      }
+
+      if (cachedProfiles.length > 0) {
+        // Merge cached profiles into state.playerApplications, preserving any that are unique
+        const mergedApps = [...cachedProfiles];
+        for (const localApp of state.playerApplications) {
+          if (!mergedApps.some(dbApp => dbApp.id === localApp.id)) {
+            mergedApps.push(localApp);
+          }
+        }
+        state.playerApplications = mergedApps;
+        writeState(state);
+      }
+    }
+
+    res.json(state);
   });
 
-  app.post("/api/state", (req, res) => {
+  app.post("/api/state", async (req, res) => {
     const currentState = readState();
     const newState = { ...currentState, ...req.body };
     writeState(newState);
+
+    // If playerApplications are changed, sync statuses back to Supabase profiles
+    if (req.body.playerApplications && Array.isArray(req.body.playerApplications)) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+          for (const app of req.body.playerApplications) {
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ status: app.status })
+              .eq('id', app.id);
+
+            if (updateError) {
+              console.error(`[Supabase Status Sync Error] Failed to update profile status for user ${app.id}:`, updateError.message);
+            }
+          }
+          // Invalidate cache so next GET is direct
+          lastSupabaseFetchTime = 0;
+        } catch (err: any) {
+          console.error('[Supabase Status Sync Exception]:', err?.message || err);
+        }
+      }
+    }
+
     res.json({ success: true, state: newState });
   });
 
@@ -253,15 +358,15 @@ async function startServer() {
         const userEmail = newApp.email || `player-${Date.now()}@example.com`;
         const userPassword = `PlayerPass123_Secure!`;
         const initialMetadata = {
-          full_name: newApp.fullName,
-          nickname: newApp.nickname,
-          club: newApp.club,
-          phone_number: newApp.phoneNumber,
-          whatsapp_number: newApp.whatsappNumber,
-          social_media_page: newApp.socialMediaPage,
+          full_name: newApp.fullName || "",
+          nickname: newApp.nickname || "",
+          club: newApp.club || "",
+          phone_number: newApp.phoneNumber || "",
+          whatsapp_number: newApp.whatsappNumber || "",
+          social_media_page: newApp.socialMediaPage || "",
           photo_url: "", // omitted base64 to avoid Request body too large (max 1MB) error
           document_url: "", // omitted base64 to avoid Request body too large (max 1MB) error
-          document_name: newApp.documentName,
+          document_name: newApp.documentName || "",
         };
 
         let targetUserId: string | null = null;
@@ -280,7 +385,7 @@ async function startServer() {
               console.log(`[Supabase Admin Sync] Email ${userEmail} already exists. Finding existing user ID...`);
               const { data: userList, error: listError } = await supabase.auth.admin.listUsers();
               if (!listError && userList && userList.users) {
-                const existingUser = userList.users.find(u => u.email?.toLowerCase() === userEmail.toLowerCase());
+                const existingUser = userList.users.find((u: any) => u.email?.toLowerCase() === userEmail.toLowerCase());
                 if (existingUser) {
                   targetUserId = existingUser.id;
                   console.log(`[Supabase Admin Sync] Found user ID: ${targetUserId}. Updating user metadata with initial metadata...`);
@@ -365,15 +470,15 @@ async function startServer() {
             try {
               await supabase.auth.admin.updateUserById(targetUserId, {
                 user_metadata: {
-                  full_name: newApp.fullName,
-                  nickname: newApp.nickname,
-                  club: newApp.club,
-                  phone_number: newApp.phoneNumber,
-                  whatsapp_number: newApp.whatsappNumber,
-                  social_media_page: newApp.socialMediaPage,
-                  photo_url: finalPhotoUrl,
-                  document_url: finalDocumentUrl,
-                  document_name: newApp.documentName,
+                  full_name: newApp.fullName || "",
+                  nickname: newApp.nickname || "",
+                  club: newApp.club || "",
+                  phone_number: newApp.phoneNumber || "",
+                  whatsapp_number: newApp.whatsappNumber || "",
+                  social_media_page: newApp.socialMediaPage || "",
+                  photo_url: finalPhotoUrl || "",
+                  document_url: finalDocumentUrl || "",
+                  document_name: newApp.documentName || "",
                 }
               });
               console.log('[Supabase Admin Sync]: Updated user auth metadata with new file URLs.');
@@ -388,15 +493,15 @@ async function startServer() {
             .from('profiles')
             .upsert({
               id: targetUserId,
-              full_name: newApp.fullName,
-              nickname: newApp.nickname,
-              club: newApp.club,
-              phone_number: newApp.phoneNumber,
-              whatsapp_number: newApp.whatsappNumber,
-              social_media_page: newApp.socialMediaPage,
-              photo_url: finalPhotoUrl,
-              document_url: finalDocumentUrl,
-              document_name: newApp.documentName,
+              full_name: newApp.fullName || "",
+              nickname: newApp.nickname || null,
+              club: newApp.club || null,
+              phone_number: newApp.phoneNumber || null,
+              whatsapp_number: newApp.whatsappNumber || null,
+              social_media_page: newApp.socialMediaPage || null,
+              photo_url: finalPhotoUrl || null,
+              document_url: finalDocumentUrl || null,
+              document_name: newApp.documentName || null,
               status: 'pending'
             });
 
@@ -418,6 +523,9 @@ async function startServer() {
     // Now push to state and write (ensuring data.json has storage public URLs, NOT huge base64 strings!)
     state.playerApplications.push(newApp);
     writeState(state);
+
+    // Invalidate Supabase cache so the next GET reflects the new profile instantly
+    lastSupabaseFetchTime = 0;
 
     res.json({ success: true, application: newApp });
   });

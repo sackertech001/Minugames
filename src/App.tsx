@@ -1100,40 +1100,6 @@ export default function App() {
     }
 
     const handleSubmitApplication = async (app: Omit<PlayerApplication, 'id' | 'status' | 'appliedAt'>) => {
-      // If Supabase client is configured, register the player to Supabase Auth to trigger profiles population
-      const supabase = getSupabase();
-      if (supabase) {
-        try {
-          const userEmail = app.email || `player-${Date.now()}@example.com`;
-          // We use a safe password structure for registration
-          const userPassword = `PlayerPass123_Secure!`;
-          const { data, error } = await supabase.auth.signUp({
-            email: userEmail,
-            password: userPassword,
-            options: {
-              data: {
-                full_name: app.fullName,
-                nickname: app.nickname,
-                club: app.club,
-                phone_number: app.phoneNumber,
-                whatsapp_number: app.whatsappNumber,
-                social_media_page: app.socialMediaPage,
-                photo_url: app.photoUrl,
-                document_url: app.documentUrl,
-                document_name: app.documentName,
-              }
-            }
-          });
-          if (error) {
-            console.error('Supabase signup trigger error:', error.message);
-          } else {
-            console.log('Successfully synchronized application to Supabase Auth:', data.user);
-          }
-        } catch (supabaseErr) {
-          console.error('Unexpected Supabase error during player registration:', supabaseErr);
-        }
-      }
-
       try {
         const res = await fetch('/api/applications', {
           method: 'POST',
