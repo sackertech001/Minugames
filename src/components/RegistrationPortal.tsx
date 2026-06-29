@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Player, PlayerApplication } from '../types';
+import { Player, PlayerApplication, TournamentConfig } from '../types';
 import { 
   UserPlus, Trash2, Upload, Sparkles, AlertCircle, Edit, ShieldCheck, CheckCircle2, Trophy,
   Check, XCircle, Users, FileText, Globe, Phone, MessageSquare, Calendar, ListFilter
@@ -16,6 +16,7 @@ interface RegistrationPortalProps {
   playersCount: number;
   applications: PlayerApplication[];
   onApplicationsChange: (apps: PlayerApplication[]) => void;
+  config: TournamentConfig;
 }
 
 export default function RegistrationPortal({
@@ -26,6 +27,7 @@ export default function RegistrationPortal({
   playersCount,
   applications,
   onApplicationsChange,
+  config,
 }: RegistrationPortalProps) {
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
@@ -43,6 +45,12 @@ export default function RegistrationPortal({
 
   // Sub-tabs and Application states
   const [activeSubTab, setActiveSubTab] = useState<'roster' | 'applications'>('roster');
+
+  const [tournamentType, setTournamentType] = useState(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
+
+  React.useEffect(() => {
+    setTournamentType(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
+  }, [config.selectedTournamentType, config.tournamentTypes]);
   const [appFilter, setAppFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedSeeds, setSelectedSeeds] = useState<Record<string, number>>({});
 
@@ -173,6 +181,7 @@ export default function RegistrationPortal({
             club: club.trim() || undefined,
             seed: seedNum,
             photoUrl: finalPhotoUrl,
+            tournamentType: tournamentType,
           };
         }
         return p;
@@ -200,6 +209,7 @@ export default function RegistrationPortal({
         totalPoints: 0,
         highestBreak: 0,
         status: 'active',
+        tournamentType: tournamentType,
       };
 
       const updated = [...players, newPlayer].sort((a, b) => a.seed - b.seed);
@@ -212,6 +222,7 @@ export default function RegistrationPortal({
     setClub('');
     setPhotoDataUrl('');
     setSeed('');
+    setTournamentType(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
   };
 
   const handleEdit = (p: Player) => {
@@ -221,6 +232,7 @@ export default function RegistrationPortal({
     setClub(p.club || '');
     setSeed(p.seed);
     setPhotoDataUrl(p.photoUrl);
+    setTournamentType(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
     setError('');
   };
 
@@ -310,6 +322,24 @@ export default function RegistrationPortal({
                 className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                 maxLength={40}
               />
+            </div>
+
+            {/* Tournament Type prefilled & uneditable field */}
+            <div className="text-left">
+              <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                <Trophy className="w-3 h-3 text-rose-500" /> Tournament Type
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  readOnly
+                  value={config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker'}
+                  className="w-full bg-bg-tertiary/60 dark:bg-[#030912] border border-rose-500/10 rounded-xl px-4 py-2.5 text-sm text-text-secondary dark:text-slate-300 font-bold cursor-not-allowed outline-none select-none"
+                />
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-sans font-black bg-rose-500/10 text-rose-500 border border-rose-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  Prefilled
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-left">
@@ -582,9 +612,16 @@ export default function RegistrationPortal({
                       </div>
 
                       <div className="min-w-0 flex-1 text-left">
-                        <p className="text-xs font-black text-text-primary dark:text-slate-100 truncate group-hover:text-rose-500 transition-colors">
-                          {p.name}
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs font-black text-text-primary dark:text-slate-100 truncate group-hover:text-rose-500 transition-colors">
+                            {p.name}
+                          </p>
+                          {p.tournamentType && (
+                            <span className="text-[8px] font-sans font-black tracking-widest bg-rose-500/10 text-rose-500 px-1 py-0.5 rounded border border-rose-500/20 uppercase">
+                              {p.tournamentType}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-text-secondary dark:text-slate-400 italic truncate font-sans">
                           {p.nickname ? `"${p.nickname}"` : p.club || 'Independent'}
                         </p>
@@ -660,6 +697,7 @@ export default function RegistrationPortal({
               <button
                 type="button"
                 onClick={() => {
+                  const types = config.tournamentTypes || ['Soccer', 'Snooker', 'Table Tennis'];
                   const demoApps: PlayerApplication[] = [
                     {
                       id: `app-sim-1`,
@@ -673,7 +711,8 @@ export default function RegistrationPortal({
                       status: 'pending',
                       appliedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
                       documentUrl: 'data:application/pdf;base64,JVBERi0xLjUKMSAwIG9iagogIDw8IC9UeXBlIC9DYXRhbG9nCiAgICAgL1BhZ2VzIDIgMCBSCiAgPj4KZW5kb2JqCjIgMCBvYmoKICA8PCAvVHlwZSAvUGFnZXMKICAgICAvS2lkcyBbIDMgMCBSIF0KICAgICAvQ291bnQgMQogID4+CmVuZG9iagozIDAgb2JqCiAgPDwgL1R5cGUgL1BhZ2UKICAgICAvUGFyZW50IDIgMCBSCiAgICAgL01lZGlhQm94IFsgMCAwIDU5NSA4NDIgXQogICAgIC9Db250ZW50cyA0IDAgUgoKICA+PgplbmRvYmoKNCAwIG9iagogIDw8IC9MZW5ndGggNTYgPj4Kc3RyZWFtCkJUCi9GMSAxMiBUZgogNzAgNzAwIFRECiAoSlVERCBUUlVNUCBWRVJJRklDQVRJT04gRE9DVU1FTlQpIFRQCgVFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNyAwMDAwMCBuIAowMDAwMDAwMDgxIDAwMDAwIG4gCjAwMDAwMDAxNDkgAwMDAwIG4gCjAwMDAwMDAyNTUgAwMDAwIG4gCnRyYWlsZXIKICA8PCAvU2l6ZSA1CiAgICAgL1Jvb3QgMSAwIFIKICA+PgpzdGFydHhyZWYKMzYwCiUlRU9GCg==',
-                      documentName: 'judd_trump_license.pdf'
+                      documentName: 'judd_trump_license.pdf',
+                      tournamentType: types[1] || types[0] || 'Snooker'
                     },
                     {
                       id: `app-sim-2`,
@@ -686,7 +725,8 @@ export default function RegistrationPortal({
                       status: 'pending',
                       appliedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
                       documentUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-                      documentName: 'mark_selby_id.png'
+                      documentName: 'mark_selby_id.png',
+                      tournamentType: types[1] || types[0] || 'Snooker'
                     },
                     {
                       id: `app-sim-3`,
@@ -697,7 +737,8 @@ export default function RegistrationPortal({
                       phoneNumber: '+44 7700 900099',
                       whatsappNumber: '+44 7700 900099',
                       status: 'pending',
-                      appliedAt: new Date(Date.now() - 3600000 * 12).toISOString()
+                      appliedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+                      tournamentType: types[1] || types[0] || 'Snooker'
                     }
                   ];
                   onApplicationsChange([...demoApps, ...applications]);
@@ -800,6 +841,11 @@ export default function RegistrationPortal({
                                 {app.nickname && (
                                   <span className="text-[10px] text-rose-500 font-sans font-black tracking-widest bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
                                     "{app.nickname}"
+                                  </span>
+                                )}
+                                {app.tournamentType && (
+                                  <span className="text-[10px] text-amber-500 font-sans font-black tracking-widest bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 uppercase">
+                                    {app.tournamentType}
                                   </span>
                                 )}
                               </div>
@@ -953,6 +999,7 @@ export default function RegistrationPortal({
                                     totalPoints: 0,
                                     highestBreak: 0,
                                     status: 'active',
+                                    tournamentType: app.tournamentType,
                                   };
 
                                   // Add player

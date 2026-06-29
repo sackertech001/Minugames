@@ -102,7 +102,9 @@ export default function App() {
       second: '₦150,000 + Certificate',
       third: 'Meal of Choice',
       highestBreak: '₦50,000',
-    }
+    },
+    tournamentTypes: ['Soccer', 'Snooker', 'Table Tennis'],
+    selectedTournamentType: 'Snooker'
   });
 
   // Role-Based Access Control users state with rich defaults
@@ -187,19 +189,114 @@ export default function App() {
     // Direct Client-side Supabase updates if server API is unavailable/404 and Supabase is configured
     if (!succeeded) {
       const supabase = getSupabase();
-      if (supabase && patch.playerApplications && Array.isArray(patch.playerApplications)) {
-        try {
-          for (const app of patch.playerApplications) {
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ status: app.status })
-              .eq('id', app.id);
-            if (updateError) {
-              console.error(`[Client Supabase DB Update Error] Failed to update profile status for ${app.id}:`, updateError.message);
+      if (supabase) {
+        if (patch.playerApplications && Array.isArray(patch.playerApplications)) {
+          try {
+            for (const app of patch.playerApplications) {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ status: app.status })
+                .eq('id', app.id);
+              if (updateError) {
+                console.error(`[Client Supabase DB Update Error] Failed to update profile status for ${app.id}:`, updateError.message);
+              }
             }
+          } catch (err: any) {
+            console.error('[Client Supabase Status Sync Exception]:', err?.message || err);
           }
-        } catch (err: any) {
-          console.error('[Client Supabase Status Sync Exception]:', err?.message || err);
+        }
+
+        if (patch.players && Array.isArray(patch.players)) {
+          try {
+            for (const player of patch.players) {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({
+                  status: player.status,
+                  seed: player.seed,
+                  matches_played: player.matchesPlayed,
+                  matches_won: player.matchesWon,
+                  total_points: player.totalPoints,
+                  highest_break: player.highestBreak,
+                })
+                .eq('id', player.id);
+              if (updateError) {
+                console.error(`[Client Supabase Player Stats Sync Error] Failed to update stats for user ${player.id}:`, updateError.message);
+              }
+            }
+          } catch (err: any) {
+            console.error('[Client Supabase Player Stats Sync Exception]:', err?.message || err);
+          }
+        }
+
+        if (patch.wipePlayersAndAuthUsers) {
+          try {
+            const { data: dbProfiles, error: fetchErr } = await supabase
+              .from('profiles')
+              .select('id');
+            if (!fetchErr && dbProfiles && dbProfiles.length > 0) {
+              const ids = dbProfiles.map((p: any) => p.id);
+              const { error: deleteProfilesErr } = await supabase
+                .from('profiles')
+                .delete()
+                .in('id', ids);
+              if (deleteProfilesErr) {
+                console.error('[Client Supabase Wipe Error] Failed to delete profiles:', deleteProfilesErr.message);
+              }
+
+              for (const id of ids) {
+                if (supabase.auth?.admin?.deleteUser) {
+                  await supabase.auth.admin.deleteUser(id);
+                }
+              }
+            }
+          } catch (err: any) {
+            console.error('[Client Supabase Wipe Exception]:', err?.message || err);
+          }
+        }
+
+        if (patch.tournamentConfig) {
+          try {
+            const { tournamentTypes, selectedTournamentType } = patch.tournamentConfig;
+            if (Array.isArray(tournamentTypes)) {
+              const { data: currentDbTypes, error: selectErr } = await supabase
+                .from('tournament_types')
+                .select('*');
+
+              if (!selectErr && currentDbTypes) {
+                const dbTypeNames = currentDbTypes.map((t: any) => t.name);
+                const toDelete = dbTypeNames.filter(name => !tournamentTypes.includes(name));
+                if (toDelete.length > 0) {
+                  await supabase
+                    .from('tournament_types')
+                    .delete()
+                    .in('name', toDelete);
+                }
+
+                for (const type of tournamentTypes) {
+                  const isActive = type === selectedTournamentType;
+                  await supabase
+                    .from('tournament_types')
+                    .upsert({
+                      name: type,
+                      is_active: isActive
+                    }, { onConflict: 'name' });
+                }
+              }
+            } else if (selectedTournamentType) {
+              await supabase
+                .from('tournament_types')
+                .update({ is_active: false })
+                .not('name', 'eq', selectedTournamentType);
+
+              await supabase
+                .from('tournament_types')
+                .update({ is_active: true })
+                .eq('name', selectedTournamentType);
+            }
+          } catch (err: any) {
+            console.error('[Client Supabase Tournament Types Sync Exception]:', err?.message || err);
+          }
         }
       }
     }
@@ -282,7 +379,14 @@ export default function App() {
         setIsTournamentStarted(JSON.parse(savedStarted));
       }
       if (savedConfig) {
-        setTournamentConfig(JSON.parse(savedConfig));
+        const parsed = JSON.parse(savedConfig);
+        if (!parsed.tournamentTypes || !Array.isArray(parsed.tournamentTypes)) {
+          parsed.tournamentTypes = ['Soccer', 'Snooker', 'Table Tennis'];
+        }
+        if (!parsed.selectedTournamentType) {
+          parsed.selectedTournamentType = parsed.tournamentTypes[0] || 'Snooker';
+        }
+        setTournamentConfig(parsed);
       }
       if (savedUsers) {
         setSystemUsers(JSON.parse(savedUsers));
@@ -519,13 +623,63 @@ export default function App() {
                   documentUrl: p.document_url || '',
                   documentName: p.document_name || '',
                   status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
-                  appliedAt: p.created_at || p.applied_at || new Date().toISOString()
+                  appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
+                  tournamentType: p.tournament_type || ''
                 }));
 
                 setPlayerApplications((prev) => {
                   if (JSON.stringify(prev) !== JSON.stringify(mappedApps)) {
                     safeStorage.setItem('snooker_player_applications', JSON.stringify(mappedApps));
                     return mappedApps;
+                  }
+                  return prev;
+                });
+
+                // Pick players that have approved/active status from profiles to populate players state
+                const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+                const dbPlayers = dbProfiles
+                  .filter((p: any) => approvedStatuses.includes(p.status))
+                  .map((p: any) => ({
+                    id: p.id,
+                    name: p.full_name || 'Tournament Player',
+                    nickname: p.nickname || '',
+                    club: p.club || '',
+                    seed: p.seed || 1,
+                    photoUrl: p.photo_url || '',
+                    matchesPlayed: p.matches_played || 0,
+                    matchesWon: p.matches_won || 0,
+                    totalPoints: p.total_points || 0,
+                    highestBreak: p.highest_break || 0,
+                    status: p.status === 'approved' ? 'active' : p.status,
+                    tournamentType: p.tournament_type || ''
+                  }))
+                  .sort((a, b) => (a.seed || 0) - (b.seed || 0));
+
+                setPlayers((prev) => {
+                  if (JSON.stringify(prev) !== JSON.stringify(dbPlayers)) {
+                    safeStorage.setItem('snooker_players', JSON.stringify(dbPlayers));
+                    return dbPlayers;
+                  }
+                  return prev;
+                });
+              }
+
+              const { data: dbTypes, error: typesError } = await supabase
+                .from('tournament_types')
+                .select('*');
+
+              if (!typesError && dbTypes && dbTypes.length > 0) {
+                const typesList = dbTypes.map((t: any) => t.name);
+                const activeType = dbTypes.find((t: any) => t.is_active)?.name || typesList[0] || 'Snooker';
+                setTournamentConfig((prev) => {
+                  const updated = {
+                    ...prev,
+                    tournamentTypes: typesList,
+                    selectedTournamentType: activeType
+                  };
+                  if (JSON.stringify(prev) !== JSON.stringify(updated)) {
+                    safeStorage.setItem('snooker_config', JSON.stringify(updated));
+                    return updated;
                   }
                   return prev;
                 });
@@ -1005,7 +1159,9 @@ export default function App() {
         second: '₦150,000 + Certificate',
         third: 'Meal of Choice',
         highestBreak: '₦50,000',
-      }
+      },
+      tournamentTypes: ['Soccer', 'Snooker', 'Table Tennis'],
+      selectedTournamentType: 'Snooker'
     };
     setTournamentConfig(defaultConfig);
     
@@ -1072,7 +1228,8 @@ export default function App() {
       systemUsers: defaultUsers,
       rolePermissions: defaultPermissions,
       playerApplications: [],
-      publicRegistrationEnabled: true
+      publicRegistrationEnabled: true,
+      wipePlayersAndAuthUsers: true
     });
 
     setShowWipeConfirm(false);
@@ -1310,6 +1467,7 @@ export default function App() {
                 photo_url: finalPhotoUrl || null,
                 document_url: finalDocumentUrl || null,
                 document_name: app.documentName || null,
+                tournament_type: app.tournamentType || null,
                 status: 'pending'
               });
 
@@ -1334,7 +1492,8 @@ export default function App() {
                   documentUrl: p.document_url || '',
                   documentName: p.document_name || '',
                   status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
-                  appliedAt: p.created_at || p.applied_at || new Date().toISOString()
+                  appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
+                  tournamentType: p.tournament_type || ''
                 }));
                 setPlayerApplications(mappedApps);
                 safeStorage.setItem('snooker_player_applications', JSON.stringify(mappedApps));
@@ -1374,6 +1533,8 @@ export default function App() {
         tournamentName={tournamentConfig.tournamentName}
         onSubmitApplication={handleSubmitApplication}
         systemLogo={systemLogo}
+        tournamentTypes={tournamentConfig.tournamentTypes}
+        selectedTournamentType={tournamentConfig.selectedTournamentType}
       />
     );
   }
@@ -1557,6 +1718,7 @@ export default function App() {
               playersCount={tournamentConfig.playersCount}
               applications={playerApplications}
               onApplicationsChange={handleApplicationsChange}
+              config={tournamentConfig}
             />
           )}
 

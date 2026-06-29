@@ -102,6 +102,8 @@ export default function SettingsTab({
   const [winPoints, setWinPoints] = useState(config.winPoints || 3);
   const [drawPoints, setDrawPoints] = useState(config.drawPoints || 1);
   const [lossPoints, setLossPoints] = useState(config.lossPoints || 0);
+  const [newTournamentType, setNewTournamentType] = useState('');
+  const [typeError, setTypeError] = useState('');
 
   React.useEffect(() => {
     if (formatType === 'group') {
@@ -318,6 +320,52 @@ export default function SettingsTab({
     }
     onUpdateRolePermissions(rolePermissions.filter((rp) => rp.role !== roleName));
     showTemporarySuccess(`Deleted custom role "${roleName}".`);
+  };
+
+  const handleAddTournamentType = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTypeError('');
+    const trimmed = newTournamentType.trim();
+    if (!trimmed) {
+      setTypeError('Tournament type cannot be empty.');
+      return;
+    }
+    const currentTypes = config.tournamentTypes || ['Soccer', 'Snooker', 'Table Tennis'];
+    if (currentTypes.some(t => t.toLowerCase() === trimmed.toLowerCase())) {
+      setTypeError('This tournament type already exists.');
+      return;
+    }
+    const updatedTypes = [...currentTypes, trimmed];
+    onUpdateConfig({ ...config, tournamentTypes: updatedTypes });
+    setNewTournamentType('');
+    showTemporarySuccess(`Added "${trimmed}" to tournament types master list.`);
+  };
+
+  const handleSelectTournamentType = (type: string) => {
+    onUpdateConfig({ ...config, selectedTournamentType: type });
+    showTemporarySuccess(`"${type}" selected as the active tournament discipline.`);
+  };
+
+  const handleDeleteTournamentType = (typeToDelete: string) => {
+    setTypeError('');
+    const currentTypes = config.tournamentTypes || ['Soccer', 'Snooker', 'Table Tennis'];
+    if (currentTypes.length <= 1) {
+      setTypeError('You must keep at least one tournament type in the master list.');
+      return;
+    }
+    const updatedTypes = currentTypes.filter(t => t !== typeToDelete);
+    
+    let nextSelected = config.selectedTournamentType;
+    if (config.selectedTournamentType === typeToDelete) {
+      nextSelected = updatedTypes[0];
+    }
+    
+    onUpdateConfig({ 
+      ...config, 
+      tournamentTypes: updatedTypes,
+      selectedTournamentType: nextSelected 
+    });
+    showTemporarySuccess(`Deleted "${typeToDelete}" from tournament types master list.`);
   };
 
 
@@ -1288,6 +1336,130 @@ export default function SettingsTab({
         </div>
 
       </div>
+
+      {/* 4. MASTER LIST OF TOURNAMENT TYPES */}
+      <div className="bg-bg-secondary border border-rose-500/10 dark:border-rose-500/15 rounded-2xl p-6 shadow-[0_0_15px_rgba(239,68,68,0.03)] space-y-6 transition-colors duration-300 mt-8">
+        <div className="border-b border-rose-500/10 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h4 className="font-sans font-black text-text-primary text-sm uppercase tracking-[0.1em] flex items-center gap-2">
+              <Award className="w-5 h-5 text-rose-500" /> Master List of Tournament Types
+            </h4>
+            <p className="text-xs text-text-muted font-sans font-medium mt-0.5">
+              Manage the central register of tournament disciplines. These options populate the mandatory tournament type dropdown on public and admin player registration forms.
+            </p>
+          </div>
+        </div>
+
+        {isConfigEditable ? (
+          <div className="space-y-6">
+            {/* Input Row */}
+            <form onSubmit={handleAddTournamentType} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end max-w-2xl">
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="block text-[10px] font-sans font-black text-slate-400 uppercase tracking-widest">
+                  New Tournament Type (e.g. Soccer, Snooker, Table Tennis)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Chess, Basketball, Snooker"
+                  value={newTournamentType}
+                  onChange={(e) => setNewTournamentType(e.target.value)}
+                  className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary placeholder-slate-600 outline-none w-full transition-all font-sans font-bold"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-rose-500 hover:bg-rose-600 text-white font-sans font-black text-xs px-5 py-3 rounded-xl border border-rose-500/30 transition-all cursor-pointer w-full flex items-center justify-center gap-2 uppercase tracking-wider shadow-[0_0_12px_rgba(239,68,68,0.2)]"
+              >
+                <Plus className="w-4 h-4" /> Add Type
+              </button>
+            </form>
+
+            {typeError && (
+              <p className="text-rose-500 font-sans font-bold text-[11px]">⚠ {typeError}</p>
+            )}
+
+            {/* List Table */}
+            <div className="bg-bg-primary rounded-xl border border-rose-500/10 overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-rose-500/10 bg-bg-tertiary">
+                    <th className="py-2.5 px-4 text-[10px] font-sans font-black text-slate-400 uppercase tracking-widest">Tournament Type Name</th>
+                    <th className="py-2.5 px-4 text-center text-[10px] font-sans font-black text-slate-400 uppercase tracking-widest w-40">Status</th>
+                    <th className="py-2.5 px-4 text-right text-[10px] font-sans font-black text-slate-400 uppercase tracking-widest w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(config.tournamentTypes || ['Soccer', 'Snooker', 'Table Tennis']).map((type, i) => {
+                    const isSelected = type === (config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
+                    return (
+                      <tr key={i} className="border-b border-rose-500/5 last:border-none hover:bg-bg-tertiary/50 transition-colors">
+                        <td className="py-3 px-4 text-xs font-sans font-black text-slate-200">
+                          {type}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {isSelected ? (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-sans font-black tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full uppercase">
+                              <Check className="w-3 h-3 text-emerald-400" /> Selected Active
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectTournamentType(type)}
+                              className="inline-flex items-center gap-1 text-[9px] font-sans font-black tracking-wider bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 px-2 py-1 rounded-full uppercase cursor-pointer transition-colors"
+                            >
+                              Set Active
+                            </button>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTournamentType(type)}
+                            className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                            title={`Delete "${type}"`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-bg-primary border border-rose-500/15 p-6 rounded-2xl flex flex-col items-center justify-center text-center py-12">
+            <Lock className="w-8 h-8 text-rose-500 mb-3 animate-pulse" />
+            <p className="text-xs font-sans font-black text-text-primary uppercase tracking-widest">Access Restricted</p>
+            <p className="text-[11px] text-text-muted font-sans font-medium mt-2 max-w-xs leading-relaxed">
+              Your currently logged-in role does not have authorization to modify the Tournament Types Master List.
+            </p>
+            {/* View only table of current types */}
+            <div className="mt-4 w-full max-w-md bg-bg-secondary rounded-xl border border-rose-500/5 overflow-hidden text-left">
+              <div className="py-2 px-3 bg-bg-tertiary text-[10px] font-sans font-black text-slate-400 uppercase tracking-widest border-b border-rose-500/5">
+                Current Registered Disciplines
+              </div>
+              <ul className="divide-y divide-rose-500/5">
+                {(config.tournamentTypes || ['Soccer', 'Snooker', 'Table Tennis']).map((type, i) => {
+                  const isSelected = type === (config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
+                  return (
+                    <li key={i} className="py-2 px-3 text-xs font-sans text-slate-300 font-medium flex items-center justify-between">
+                      <span>• {type}</span>
+                      {isSelected && (
+                        <span className="text-[8px] font-sans font-black tracking-widest bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 uppercase">
+                          Active
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

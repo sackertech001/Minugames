@@ -10,6 +10,7 @@ export interface Player {
   totalPoints: number; // Cumulative points scored across matches
   highestBreak: number; // Highest break in the tournament
   status: 'active' | 'eliminated' | 'champion' | 'runner_up' | 'third_place' | 'fourth_place';
+  tournamentType?: string;
 }
 
 export interface FrameScore {
@@ -92,6 +93,8 @@ export interface TournamentConfig {
     third: string;
     highestBreak?: string;
   };
+  tournamentTypes?: string[];
+  selectedTournamentType?: string;
 }
 
 export interface SystemUser {
@@ -121,6 +124,7 @@ export interface PlayerApplication {
   appliedAt: string;
   documentUrl?: string; // Base64 representation of PDF/PNG/JPEG document
   documentName?: string; // Name of the uploaded file
+  tournamentType?: string;
 }
 
 

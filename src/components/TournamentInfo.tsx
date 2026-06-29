@@ -122,7 +122,11 @@ export default function TournamentInfo({ config }: TournamentInfoProps) {
         <div className="space-y-4 font-sans text-xs text-slate-300 leading-relaxed">
           <div className="flex gap-2.5 items-start">
             <span className="text-rose-500 font-black text-base leading-none pt-0.5">•</span>
-            <p>All matches are strictly knockout (single elimination).</p>
+            <p>Interested players should pay the sum of <span className="text-rose-500 font-extrabold">30,000 naira</span> to <span className="text-white font-semibold">CLASS 46 LIMITED</span> (ACC No: <span className="text-rose-400 font-mono">8233375637</span>, MONIEPOINT)</p>
+          </div>
+          <div className="flex gap-2.5 items-start">
+            <span className="text-rose-500 font-black text-base leading-none pt-0.5">•</span>
+            <p>Click <span className="text-rose-500 font-extrabold">Apply Now</span>, fill information and upload proof of payment as verification document.</p>
           </div>
           <div className="flex gap-2.5 items-start">
             <span className="text-rose-500 font-black text-base leading-none pt-0.5">•</span>
@@ -135,10 +139,6 @@ export default function TournamentInfo({ config }: TournamentInfoProps) {
           <div className="flex gap-2.5 items-start">
             <span className="text-rose-500 font-black text-base leading-none pt-0.5">•</span>
             <p>Good sportsmanship is mandatory. Foul play or misconduct results in immediate disqualification.</p>
-          </div>
-          <div className="flex gap-2.5 items-start">
-            <span className="text-rose-500 font-black text-base leading-none pt-0.5">•</span>
-            <p>Matches are completed based on the default sets count (best of {config.setsToPlay || 3}) configured for this championship series.</p>
           </div>
         </div>
       </div>

@@ -31,6 +31,8 @@ interface TournamentState {
       third: string;
       highestBreak: string;
     };
+    tournamentTypes?: string[];
+    selectedTournamentType?: string;
   };
   systemUsers: any[];
   rolePermissions: any[];
@@ -281,10 +283,44 @@ async function startServer() {
               documentUrl: p.document_url || '',
               documentName: p.document_name || '',
               status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
-              appliedAt: p.created_at || p.applied_at || new Date().toISOString()
+              appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
+              tournamentType: p.tournament_type || ''
             }));
             cachedProfiles = mappedApps;
+
+            // Pick players that have approved/active status from profiles to populate state.players
+            const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+            const dbPlayers = dbProfiles
+              .filter((p: any) => approvedStatuses.includes(p.status))
+              .map((p: any) => ({
+                id: p.id,
+                name: p.full_name || 'Tournament Player',
+                nickname: p.nickname || '',
+                club: p.club || '',
+                seed: p.seed || 1,
+                photoUrl: p.photo_url || '',
+                matchesPlayed: p.matches_played || 0,
+                matchesWon: p.matches_won || 0,
+                totalPoints: p.total_points || 0,
+                highestBreak: p.highest_break || 0,
+                status: p.status === 'approved' ? 'active' : p.status,
+                tournamentType: p.tournament_type || ''
+              }))
+              .sort((a, b) => (a.seed || 0) - (b.seed || 0));
+
+            state.players = dbPlayers;
             lastSupabaseFetchTime = now;
+          }
+
+          const { data: dbTypes, error: typesError } = await supabase
+            .from('tournament_types')
+            .select('*');
+
+          if (!typesError && dbTypes && dbTypes.length > 0) {
+            const typesList = dbTypes.map((t: any) => t.name);
+            const activeType = dbTypes.find((t: any) => t.is_active)?.name || typesList[0] || 'Snooker';
+            state.tournamentConfig.tournamentTypes = typesList;
+            state.tournamentConfig.selectedTournamentType = activeType;
           }
         } catch (err: any) {
           console.error('[Supabase DB Sync Exception] Failed to fetch or merge profiles:', err?.message || err);
@@ -311,6 +347,57 @@ async function startServer() {
     const currentState = readState();
     const newState = { ...currentState, ...req.body };
     writeState(newState);
+
+    // If wipePlayersAndAuthUsers is true, wipe profiles and delete their corresponding auth.users
+    if (req.body.wipePlayersAndAuthUsers) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+
+          // 1. Fetch all profile IDs from profiles table first
+          const { data: dbProfiles, error: fetchErr } = await supabase
+            .from('profiles')
+            .select('id');
+
+          if (!fetchErr && dbProfiles && dbProfiles.length > 0) {
+            const ids = dbProfiles.map((p: any) => p.id);
+
+            // 2. Delete profiles table data first (only delete profiles table data first, as requested)
+            const { error: deleteProfilesErr } = await supabase
+              .from('profiles')
+              .delete()
+              .in('id', ids);
+
+            if (deleteProfilesErr) {
+              console.error('[Supabase Wipe Error] Failed to delete profiles:', deleteProfilesErr.message);
+            }
+
+            // 3. Delete corresponding auth.users data using service role / admin auth API
+            // Only those user IDs that were in the profiles table are touched
+            for (const id of ids) {
+              const { error: deleteAuthErr } = await supabase.auth.admin.deleteUser(id);
+              if (deleteAuthErr) {
+                console.error(`[Supabase Wipe Error] Failed to delete auth.user ${id}:`, deleteAuthErr.message);
+              }
+            }
+          }
+          lastSupabaseFetchTime = 0;
+        } catch (err: any) {
+          console.error('[Supabase Wipe Players Exception]:', err?.message || err);
+        }
+      }
+    }
 
     // If playerApplications are changed, sync statuses back to Supabase profiles
     if (req.body.playerApplications && Array.isArray(req.body.playerApplications)) {
@@ -342,6 +429,119 @@ async function startServer() {
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
           console.error('[Supabase Status Sync Exception]:', err?.message || err);
+        }
+      }
+    }
+
+    // If players list is changed, sync details and stats back to Supabase profiles
+    if (req.body.players && Array.isArray(req.body.players)) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+          for (const player of req.body.players) {
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({
+                status: player.status,
+                seed: player.seed,
+                matches_played: player.matchesPlayed,
+                matches_won: player.matchesWon,
+                total_points: player.totalPoints,
+                highest_break: player.highestBreak,
+              })
+              .eq('id', player.id);
+
+            if (updateError) {
+              console.error(`[Supabase Player Stats Sync Error] Failed to update stats for user ${player.id}:`, updateError.message);
+            }
+          }
+          lastSupabaseFetchTime = 0;
+        } catch (err: any) {
+          console.error('[Supabase Player Stats Sync Exception]:', err?.message || err);
+        }
+      }
+    }
+
+    // If tournamentConfig is changed, sync tournament types to Supabase
+    if (req.body.tournamentConfig) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+
+          const { tournamentTypes, selectedTournamentType } = req.body.tournamentConfig;
+          
+          if (Array.isArray(tournamentTypes)) {
+            // Get current types in Supabase
+            const { data: currentDbTypes, error: selectErr } = await supabase
+              .from('tournament_types')
+              .select('*');
+
+            if (!selectErr && currentDbTypes) {
+              const dbTypeNames = currentDbTypes.map((t: any) => t.name);
+
+              // Delete types that are no longer in the list
+              const toDelete = dbTypeNames.filter(name => !tournamentTypes.includes(name));
+              if (toDelete.length > 0) {
+                const { error: delErr } = await supabase
+                  .from('tournament_types')
+                  .delete()
+                  .in('name', toDelete);
+                if (delErr) console.error('[Supabase Type Sync Error] Failed to delete tournament types:', delErr.message);
+              }
+
+              // Insert or update remaining types
+              for (const type of tournamentTypes) {
+                const isActive = type === selectedTournamentType;
+                const { error: upsertErr } = await supabase
+                  .from('tournament_types')
+                  .upsert({
+                    name: type,
+                    is_active: isActive
+                  }, { onConflict: 'name' });
+                
+                if (upsertErr) console.error(`[Supabase Type Sync Error] Failed to upsert tournament type "${type}":`, upsertErr.message);
+              }
+            }
+          } else if (selectedTournamentType) {
+            // If only active type changed, update active states
+            const { error: resetErr } = await supabase
+              .from('tournament_types')
+              .update({ is_active: false })
+              .not('name', 'eq', selectedTournamentType);
+            
+            if (resetErr) console.error('[Supabase Type Sync Error] Failed to reset active states:', resetErr.message);
+
+            const { error: setErr } = await supabase
+              .from('tournament_types')
+              .update({ is_active: true })
+              .eq('name', selectedTournamentType);
+            
+            if (setErr) console.error(`[Supabase Type Sync Error] Failed to set active state for "${selectedTournamentType}":`, setErr.message);
+          }
+        } catch (err: any) {
+          console.error('[Supabase Tournament Types Sync Exception]:', err?.message || err);
         }
       }
     }
@@ -395,6 +595,7 @@ async function startServer() {
           photo_url: "", // omitted base64 to avoid Request body too large (max 1MB) error
           document_url: "", // omitted base64 to avoid Request body too large (max 1MB) error
           document_name: newApp.documentName || "",
+          tournament_type: newApp.tournamentType || "",
         };
 
         let targetUserId: string | null = null;
@@ -507,6 +708,7 @@ async function startServer() {
                   photo_url: finalPhotoUrl || "",
                   document_url: finalDocumentUrl || "",
                   document_name: newApp.documentName || "",
+                  tournament_type: newApp.tournamentType || "",
                 }
               });
               console.log('[Supabase Admin Sync]: Updated user auth metadata with new file URLs.');
@@ -530,6 +732,7 @@ async function startServer() {
               photo_url: finalPhotoUrl || null,
               document_url: finalDocumentUrl || null,
               document_name: newApp.documentName || null,
+              tournament_type: newApp.tournamentType || null,
               status: 'pending'
             });
 
