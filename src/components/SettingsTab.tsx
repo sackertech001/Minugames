@@ -334,41 +334,41 @@ export default function SettingsTab({
     <div className="space-y-8">
       {/* Dynamic Success Toast */}
       {successMsg && (
-        <div className="bg-emerald-500 text-white p-3.5 rounded-xl font-bold text-xs shadow-lg flex items-center gap-2 max-w-sm ml-auto border border-emerald-600 animate-in fade-in slide-in-from-top-4 duration-300">
-          ✓ {successMsg}
+        <div className="bg-[#05101E] text-emerald-400 p-4 rounded-xl font-sans font-black text-xs shadow-[0_0_20px_rgba(16,185,129,0.15)] flex items-center gap-2.5 max-w-sm ml-auto border border-emerald-500/30 animate-in fade-in slide-in-from-top-4 duration-300">
+          <span className="text-emerald-500">✓</span> {successMsg}
         </div>
       )}
 
       {/* 1. SESSION MANAGEMENT ROW */}
-      <div className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] rounded-2xl p-6 shadow-xl transition-colors duration-300">
+      <div className="bg-[#091A2E] border border-rose-500/15 rounded-2xl p-6 shadow-[0_0_15px_rgba(239,68,68,0.03)] transition-colors duration-300">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <h3 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider flex items-center gap-2">
-              <Shield className="w-5 h-5 text-[#D4AF37]" /> Access Management & Sessions
+          <div className="space-y-1.5">
+            <h3 className="font-sans font-black text-slate-100 text-sm uppercase tracking-[0.1em] flex items-center gap-2">
+              <Shield className="w-5 h-5 text-rose-500" /> Access Management & Sessions
             </h3>
-            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+            <p className="text-xs text-slate-400 font-sans font-medium">
               Control dashboard permissions. Referees, scorers, and admins must sign in using their PINs to edit tournament events.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             {currentUser ? (
-              <div className="flex items-center gap-3.5 bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] px-4.5 py-2.5 rounded-xl">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              <div className="flex items-center gap-3.5 bg-[#05101E] border border-rose-500/15 px-4.5 py-2.5 rounded-xl">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                 <div className="text-xs">
-                  <p className="font-bold text-slate-800 dark:text-[#E0E2E6]">Logged in: {currentUser.username}</p>
-                  <p className="text-[10px] text-slate-500 dark:text-[#9CA3AF] capitalize font-medium">Role: {currentUser.role}</p>
+                  <p className="font-sans font-black text-white">Logged in: {currentUser.username}</p>
+                  <p className="text-[10px] text-slate-400 capitalize font-bold font-sans tracking-wide">Role: {currentUser.role}</p>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/15 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                  className="bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/20 text-[10px] font-sans font-black px-3.5 py-1.5 rounded-lg transition-all cursor-pointer uppercase tracking-wider"
                 >
                   Log Out
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-2.5">
-                <span className="text-xs font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl uppercase tracking-wide">
+                <span className="text-xs font-sans font-black text-rose-500 bg-rose-500/5 border border-rose-500/20 px-4 py-2 rounded-xl uppercase tracking-widest">
                   Guest Browsing Mode
                 </span>
               </div>
@@ -378,10 +378,10 @@ export default function SettingsTab({
 
         {/* Login form if not logged in */}
         {!currentUser && (
-          <div className="mt-6 border-t border-slate-100 dark:border-[#2A2E37]/50 pt-5">
+          <div className="mt-6 border-t border-rose-500/10 pt-5">
             <form onSubmit={handleUserLogin} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end max-w-2xl">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1.5">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-sans font-black text-slate-400 uppercase tracking-widest">
                   Username
                 </label>
                 <input
@@ -389,11 +389,11 @@ export default function SettingsTab({
                   placeholder="e.g. admin"
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
-                  className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] placeholder-slate-400 dark:placeholder-slate-700 outline-none w-full transition-colors"
+                  className="bg-[#05101E] border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-600 outline-none w-full transition-all"
                 />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1.5">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-sans font-black text-slate-400 uppercase tracking-widest">
                   4-Digit PIN Code
                 </label>
                 <input
@@ -402,34 +402,34 @@ export default function SettingsTab({
                   maxLength={4}
                   value={loginPin}
                   onChange={(e) => setLoginPin(e.target.value)}
-                  className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] placeholder-slate-400 dark:placeholder-slate-700 outline-none w-full tracking-widest font-mono transition-colors"
+                  className="bg-[#05101E] border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-600 outline-none w-full tracking-widest font-sans font-bold transition-all"
                 />
               </div>
               <button
                 type="submit"
-                className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#0F1115] font-bold text-xs px-5 py-2.5 rounded-xl shadow-md border border-[#BFA032] transition-colors cursor-pointer w-full flex items-center justify-center gap-1.5"
+                className="bg-rose-500 hover:bg-rose-600 text-white font-sans font-black text-xs px-5 py-2.5 rounded-xl border border-rose-500/30 transition-all cursor-pointer w-full flex items-center justify-center gap-2 uppercase tracking-wider shadow-[0_0_12px_rgba(239,68,68,0.2)]"
               >
                 <Key className="w-4 h-4" /> Authenticate Session
               </button>
             </form>
             {loginError && (
-              <p className="text-red-500 font-bold text-[11px] mt-2.5">⚠ {loginError}</p>
+              <p className="text-rose-500 font-sans font-bold text-[11px] mt-3">⚠ {loginError}</p>
             )}
-            <p className="text-[10px] text-slate-400 dark:text-[#6B7280] mt-3">
-              * Note: Default Admin credentials are Username: <span className="font-semibold text-slate-600 dark:text-slate-300">admin</span> • PIN: <span className="font-semibold text-slate-600 dark:text-slate-300">1234</span>. Sign in to edit configs!
+            <p className="text-[10px] text-slate-500 font-sans font-medium mt-3.5">
+              * Note: Default Admin credentials are Username: <span className="font-bold text-slate-400">admin</span> • PIN: <span className="font-bold text-slate-400">1234</span>. Sign in to edit configs!
             </p>
           </div>
         )}
       </div>
 
       {/* PUBLIC PLAYER REGISTRATION LINK CARD */}
-      <div className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] rounded-2xl p-6 shadow-xl space-y-5 transition-colors duration-300">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-[#2A2E37]/50 pb-4">
-          <div className="space-y-1">
-            <h3 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider flex items-center gap-2">
-              <Link className="w-5 h-5 text-[#D4AF37]" /> Public Tournament Portal Link
+      <div className="bg-[#091A2E] border border-rose-500/15 rounded-2xl p-6 shadow-[0_0_15px_rgba(239,68,68,0.03)] space-y-5 transition-colors duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rose-500/10 pb-4">
+          <div className="space-y-1.5">
+            <h3 className="font-sans font-black text-slate-100 text-sm uppercase tracking-[0.1em] flex items-center gap-2">
+              <Link className="w-5 h-5 text-rose-500" /> Public Tournament Portal Link
             </h3>
-            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+            <p className="text-xs text-slate-400 font-sans font-medium">
               Generate a link to share with public so they can view tournament info, fixtures, and live results.
             </p>
           </div>
@@ -440,7 +440,7 @@ export default function SettingsTab({
               onUpdateConfig({ ...config, publicPortalToken: newToken });
               showTemporarySuccess('Portal link regenerated!');
             }}
-            className="text-[10px] font-bold text-[#D4AF37] hover:text-[#D4AF37]/80 uppercase tracking-widest cursor-pointer"
+            className="text-[10px] font-sans font-black text-rose-500 hover:text-rose-400 uppercase tracking-widest cursor-pointer"
           >
             Regenerate Link
           </button>
@@ -453,7 +453,7 @@ export default function SettingsTab({
                 type="text"
                 readOnly
                 value={`${window.location.origin}${window.location.pathname}?public=true&token=${config.publicPortalToken}`}
-                className="w-full bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] rounded-xl px-4 py-2.5 text-xs text-slate-600 dark:text-slate-300 font-mono select-all outline-none"
+                className="w-full bg-[#05101E] border border-rose-500/15 rounded-xl px-4 py-3 text-xs text-slate-300 font-sans font-bold select-all outline-none"
               />
             </div>
             
@@ -465,7 +465,7 @@ export default function SettingsTab({
                   navigator.clipboard.writeText(url);
                   showTemporarySuccess('Public link copied to clipboard!');
                 }}
-                className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#0F1115] text-[10px] font-bold py-2.5 px-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-sans font-black py-3 px-4 rounded-xl transition-all uppercase tracking-wider shadow-[0_0_12px_rgba(239,68,68,0.2)] flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Copy className="w-4 h-4" /> Copy
               </button>
@@ -473,7 +473,7 @@ export default function SettingsTab({
                 href={`${window.location.origin}${window.location.pathname}?public=true&token=${config.publicPortalToken}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-slate-100 hover:bg-slate-200 dark:bg-[#12151A] dark:hover:bg-[#1C1F26] border border-slate-200 dark:border-[#2A2E37] text-slate-700 dark:text-[#E0E2E6] text-xs font-bold p-2.5 rounded-xl transition-all flex items-center justify-center cursor-pointer"
+                className="bg-[#05101E] hover:bg-rose-500/10 border border-rose-500/15 text-slate-300 hover:text-rose-500 text-xs font-sans font-black p-3 rounded-xl transition-all flex items-center justify-center cursor-pointer"
                 title="Open public portal"
               >
                 <ExternalLink className="w-4 h-4" />
@@ -484,19 +484,19 @@ export default function SettingsTab({
       </div>
       
       {/* EXISTING PLAYER REGISTRATION CARD */}
-      <div className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] rounded-2xl p-6 shadow-xl space-y-5 transition-colors duration-300">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-[#2A2E37]/50 pb-4">
-          <div className="space-y-1">
-            <h3 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider flex items-center gap-2">
-              <Link className="w-5 h-5 text-[#D4AF37]" /> Public Player Registration Link
+      <div className="bg-[#091A2E] border border-rose-500/15 rounded-2xl p-6 shadow-[0_0_15px_rgba(239,68,68,0.03)] space-y-5 transition-colors duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rose-500/10 pb-4">
+          <div className="space-y-1.5">
+            <h3 className="font-sans font-black text-slate-100 text-sm uppercase tracking-[0.1em] flex items-center gap-2">
+              <Link className="w-5 h-5 text-rose-500" /> Public Player Registration Link
             </h3>
-            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+            <p className="text-xs text-slate-400 font-sans font-medium">
               Generate a secure link to share with snooker players so they can submit their applications online.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-widest font-mono">STATUS:</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-sans font-black text-slate-500 uppercase tracking-widest">STATUS:</span>
             <button
               type="button"
               disabled={!isConfigEditable}
@@ -507,12 +507,12 @@ export default function SettingsTab({
                 onPublicRegistrationEnabledChange?.(nextVal);
                 showTemporarySuccess(`Public registration link has been ${nextVal ? 'ENABLED' : 'DISABLED'}.`);
               }}
-              className={`px-3 py-1 text-[11px] font-extrabold rounded-full uppercase tracking-wider transition-all border shrink-0 ${
-                !isConfigEditable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+              className={`px-3.5 py-1.5 text-[11px] font-sans font-black rounded-full uppercase tracking-widest transition-all border shrink-0 ${
+                !isConfigEditable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
               } ${
                 publicRegEnabled
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/15'
-                  : 'bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/15'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15'
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/15'
               }`}
             >
               {publicRegEnabled ? '● Active' : '○ Inactive'}
@@ -527,7 +527,7 @@ export default function SettingsTab({
                 type="text"
                 readOnly
                 value={`${window.location.origin}${window.location.pathname}?apply=true&token=${config.registrationToken}`}
-                className="w-full bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] rounded-xl px-4 py-2.5 text-xs text-slate-600 dark:text-slate-300 font-mono select-all outline-none"
+                className="w-full bg-[#05101E] border border-rose-500/15 rounded-xl px-4 py-3 text-xs text-slate-300 font-sans font-bold select-all outline-none"
               />
             </div>
             
@@ -539,7 +539,7 @@ export default function SettingsTab({
                   onUpdateConfig({ ...config, registrationToken: newToken });
                   showTemporarySuccess('Registration link regenerated successfully.');
                 }}
-                className="bg-slate-800 dark:bg-[#2A2E37] hover:bg-slate-700 dark:hover:bg-[#3A3F4A] text-white text-[10px] font-bold py-2.5 px-3 rounded-xl transition-all shadow-md cursor-pointer"
+                className="bg-[#05101E] hover:bg-rose-500/10 border border-rose-500/15 text-rose-500 text-[10px] font-sans font-black py-3 px-4 rounded-xl transition-all uppercase tracking-wider cursor-pointer"
               >
                 Regenerate
               </button>
@@ -552,7 +552,7 @@ export default function SettingsTab({
                   setTimeout(() => setCopiedLink(false), 2000);
                   showTemporarySuccess('Registration link copied to clipboard!');
                 }}
-                className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#0F1115] text-[10px] font-bold py-2.5 px-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-sans font-black py-3 px-4 rounded-xl transition-all uppercase tracking-wider shadow-[0_0_12px_rgba(239,68,68,0.2)] flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {copiedLink ? (
                   <>
@@ -569,7 +569,7 @@ export default function SettingsTab({
                 href={`${window.location.origin}${window.location.pathname}?apply=true&token=${config.registrationToken}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-slate-100 hover:bg-slate-200 dark:bg-[#12151A] dark:hover:bg-[#1C1F26] border border-slate-200 dark:border-[#2A2E37] text-slate-700 dark:text-[#E0E2E6] text-xs font-bold p-2.5 rounded-xl transition-all flex items-center justify-center cursor-pointer"
+                className="bg-bg-primary hover:bg-rose-500/10 border border-rose-500/15 text-text-secondary hover:text-rose-500 text-xs font-sans font-black p-3 rounded-xl transition-all flex items-center justify-center cursor-pointer"
                 title="Open registration form preview"
               >
                 <ExternalLink className="w-4 h-4" />
@@ -577,14 +577,14 @@ export default function SettingsTab({
             </div>
           </div>
 
-          <div className="bg-slate-50 dark:bg-[#0F1115] p-4 rounded-xl border border-slate-150 dark:border-[#2A2E37]/50 text-xs text-slate-500 dark:text-[#9CA3AF] leading-relaxed space-y-2">
-            <p className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Info className="w-4 h-4 text-[#D4AF37]" /> Instructions for Organizers:
+          <div className="bg-bg-primary p-4.5 rounded-xl border border-rose-500/10 text-xs text-text-muted font-sans font-medium leading-relaxed space-y-2.5">
+            <p className="font-sans font-black text-text-primary flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+              <Info className="w-4 h-4 text-rose-500" /> Instructions for Organizers:
             </p>
-            <ul className="list-disc pl-5 space-y-1 text-[11px]">
-              <li>Copy and share the link above to WhatsApp groups, club flyers, or social media pages.</li>
-              <li>Players fill in their <span className="font-semibold text-slate-600 dark:text-slate-300">Full Name, Nickname, Photo, represent Club, and Phone/WhatsApp numbers</span>.</li>
-              <li>Go to the <span className="font-semibold text-[#D4AF37] hover:underline">Player Registration</span> tab, click <span className="font-semibold text-slate-600 dark:text-slate-300">Applications Register</span> to view submissions.</li>
+            <ul className="list-disc pl-5 space-y-1.5 text-[11px] text-text-muted font-sans font-bold">
+              <li>Copy and share the registration link above to WhatsApp groups, club flyers, or social media pages.</li>
+              <li>Players fill in their <span className="text-rose-500 font-sans font-black">Full Name, Nickname, Photo, represent Club, and Phone/WhatsApp numbers</span>.</li>
+              <li>Go to the <span className="text-rose-500 font-sans font-black hover:underline cursor-pointer">Player Registration</span> tab, click <span className="text-text-primary">Applications Register</span> to view submissions.</li>
               <li>Organizers can review applicants and assign them a specific available Seed Slot to sync them into the knockout bracket tree.</li>
             </ul>
           </div>
@@ -592,25 +592,25 @@ export default function SettingsTab({
       </div>
 
       {/* SYSTEM BRANDING & LOGO SETTINGS */}
-      <div className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] rounded-2xl p-6 shadow-xl space-y-5 transition-colors duration-300">
-        <div className="border-b border-slate-100 dark:border-[#2A2E37]/50 pb-4">
-          <h3 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider flex items-center gap-2">
-            <Settings className="w-5 h-5 text-[#D4AF37]" /> System Branding & Logo Settings
+      <div className="bg-bg-secondary border border-rose-500/10 dark:border-rose-500/15 rounded-2xl p-6 shadow-[0_0_15px_rgba(239,68,68,0.03)] space-y-5 transition-colors duration-300">
+        <div className="border-b border-rose-500/10 pb-4">
+          <h3 className="font-sans font-black text-text-primary text-sm uppercase tracking-[0.1em] flex items-center gap-2">
+            <Settings className="w-5 h-5 text-rose-500" /> System Branding & Logo Settings
           </h3>
-          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">
+          <p className="text-xs text-text-muted font-sans font-medium mt-0.5">
             Upload your organization's logo or custom championship banner. This will represent the official brand identity in the Public Player Application Portal.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
           {/* Logo Preview */}
-          <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] rounded-2xl h-40">
+          <div className="flex flex-col items-center justify-center p-4 bg-bg-primary border border-rose-500/15 rounded-2xl h-40">
             {logoUrl ? (
               <div className="relative group w-full h-full flex items-center justify-center">
                 <img
                   src={logoUrl}
                   alt="System Logo Preview"
-                  className="max-h-28 max-w-full object-contain rounded shadow-md border border-slate-300 dark:border-slate-800 p-1 bg-white dark:bg-[#12151A]"
+                  className="max-h-28 max-w-full object-contain rounded-lg shadow-md border border-rose-500/20 p-1.5 bg-bg-primary"
                   referrerPolicy="no-referrer"
                 />
                 {isConfigEditable && (
@@ -621,7 +621,7 @@ export default function SettingsTab({
                       onUpdateSystemLogo?.('');
                       showTemporarySuccess('System logo removed.');
                     }}
-                    className="absolute -top-1 -right-1 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-full shadow-lg transition-colors cursor-pointer"
+                    className="absolute -top-1 -right-1 bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded-full shadow-lg transition-colors cursor-pointer"
                     title="Remove custom logo"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -629,12 +629,12 @@ export default function SettingsTab({
                 )}
               </div>
             ) : (
-              <div className="text-center space-y-1.5 text-slate-400">
-                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-850 flex items-center justify-center mx-auto">
-                  <Award className="w-6 h-6 text-slate-400 dark:text-slate-600" />
+              <div className="text-center space-y-1.5 text-text-muted">
+                <div className="w-12 h-12 rounded-full bg-bg-tertiary border border-rose-500/10 flex items-center justify-center mx-auto">
+                  <Award className="w-6 h-6 text-rose-500/60" />
                 </div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-600">Default Logo</p>
-                <p className="text-[9px] text-slate-500">Championship Trophy</p>
+                <p className="text-[10px] font-sans font-black uppercase tracking-wider text-rose-500">Default Logo</p>
+                <p className="text-[9px] text-text-muted font-medium font-sans">Championship Trophy</p>
               </div>
             )}
           </div>
@@ -643,7 +643,7 @@ export default function SettingsTab({
           <div className="md:col-span-2">
             {isConfigEditable ? (
               <div className="space-y-3">
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider">
+                <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                   Upload Logo File
                 </label>
                 <div
@@ -655,10 +655,10 @@ export default function SettingsTab({
                     const file = e.dataTransfer.files[0];
                     if (file) handleLogoFile(file);
                   }}
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-2 ${
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-2.5 ${
                     isDragActive
-                      ? 'border-[#D4AF37] bg-[#D4AF37]/5'
-                      : 'border-slate-200 dark:border-[#2A2E37] hover:border-[#D4AF37]/50 hover:bg-slate-50/50 dark:hover:bg-[#12151A]/20'
+                      ? 'border-rose-500 bg-rose-500/5'
+                      : 'border-rose-500/15 hover:border-rose-500/30 hover:bg-rose-500/5'
                   }`}
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -672,25 +672,25 @@ export default function SettingsTab({
                       if (file) handleLogoFile(file);
                     }}
                   />
-                  <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[#D4AF37]">
+                  <div className="w-10 h-10 rounded-full bg-bg-primary border border-rose-500/15 flex items-center justify-center text-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.1)]">
                     <Upload className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <p className="text-xs font-sans font-bold text-text-primary">
                       Click to upload or drag & drop logo
                     </p>
-                    <p className="text-[9px] text-slate-400 dark:text-slate-600 mt-1">
+                    <p className="text-[10px] text-text-muted font-sans font-medium mt-1">
                       PNG, JPEG, SVG or WEBP • Max size 2MB
                     </p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="bg-slate-50 dark:bg-[#0F1115]/30 border border-slate-200 dark:border-[#2A2E37] p-4 rounded-xl flex items-start gap-3">
-                <Lock className="w-5 h-5 text-slate-400 shrink-0" />
-                <div className="text-xs">
-                  <p className="font-semibold text-slate-700 dark:text-[#E0E2E6]">Upload Disabled</p>
-                  <p className="text-slate-400 dark:text-[#6B7280] mt-0.5">
+              <div className="bg-bg-primary border border-rose-500/15 p-4 rounded-xl flex items-start gap-3">
+                <Lock className="w-5 h-5 text-rose-500 shrink-0" />
+                <div className="text-xs font-sans">
+                  <p className="font-sans font-black text-text-primary uppercase tracking-wider">Upload Disabled</p>
+                  <p className="text-text-muted font-sans font-medium mt-0.5">
                     Your currently logged-in account does not have permission to modify system branding or logos.
                   </p>
                 </div>
@@ -703,12 +703,12 @@ export default function SettingsTab({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
         {/* 2. TOURNAMENT DETAILS & PRIZES CONFIGURATION */}
-        <div className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] rounded-2xl p-6 shadow-xl space-y-6 transition-colors duration-300">
-          <div className="border-b border-slate-200 dark:border-[#2A2E37] pb-4">
-            <h4 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider flex items-center gap-2">
-              <Award className="w-5 h-5 text-[#D4AF37]" /> Edit Tournament & Prizes
+        <div className="bg-bg-secondary border border-rose-500/10 dark:border-rose-500/15 rounded-2xl p-6 shadow-[0_0_15px_rgba(239,68,68,0.03)] space-y-6 transition-colors duration-300">
+          <div className="border-b border-rose-500/10 pb-4">
+            <h4 className="font-sans font-black text-text-primary text-sm uppercase tracking-[0.1em] flex items-center gap-2">
+              <Award className="w-5 h-5 text-rose-500" /> Edit Tournament & Prizes
             </h4>
-            <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">
+            <p className="text-xs text-text-muted font-sans font-medium mt-0.5">
               Customize dates, venue, match sizing, and standard podium prize amounts.
             </p>
           </div>
@@ -716,73 +716,73 @@ export default function SettingsTab({
           {isConfigEditable ? (
             <form onSubmit={handleSaveTournamentSettings} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                     Tournament Name
                   </label>
                   <input
                     type="text"
                     value={tourneyName}
                     onChange={(e) => setTourneyName(e.target.value)}
-                    className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors font-semibold"
+                    className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                     Arena Venue Location
                   </label>
                   <input
                     type="text"
                     value={tourneyVenue}
                     onChange={(e) => setTourneyVenue(e.target.value)}
-                    className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors font-semibold"
+                    className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                     Start Date
                   </label>
                   <input
                     type="date"
                     value={tourneyStartDate}
                     onChange={(e) => setTourneyStartDate(e.target.value)}
-                    className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors [&::-webkit-calendar-picker-indicator]:invert-0 dark:[&::-webkit-calendar-picker-indicator]:invert"
+                    className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold [&::-webkit-calendar-picker-indicator]:invert-0 dark:[&::-webkit-calendar-picker-indicator]:invert"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                     End Date
                   </label>
                   <input
                     type="date"
                     value={tourneyEndDate}
                     onChange={(e) => setTourneyEndDate(e.target.value)}
-                    className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors [&::-webkit-calendar-picker-indicator]:invert-0 dark:[&::-webkit-calendar-picker-indicator]:invert"
+                    className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold [&::-webkit-calendar-picker-indicator]:invert-0 dark:[&::-webkit-calendar-picker-indicator]:invert"
                   />
                 </div>
               </div>
-              <div className="mt-4">
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                   Calculated Duration (Days)
                 </label>
                 <input
                   type="text"
                   readOnly
                   value={Math.max(1, Math.ceil((new Date(tourneyEndDate).getTime() - new Date(tourneyStartDate).getTime()) / (1000 * 60 * 60 * 24)) + 1) || 1}
-                  className="bg-slate-100 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-[#9CA3AF] w-full"
+                  className="bg-bg-primary border border-rose-500/10 rounded-xl px-3.5 py-2.5 text-xs text-text-muted w-full font-sans font-bold"
                 />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                   Tournament Format Type
                 </label>
                 <select
                   value={formatType}
                   onChange={(e) => setFormatType(e.target.value as 'knockout' | 'group')}
-                  className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors cursor-pointer"
+                  className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all cursor-pointer font-sans font-bold"
                 >
                   <option value="knockout">Knockout</option>
                   <option value="group">Group Stage</option>
@@ -791,43 +791,43 @@ export default function SettingsTab({
                   <button
                     type="button"
                     onClick={handleGenerateGroups}
-                    className="mt-2 w-full bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 text-[10px] font-bold py-2 rounded-xl transition-colors cursor-pointer"
+                    className="mt-2 w-full bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 border border-rose-500/25 text-[10px] font-sans font-black py-2 rounded-xl transition-all cursor-pointer uppercase tracking-wider"
                   >
                     Generate Groups
                   </button>
                 )}
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                   Tournament Format
                 </label>
                 <input
                   type="text"
                   value={tourneyFormat}
                   onChange={(e) => setTourneyFormat(e.target.value)}
-                  className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors font-semibold"
+                  className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                 />
               </div>
 
               {/* Tournament structure configs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-[#0F1115] p-3 rounded-xl border border-slate-200/50 dark:border-[#2A2E37]/50">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-bg-primary p-4.5 rounded-xl border border-rose-500/10">
                 {formatType === 'knockout' && (
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                       Bracket Size (Players)
                     </label>
                     <select
                       value={playersCount}
                       disabled={isTournamentStarted}
                       onChange={(e) => setPlayersCount(Number(e.target.value))}
-                      className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full cursor-pointer transition-colors"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full cursor-pointer transition-all font-sans font-bold"
                     >
                       <option value={8}>8 Players (Quarter Finals Start)</option>
                       <option value={16}>16 Players (Round of 16 Start)</option>
                       <option value={32}>32 Players (Round of 32 Start)</option>
                     </select>
                     {isTournamentStarted && (
-                      <span className="text-[9px] text-amber-500 font-bold block mt-1">
+                      <span className="text-[9px] text-rose-500 font-sans font-black block mt-1.5 uppercase tracking-wider">
                         🔒 Locked: Tournament has started
                       </span>
                     )}
@@ -835,46 +835,46 @@ export default function SettingsTab({
                 )}
                 {formatType === 'group' && (
                   <>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                         Number of Groups
                       </label>
                       <input
                         type="number"
                         value={numberOfGroups}
                         onChange={(e) => setNumberOfGroups(Number(e.target.value))}
-                        className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors"
+                        className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                         Teams per Group
                       </label>
                       <input
                         type="number"
                         value={teamsPerGroup}
                         onChange={(e) => setTeamsPerGroup(Number(e.target.value))}
-                        className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors"
+                        className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-2 col-span-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">Win Pts</label>
-                        <input type="number" value={winPoints} onChange={(e) => setWinPoints(Number(e.target.value))} className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors" />
+                    <div className="grid grid-cols-3 gap-2.5 col-span-2">
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">Win Pts</label>
+                        <input type="number" value={winPoints} onChange={(e) => setWinPoints(Number(e.target.value))} className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-2 py-2 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold text-center" />
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">Draw Pts</label>
-                        <input type="number" value={drawPoints} onChange={(e) => setDrawPoints(Number(e.target.value))} className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors" />
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">Draw Pts</label>
+                        <input type="number" value={drawPoints} onChange={(e) => setDrawPoints(Number(e.target.value))} className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-2 py-2 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold text-center" />
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">Loss Pts</label>
-                        <input type="number" value={lossPoints} onChange={(e) => setLossPoints(Number(e.target.value))} className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors" />
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">Loss Pts</label>
+                        <input type="number" value={lossPoints} onChange={(e) => setLossPoints(Number(e.target.value))} className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-2 py-2 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold text-center" />
                       </div>
                     </div>
                   </>
                 )}
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">
                     {formatType === 'group' ? 'Matches per Team in Group' : 'Sets to play per Match'}
                   </label>
                   {formatType === 'group' ? (
@@ -882,13 +882,13 @@ export default function SettingsTab({
                       type="number"
                       value={matchesPerTeamInGroup}
                       onChange={(e) => setMatchesPerTeamInGroup(Number(e.target.value))}
-                      className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   ) : (
                     <select
                       value={setsToPlay}
                       onChange={(e) => setSetsToPlay(Number(e.target.value))}
-                      className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full cursor-pointer transition-colors"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full cursor-pointer transition-all font-sans font-bold"
                     >
                       <option value={3}>Best of 3 Sets</option>
                       <option value={5}>Best of 5 Sets</option>
@@ -901,46 +901,46 @@ export default function SettingsTab({
               </div>
 
               {/* Prizes setup */}
-              <div className="space-y-3 pt-2">
-                <p className="text-[10px] font-extrabold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-wider">PODIUM PRIZES</p>
+              <div className="space-y-3.5 pt-2">
+                <p className="text-[10px] font-sans font-black text-rose-500 uppercase tracking-widest">PODIUM PRIZES</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       1st Place Champion
                     </label>
                     <input
                       type="text"
                       value={prize1}
                       onChange={(e) => setPrize1(e.target.value)}
-                      className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       2nd Place Runner-Up
                     </label>
                     <input
                       type="text"
                       value={prize2}
                       onChange={(e) => setPrize2(e.target.value)}
-                      className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       3rd Place Finish
                     </label>
                     <input
                       type="text"
                       value={prize3}
                       onChange={(e) => setPrize3(e.target.value)}
-                      className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       Highest Break Bonus
                     </label>
                     <input
@@ -948,26 +948,26 @@ export default function SettingsTab({
                       value={prizeBreak}
                       placeholder="e.g. ₦50,000"
                       onChange={(e) => setPrizeBreak(e.target.value)}
-                      className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="pt-3 flex justify-end">
+              <div className="pt-3.5 flex justify-end">
                 <button
                   type="submit"
-                  className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#0F1115] font-bold text-xs px-5 py-2.5 rounded-xl shadow-md border border-[#BFA032] transition-colors cursor-pointer"
+                  className="bg-rose-500 hover:bg-rose-600 text-white font-sans font-black text-xs px-6 py-3 rounded-xl border border-rose-500/30 transition-all cursor-pointer uppercase tracking-wider shadow-[0_0_12px_rgba(239,68,68,0.2)]"
                 >
                   Save Configuration
                 </button>
               </div>
             </form>
           ) : (
-            <div className="bg-slate-50 dark:bg-[#0F1115]/40 border border-slate-200 dark:border-[#2A2E37] p-6 rounded-2xl flex flex-col items-center justify-center text-center py-12">
-              <Lock className="w-8 h-8 text-[#D4AF37] mb-3" />
-              <p className="text-xs font-bold text-slate-700 dark:text-[#E0E2E6] uppercase tracking-wider">Access Restricted</p>
-              <p className="text-[11px] text-slate-400 dark:text-[#6B7280] mt-1.5 max-w-xs">
+            <div className="bg-bg-primary border border-rose-500/15 p-6 rounded-2xl flex flex-col items-center justify-center text-center py-12">
+              <Lock className="w-8 h-8 text-rose-500 mb-3" />
+              <p className="text-xs font-sans font-black text-text-primary uppercase tracking-widest">Access Restricted</p>
+              <p className="text-[11px] text-text-muted font-sans font-medium mt-2 max-w-xs leading-relaxed">
                 Your currently logged-in role does not have authorization to edit tournament details, brackets, sets, or prizes.
               </p>
             </div>
@@ -975,13 +975,13 @@ export default function SettingsTab({
         </div>
 
         {/* 3. RBAC USER SYSTEM PANEL */}
-        <div className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] rounded-2xl p-6 shadow-xl space-y-6 transition-colors duration-300">
-          <div className="border-b border-slate-200 dark:border-[#2A2E37] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-bg-secondary border border-rose-500/10 dark:border-rose-500/15 rounded-2xl p-6 shadow-[0_0_15px_rgba(239,68,68,0.03)] space-y-6 transition-colors duration-300">
+          <div className="border-b border-rose-500/10 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h4 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-[#D4AF37]" /> RBAC System User Management
+              <h4 className="font-sans font-black text-text-primary text-sm uppercase tracking-[0.1em] flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-rose-500" /> RBAC System User Management
               </h4>
-              <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">
+              <p className="text-xs text-text-muted font-sans font-medium mt-0.5">
                 Add and manage accounts directly inside the system. Generate 4-digit PIN access.
               </p>
             </div>
@@ -990,13 +990,13 @@ export default function SettingsTab({
           {isUserMgmtAllowed ? (
             <div className="space-y-6">
               {/* Form to add user */}
-              <form onSubmit={handleAddUser} className="bg-slate-50 dark:bg-[#0F1115]/30 p-4 rounded-xl border border-slate-200 dark:border-[#2A2E37] space-y-3.5">
-                <span className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
-                  <UserPlus className="w-4 h-4 text-[#D4AF37]" /> Create New System User
+              <form onSubmit={handleAddUser} className="bg-bg-primary p-4.5 rounded-xl border border-rose-500/10 space-y-3.5">
+                <span className="text-[10px] font-sans font-black text-rose-500 uppercase tracking-widest flex items-center gap-1.5">
+                  <UserPlus className="w-4 h-4 text-rose-500" /> Create New System User
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       Username
                     </label>
                     <input
@@ -1004,17 +1004,17 @@ export default function SettingsTab({
                       placeholder="e.g. john_ref"
                       value={newUsername}
                       onChange={(e) => setNewUsername(e.target.value)}
-                      className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors font-medium"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3 py-2 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                  <div className="space-y-1.5">
+                                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       System Role
                     </label>
                     <select
                       value={newRole}
                       onChange={(e) => setNewRole(e.target.value)}
-                      className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2 py-1.5 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full cursor-pointer transition-colors font-medium"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3 py-2 text-xs text-text-primary outline-none w-full cursor-pointer transition-all font-sans font-bold"
                     >
                       {rolePermissions.map((rp) => (
                         <option key={rp.role} value={rp.role}>
@@ -1023,8 +1023,8 @@ export default function SettingsTab({
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       4-Digit PIN Code
                     </label>
                     <input
@@ -1033,19 +1033,19 @@ export default function SettingsTab({
                       maxLength={4}
                       value={newPin}
                       onChange={(e) => setNewPin(e.target.value)}
-                      className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full tracking-widest font-mono transition-colors"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3 py-2 text-xs text-text-primary outline-none w-full tracking-widest font-sans font-bold transition-all"
                     />
                   </div>
                 </div>
 
                 {userError && (
-                  <p className="text-red-500 font-bold text-[10px]">⚠ {userError}</p>
+                  <p className="text-rose-500 font-sans font-bold text-[10px]">⚠ {userError}</p>
                 )}
 
                 <div className="flex justify-end pt-1">
                   <button
                     type="submit"
-                    className="bg-[#D4AF37]/15 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#0F1115] border border-[#D4AF37]/35 font-bold text-xs px-4 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                    className="bg-rose-500 hover:bg-rose-600 text-white font-sans font-black text-xs px-4 py-2 rounded-xl border border-rose-500/30 transition-all cursor-pointer flex items-center gap-1 uppercase tracking-wider shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                   >
                     + Add New User
                   </button>
@@ -1053,62 +1053,62 @@ export default function SettingsTab({
               </form>
 
               {/* Active Users Table list */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider">Registered Accounts list</span>
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">Registered Accounts list</span>
                 
-                <div className="border border-slate-200 dark:border-[#2A2E37] rounded-xl overflow-hidden">
+                <div className="border border-rose-500/15 rounded-xl overflow-hidden bg-bg-primary">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-[11px]">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-[#12151A] border-b border-slate-200 dark:border-[#2A2E37] text-slate-400 dark:text-[#6B7280] font-bold uppercase tracking-wider">
-                          <th className="py-2.5 px-3">Username</th>
-                          <th className="py-2.5 px-3">Role</th>
-                          <th className="py-2.5 px-3 text-center">PIN Code</th>
-                          <th className="py-2.5 px-3 text-right">Actions</th>
+                        <tr className="bg-bg-primary border-b border-rose-500/15 text-text-muted font-sans font-black uppercase tracking-widest">
+                          <th className="py-3 px-3">Username</th>
+                          <th className="py-3 px-3">Role</th>
+                          <th className="py-3 px-3 text-center">PIN Code</th>
+                          <th className="py-3 px-3 text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-[#2A2E37]/40 text-slate-600 dark:text-[#9CA3AF]">
+                      <tbody className="divide-y divide-rose-500/10 text-text-secondary">
                         {users.map((u) => {
                           const isShowingPin = !!showPins[u.id];
                           const hasCustomBadge = !['Admin', 'Referee', 'Scorer', 'Player'].includes(u.role);
                           return (
-                            <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-[#12151A]/30 transition-colors">
-                              <td className="py-2 px-3 font-bold text-slate-800 dark:text-[#E0E2E6]">
+                            <tr key={u.id} className="hover:bg-rose-500/5 transition-all">
+                              <td className="py-2.5 px-3 font-sans font-bold text-text-primary">
                                 {u.username}
                               </td>
-                              <td className="py-2 px-3">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                              <td className="py-2.5 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-black uppercase tracking-wider ${
                                   u.role === 'Admin' 
-                                    ? 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/15'
+                                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/15'
                                     : u.role === 'Referee'
-                                    ? 'bg-blue-500/10 text-blue-500 dark:text-blue-400'
+                                    ? 'bg-sky-500/10 text-sky-400 border border-sky-500/15'
                                     : u.role === 'Scorer'
-                                    ? 'bg-emerald-500/10 text-emerald-500'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15'
                                     : hasCustomBadge
-                                    ? 'bg-purple-500/10 text-purple-500 dark:text-purple-400 border border-purple-500/15'
-                                    : 'bg-slate-100 dark:bg-[#0F1115] text-slate-500 dark:text-slate-400'
+                                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/15'
+                                    : 'bg-bg-primary border border-rose-500/10 text-text-muted'
                                 }`}>
                                   {u.role}
                                 </span>
                               </td>
-                              <td className="py-2 px-3 text-center font-mono font-bold text-slate-700 dark:text-[#E0E2E6]">
+                              <td className="py-2.5 px-3 text-center font-sans font-bold text-text-primary">
                                 <div className="flex items-center justify-center gap-1.5">
                                   <span>{isShowingPin ? u.pin : '••••'}</span>
                                   <button
                                     type="button"
                                     onClick={() => togglePinVisibility(u.id)}
-                                    className="p-1 hover:bg-slate-100 dark:hover:bg-[#12151A] rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                                    className="p-1 hover:bg-bg-secondary rounded text-text-muted hover:text-rose-500 transition-colors cursor-pointer"
                                     title="Show/Hide PIN"
                                   >
                                     {isShowingPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                                   </button>
                                 </div>
                               </td>
-                              <td className="py-2 px-3 text-right">
+                              <td className="py-2.5 px-3 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
                                     onClick={() => handleGeneratePin(u.id)}
-                                    className="bg-[#D4AF37]/10 hover:bg-[#D4AF37]/25 text-[#D4AF37] text-[10px] font-bold px-2 py-1 rounded transition-colors cursor-pointer"
+                                    className="bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 border border-rose-500/20 text-[10px] font-sans font-black px-2.5 py-1 rounded transition-all cursor-pointer uppercase tracking-wider"
                                     title="Generate new PIN if user forgot"
                                   >
                                     New PIN
@@ -1116,7 +1116,7 @@ export default function SettingsTab({
                                   {u.username !== 'admin' && (
                                     <button
                                       onClick={() => handleDeleteUser(u.id)}
-                                      className="p-1 text-red-500 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
+                                      className="p-1 text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
                                       title="Remove User"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -1134,20 +1134,20 @@ export default function SettingsTab({
               </div>
 
               {/* Role-Based Access Control Permissions Matrix */}
-              <div className="space-y-4 pt-5 border-t border-slate-200 dark:border-[#2A2E37]/50">
+              <div className="space-y-4 pt-5 border-t border-rose-500/10">
                 <div>
-                  <h5 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <Shield className="w-4 h-4 text-[#D4AF37]" /> Dynamic Role Permissions Matrix
+                  <h5 className="font-sans font-black text-text-primary text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-rose-500" /> Dynamic Role Permissions Matrix
                   </h5>
-                  <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] mt-0.5">
+                  <p className="text-[11px] text-text-muted font-sans font-medium mt-0.5">
                     Define and toggle exactly what screens, tabs, and administrative capabilities are granted to each system role.
                   </p>
                 </div>
 
                 {/* Form to create a custom role */}
-                <form onSubmit={handleAddCustomRole} className="bg-slate-50 dark:bg-[#0F1115]/30 p-3.5 rounded-xl border border-slate-200 dark:border-[#2A2E37] flex flex-col sm:flex-row items-end gap-3 max-w-xl">
+                <form onSubmit={handleAddCustomRole} className="bg-bg-primary p-3.5 rounded-xl border border-rose-500/10 flex flex-col sm:flex-row items-end gap-3 max-w-xl">
                   <div className="flex-1 w-full">
-                    <label className="block text-[9px] font-extrabold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mb-1">
+                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest mb-1">
                       Create Custom Role Name
                     </label>
                     <input
@@ -1155,33 +1155,33 @@ export default function SettingsTab({
                       placeholder="e.g. Owner, Game Admin, Tech Support"
                       value={customRoleName}
                       onChange={(e) => setCustomRoleName(e.target.value)}
-                      className="bg-white dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-[#E0E2E6] outline-none w-full transition-colors font-medium"
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3 py-2 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="bg-[#D4AF37]/15 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#0F1115] border border-[#D4AF37]/35 font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0 w-full sm:w-auto justify-center"
+                    className="bg-rose-500 hover:bg-rose-600 text-white border border-rose-500/30 font-sans font-black text-xs px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-center uppercase tracking-wider shadow-[0_0_8px_rgba(239,68,68,0.15)]"
                   >
                     <Plus className="w-3.5 h-3.5" /> Create Role
                   </button>
                 </form>
                 {roleError && (
-                  <p className="text-red-500 font-semibold text-[10px] mt-1">⚠ {roleError}</p>
+                  <p className="text-rose-500 font-sans font-bold text-[10px] mt-1">⚠ {roleError}</p>
                 )}
 
                 {/* Matrix Table */}
-                <div className="border border-slate-200 dark:border-[#2A2E37] rounded-xl overflow-hidden shadow-sm">
+                <div className="border border-rose-500/15 rounded-xl overflow-hidden bg-bg-primary shadow-sm">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-[11px]">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-[#12151A] border-b border-slate-200 dark:border-[#2A2E37] text-slate-400 dark:text-[#6B7280] font-bold uppercase tracking-wider">
-                          <th className="py-2.5 px-3">System Role</th>
-                          <th className="py-2.5 px-3 text-center">Allowed Screen Tabs</th>
-                          <th className="py-2.5 px-3 text-center">Allowed Operations</th>
-                          <th className="py-2.5 px-3 text-right">Delete</th>
+                        <tr className="bg-bg-primary border-b border-rose-500/15 text-text-muted font-sans font-black uppercase tracking-widest">
+                          <th className="py-3 px-3">System Role</th>
+                          <th className="py-3 px-3 text-center">Allowed Screen Tabs</th>
+                          <th className="py-3 px-3 text-center">Allowed Operations</th>
+                          <th className="py-3 px-3 text-right">Delete</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-[#2A2E37]/40 text-slate-600 dark:text-[#9CA3AF]">
+                      <tbody className="divide-y divide-rose-500/10 text-text-secondary">
                         {rolePermissions.map((rp) => {
                           const tabs = [
                             { id: 'dashboard', label: 'Dashboard' },
@@ -1200,29 +1200,29 @@ export default function SettingsTab({
                           ];
 
                           return (
-                            <tr key={rp.role} className="hover:bg-slate-50 dark:hover:bg-[#12151A]/30 transition-colors">
-                              <td className="py-3.5 px-3 font-bold text-slate-800 dark:text-[#E0E2E6] align-top">
+                            <tr key={rp.role} className="hover:bg-rose-500/5 transition-all">
+                              <td className="py-3.5 px-3 font-sans font-bold text-text-primary align-top">
                                 <span className="block">{rp.role}</span>
-                                <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal">
+                                <span className="text-[9px] text-text-muted font-sans font-bold uppercase tracking-wider block mt-1">
                                   {rp.role === 'Admin' ? '★ Master Role (Locked)' : 'Configurable'}
                                 </span>
                               </td>
                               
                               {/* Tabs Allowed check cells */}
                               <td className="py-3.5 px-3 align-top">
-                                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 max-w-xs mx-auto">
+                                <div className="grid grid-cols-2 gap-x-2.5 gap-y-1.5 max-w-xs mx-auto">
                                   {tabs.map((t) => {
                                     const isChecked = rp.allowedTabs.includes(t.id);
                                     return (
-                                      <label key={t.id} className="flex items-center gap-1.5 cursor-pointer text-[10px] hover:text-slate-900 hover:dark:text-white transition-colors">
+                                      <label key={t.id} className="flex items-center gap-1.5 cursor-pointer text-[10px] hover:text-text-primary transition-colors">
                                         <input
                                           type="checkbox"
                                           checked={isChecked}
                                           disabled={rp.role === 'Admin'} // Admin is completely locked
                                           onChange={() => handleToggleTabPermission(rp.role, t.id)}
-                                          className="rounded border-slate-300 dark:border-[#2A2E37] text-[#D4AF37] focus:ring-[#D4AF37] w-3 h-3 cursor-pointer"
+                                          className="rounded border-rose-500/15 text-rose-500 focus:ring-rose-500 w-3 h-3 cursor-pointer accent-rose-500"
                                         />
-                                        <span className={isChecked ? 'font-semibold text-[#D4AF37]' : ''}>
+                                        <span className={isChecked ? 'font-sans font-black text-rose-400' : 'font-sans font-medium text-text-muted'}>
                                           {t.label}
                                         </span>
                                       </label>
@@ -1233,19 +1233,19 @@ export default function SettingsTab({
 
                               {/* Actions Allowed check cells */}
                               <td className="py-3.5 px-3 align-top">
-                                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 max-w-sm mx-auto">
+                                <div className="grid grid-cols-2 gap-x-2.5 gap-y-1.5 max-w-sm mx-auto">
                                   {actions.map((a) => {
                                     const isChecked = rp.allowedActions.includes(a.id);
                                     return (
-                                      <label key={a.id} className="flex items-center gap-1.5 cursor-pointer text-[10px] hover:text-slate-900 hover:dark:text-white transition-colors">
+                                      <label key={a.id} className="flex items-center gap-1.5 cursor-pointer text-[10px] hover:text-text-primary transition-colors">
                                         <input
                                           type="checkbox"
                                           checked={isChecked}
                                           disabled={rp.role === 'Admin'} // Admin is completely locked
                                           onChange={() => handleToggleActionPermission(rp.role, a.id)}
-                                          className="rounded border-slate-300 dark:border-[#2A2E37] text-[#D4AF37] focus:ring-[#D4AF37] w-3 h-3 cursor-pointer"
+                                          className="rounded border-rose-500/15 text-rose-500 focus:ring-rose-500 w-3 h-3 cursor-pointer accent-rose-500"
                                         />
-                                        <span className={isChecked ? 'font-semibold text-[#D4AF37]' : ''}>
+                                        <span className={isChecked ? 'font-sans font-black text-rose-400' : 'font-sans font-medium text-text-muted'}>
                                           {a.label}
                                         </span>
                                       </label>
@@ -1258,13 +1258,13 @@ export default function SettingsTab({
                                 {!['Admin', 'Owner', 'Referee', 'Scorer', 'Player'].includes(rp.role) ? (
                                   <button
                                     onClick={() => handleDeleteRole(rp.role)}
-                                    className="p-1 text-red-500 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
+                                    className="p-1 text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
                                     title={`Delete custom role "${rp.role}"`}
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 ) : (
-                                  <span className="text-[9px] text-slate-400 dark:text-slate-500 font-mono italic">System</span>
+                                  <span className="text-[9px] text-text-muted font-sans font-black uppercase tracking-widest">System</span>
                                 )}
                               </td>
                             </tr>
@@ -1277,10 +1277,10 @@ export default function SettingsTab({
               </div>
             </div>
           ) : (
-            <div className="bg-slate-50 dark:bg-[#0F1115]/40 border border-slate-200 dark:border-[#2A2E37] p-6 rounded-2xl flex flex-col items-center justify-center text-center py-12">
-              <Lock className="w-8 h-8 text-[#D4AF37] mb-3 animate-pulse" />
-              <p className="text-xs font-bold text-slate-700 dark:text-[#E0E2E6] uppercase tracking-wider">Access Restricted</p>
-              <p className="text-[11px] text-slate-400 dark:text-[#6B7280] mt-1.5 max-w-xs">
+            <div className="bg-bg-primary border border-rose-500/15 p-6 rounded-2xl flex flex-col items-center justify-center text-center py-12">
+              <Lock className="w-8 h-8 text-rose-500 mb-3 animate-pulse" />
+              <p className="text-xs font-sans font-black text-text-primary uppercase tracking-widest">Access Restricted</p>
+              <p className="text-[11px] text-text-muted font-sans font-medium mt-2 max-w-xs leading-relaxed">
                 The Role-Based User Management (RBAC) panel is restricted. Your currently logged-in role does not have authorization to view, create users, or edit security permissions.
               </p>
             </div>

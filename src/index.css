@@ -1,5 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&family=Oswald:wght@400;500;600&family=Rajdhani:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&family=Oswald:wght@400;500;600&family=Rajdhani:wght@400;500;600;700&family=Herr+Von+Muellerhoff&family=Alex+Brush&family=Montserrat:wght@900&display=swap');
 @import "tailwindcss";
+
+:root {
+  --bg-primary: #F2F4F7;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E8EBF0;
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #627288;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(239, 68, 68, 0.12);
+}
+
+.dark {
+  --bg-primary: #05101E;
+  --bg-secondary: #091A2E;
+  --bg-tertiary: #0D2642;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #8E9BAE;
+  --glass-bg: rgba(9, 26, 46, 0.95);
+  --glass-border: rgba(239, 68, 68, 0.2);
+}
 
 @theme {
   --font-sans: "Inter", sans-serif;
@@ -7,27 +29,40 @@
   --font-team: "Oswald", sans-serif;
   --font-data: "Rajdhani", sans-serif;
   
-  --color-bg-primary: #0a0a0a;
-  --color-bg-secondary: #121212;
-  --color-bg-tertiary: #1f1f1f;
-  --color-accent-green: #39FF14;
-  --color-accent-gold: #FFD700;
-  --color-text-primary: #FFFFFF;
-  --color-text-secondary: #E0E0E0;
-  --color-text-muted: #A0A0A0;
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  /* Make primary rose/red colors darker for enhanced readability and premium feel in light & dark modes */
+  --color-rose-300: #f43f5e;
+  --color-rose-400: #e11d48;
+  --color-rose-500: #be123c;
+  --color-rose-600: #9f1239;
+  --color-rose-700: #881337;
+
+  --color-red-300: #ef4444;
+  --color-red-400: #dc2626;
+  --color-red-500: #b91c1c;
+  --color-red-600: #991b1b;
+  --color-red-700: #7f1d1d;
 }
 
 html, body {
-  background-color: var(--color-bg-primary);
-  color: var(--color-text-primary);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: var(--font-sans);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 /* Custom Premium Stadium Theme Styles */
@@ -62,6 +97,28 @@ html, body {
 .glow-amber {
   box-shadow: 0 0 15px rgba(212, 175, 55, 0.35);
   border-color: rgba(212, 175, 55, 0.6);
+}
+
+.glow-red {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.glow-gold {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.metallic-text {
+  background: linear-gradient(135deg, #ffffff 30%, #a1a1aa 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.metallic-red {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Stadium Button Hover States */

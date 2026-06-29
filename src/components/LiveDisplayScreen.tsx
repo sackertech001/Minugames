@@ -29,7 +29,7 @@ function ShieldBadge({ color, photoUrl, seed }: { color: 'blue' | 'red'; photoUr
 
   return (
     <div className={`relative w-20 h-24 bg-gradient-to-b from-slate-200 via-slate-400 to-slate-600 p-[3px] rounded-b-[40%] rounded-t-lg shrink-0 flex items-center justify-center ${glowColor}`}>
-      <div className="w-full h-full bg-[#070D19] rounded-b-[38%] rounded-t-md overflow-hidden relative flex flex-col justify-center items-center">
+      <div className="w-full h-full bg-[#05101E] rounded-b-[38%] rounded-t-md overflow-hidden relative flex flex-col justify-center items-center">
         {/* Striped Background */}
         <div className="absolute inset-0 flex justify-center gap-1 opacity-30 pointer-events-none">
           <div className={`w-3.5 h-full ${stripeColor}`} />
@@ -60,7 +60,7 @@ function ShieldBadge({ color, photoUrl, seed }: { color: 'blue' | 'red'; photoUr
 
         {/* Seed indicator at the bottom */}
         {seed !== undefined && (
-          <span className="absolute bottom-1 bg-[#050C18]/90 border border-slate-600 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded text-[#D4AF37] z-10">
+          <span className="absolute bottom-1 bg-[#091A2E]/90 border border-slate-600 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded text-[#D4AF37] z-10">
             S{seed}
           </span>
         )}
@@ -144,7 +144,7 @@ function SportLiveScoreboard({ activeMatch, actP1, actP2 }: SportLiveScoreboardP
 
       {/* Top Center Live Indicator Capsule */}
       <div className="flex justify-center mb-6 relative z-10">
-        <div className="bg-[#050C18] border border-cyan-500/20 rounded-full px-5 py-1.5 flex items-center gap-3 shadow-inner">
+        <div className="bg-[#05101E] border border-cyan-500/20 rounded-full px-5 py-1.5 flex items-center gap-3 shadow-inner">
           <div className="flex items-center gap-1.5 bg-red-600 px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-widest uppercase text-white animate-pulse">
             LIVE
           </div>
@@ -372,20 +372,20 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
 
   if (isMaximized) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col justify-between p-6 md:p-8 select-none animate-in fade-in duration-300 overflow-y-auto">
+      <div className="fixed inset-0 z-50 bg-[#05101E] text-slate-100 flex flex-col justify-between p-6 md:p-8 select-none animate-in fade-in duration-300 overflow-y-auto">
         {/* Background glow effects */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-radial-gradient from-[#D4AF37]/5 via-transparent to-transparent pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-radial-gradient from-red-500/5 via-transparent to-transparent pointer-events-none"></div>
 
         {/* Top Header Row */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-4 shrink-0 z-10">
+        <div className="flex items-center justify-between border-b border-rose-500/15 pb-4 shrink-0 z-10">
           <div className="flex items-center gap-3">
             <Tv className="w-6 h-6 text-[#D4AF37] animate-pulse" />
             <div>
-              <h1 className="text-base md:text-xl font-serif font-bold text-slate-100 tracking-wider uppercase">
+              <h1 className="text-base md:text-xl font-sans font-black text-slate-100 tracking-[0.12em] uppercase">
                 Arena Broadcast Mode
               </h1>
-              <p className="text-[10px] text-slate-500 font-mono">
+              <p className="text-[9px] text-rose-500/80 font-sans tracking-widest font-black uppercase mt-0.5">
                 {liveMatches.length > 0 
                   ? `AUTOPLAY ACTIVE • CYCLING ${liveMatches.length} LIVE TABLES` 
                   : 'STANDBY FEED • AWAITING LIVE TABLES'}
@@ -395,15 +395,15 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
 
           <div className="flex items-center gap-4">
             {liveMatches.length > 0 && (
-              <span className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold font-mono text-red-500 bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/25 uppercase tracking-wider">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+              <span className="hidden sm:flex items-center gap-1.5 text-[9px] font-sans font-black text-rose-500 bg-rose-500/10 px-3.5 py-1.5 rounded-xl border border-rose-500/20 uppercase tracking-widest">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
                 Live Broadcast Feed
               </span>
             )}
 
             <button
               onClick={() => setIsMaximized(false)}
-              className="bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-[#D4AF37]/50 text-slate-200 font-bold text-xs py-2 px-4 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer z-10"
+              className="bg-[#091A2E] hover:bg-[#0D2642] border border-rose-500/15 hover:border-rose-500/30 text-slate-200 font-sans font-black uppercase tracking-wider text-[10px] py-2 px-4 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer z-10"
             >
               <Minimize2 className="w-4 h-4 text-[#D4AF37]" /> Minimize Board
             </button>
@@ -437,14 +437,14 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
         <div className="space-y-4 shrink-0 z-10">
           {/* Autoplay & Control Bar */}
           {liveMatches.length > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 bg-slate-900/60 border border-slate-800 px-6 py-2.5 rounded-2xl max-w-lg mx-auto">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 bg-[#091A2E]/80 border border-rose-500/15 px-6 py-2.5 rounded-2xl max-w-lg mx-auto shadow-lg shadow-black/20">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
                     setLiveIndex((prev) => (prev - 1 + liveMatches.length) % liveMatches.length);
                     setIsAutoplayPaused(true);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-[#D4AF37] bg-slate-950 border border-slate-800 hover:border-[#D4AF37]/50 rounded-lg transition-all cursor-pointer"
+                  className="p-1.5 text-slate-400 hover:text-[#D4AF37] bg-[#05101E] border border-rose-500/15 hover:border-rose-500/30 rounded-lg transition-all cursor-pointer"
                   title="Previous Table"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -452,7 +452,7 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
 
                 <button
                   onClick={() => setIsAutoplayPaused(!isAutoplayPaused)}
-                  className="px-3 py-1.5 font-mono text-[10px] font-bold rounded-lg flex items-center gap-1.5 transition-all bg-[#D4AF37]/10 border border-[#D4AF37]/35 text-[#D4AF37] hover:bg-[#D4AF37]/25 cursor-pointer"
+                  className="px-3 py-1.5 font-sans text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1.5 transition-all bg-[#D4AF37]/10 border border-[#D4AF37]/35 text-[#D4AF37] hover:bg-[#D4AF37]/25 cursor-pointer"
                 >
                   {isAutoplayPaused ? (
                     <>
@@ -470,7 +470,7 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
                     setLiveIndex((prev) => (prev + 1) % liveMatches.length);
                     setIsAutoplayPaused(true);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-[#D4AF37] bg-slate-950 border border-slate-800 hover:border-[#D4AF37]/50 rounded-lg transition-all cursor-pointer"
+                  className="p-1.5 text-slate-400 hover:text-[#D4AF37] bg-[#05101E] border border-rose-500/15 hover:border-rose-500/30 rounded-lg transition-all cursor-pointer"
                   title="Next Table"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -489,7 +489,7 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
                     className={`h-2 rounded-full transition-all cursor-pointer ${
                       liveIndex % liveMatches.length === idx 
                         ? 'w-5 bg-[#D4AF37]' 
-                        : 'w-2 bg-slate-800 hover:bg-slate-700'
+                        : 'w-2 bg-[#05101E] hover:bg-[#0D2642] border border-rose-500/10'
                     }`}
                     title={`Switch to Table ${m.id}`}
                   />
@@ -500,9 +500,9 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
 
           {/* Marquee ticker */}
           {!showOnlyScoreboard && (
-            <div className="bg-slate-950 border border-slate-900 rounded-xl p-2.5 overflow-hidden text-center max-w-2xl mx-auto">
-              <div className="inline-flex items-center gap-4 animate-pulse text-[10px] font-mono text-slate-500">
-                <span className="text-[#D4AF37] font-bold">🔴 BROADCAST STATION ACTIVE</span>
+            <div className="bg-[#05101E] border border-rose-500/15 rounded-xl p-2.5 overflow-hidden text-center max-w-2xl mx-auto shadow-inner">
+              <div className="inline-flex items-center gap-4 animate-pulse text-[9px] font-sans font-black tracking-widest text-slate-400 uppercase">
+                <span className="text-[#D4AF37]">🔴 BROADCAST STATION ACTIVE</span>
                 <span>•</span>
                 <span>TOP SCORER: {topScoringPlayer ? `${topScoringPlayer.name} (${topScoringPlayer.totalPoints} PTS)` : 'NONE'}</span>
                 <span>•</span>
@@ -521,10 +521,10 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
   return (
     <div className="space-y-8">
       {!showOnlyScoreboard && liveMatches.length > 0 && (
-        <div className="bg-slate-900/45 dark:bg-black/20 border border-slate-200 dark:border-[#2A2E37] rounded-2xl p-4 space-y-3.5 shadow-sm">
+        <div className="bg-[#091A2E] border border-rose-500/15 rounded-2xl p-5 space-y-4 shadow-[0_0_20px_rgba(239,68,68,0.05)]">
           {/* ... Live Matches Arena Bar content */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <span className="text-xs font-bold text-slate-800 dark:text-[#E0E2E6] uppercase tracking-wider flex items-center gap-2">
+            <span className="text-xs font-sans font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
@@ -538,14 +538,14 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
                     setLiveIndex((prev) => (prev - 1 + liveMatches.length) % liveMatches.length);
                     setIsAutoplayPaused(true);
                   }}
-                  className="px-2 py-1 text-xs font-bold text-slate-500 hover:text-[#D4AF37] dark:text-slate-400 bg-white dark:bg-[#1A1D23] hover:dark:bg-[#15181F] border border-slate-200 dark:border-[#2A2E37] rounded-lg cursor-pointer transition-all shadow-sm"
+                  className="px-3 py-1.5 text-[10px] font-sans font-black uppercase tracking-wider text-slate-300 hover:text-[#D4AF37] bg-[#05101E] border border-rose-500/15 hover:border-rose-500/30 rounded-xl cursor-pointer transition-all shadow-sm"
                   title="Previous Live Match"
                 >
                   ◀ Prev
                 </button>
                 <button
                   onClick={() => setIsAutoplayPaused(!isAutoplayPaused)}
-                  className="px-3 py-1 text-xs font-bold rounded-lg bg-[#D4AF37]/10 hover:bg-[#D4AF37]/25 border border-[#D4AF37]/35 text-[#D4AF37] cursor-pointer transition-all shadow-sm"
+                  className="px-4 py-1.5 text-[10px] font-sans font-black uppercase tracking-wider rounded-xl bg-[#D4AF37]/10 hover:bg-[#D4AF37]/25 border border-[#D4AF37]/45 text-[#D4AF37] cursor-pointer transition-all shadow-sm"
                 >
                   {isAutoplayPaused ? '▶ Resume Autoplay' : '⏸ Pause Autoplay'}
                 </button>
@@ -554,7 +554,7 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
                     setLiveIndex((prev) => (prev + 1) % liveMatches.length);
                     setIsAutoplayPaused(true);
                   }}
-                  className="px-2 py-1 text-xs font-bold text-slate-500 hover:text-[#D4AF37] dark:text-slate-400 bg-white dark:bg-[#1A1D23] hover:dark:bg-[#15181F] border border-slate-200 dark:border-[#2A2E37] rounded-lg cursor-pointer transition-all shadow-sm"
+                  className="px-3 py-1.5 text-[10px] font-sans font-black uppercase tracking-wider text-slate-300 hover:text-[#D4AF37] bg-[#05101E] border border-rose-500/15 hover:border-rose-500/30 rounded-xl cursor-pointer transition-all shadow-sm"
                   title="Next Live Match"
                 >
                   Next ▶
@@ -576,27 +576,27 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
                     setLiveIndex(index);
                     setIsAutoplayPaused(true);
                   }}
-                  className={`flex items-center gap-3.5 px-4 py-2.5 rounded-xl border text-left shrink-0 transition-all cursor-pointer ${
+                  className={`flex items-center gap-3.5 px-4.5 py-3 rounded-xl border text-left shrink-0 transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-slate-100 ring-2 ring-[#D4AF37]/15'
-                      : 'bg-white dark:bg-[#1A1D23] border-slate-200 dark:border-[#2A2E37] text-slate-500 dark:text-[#9CA3AF] hover:border-[#D4AF37]/50 hover:text-slate-800 hover:dark:text-[#E0E2E6]'
+                      ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-white ring-2 ring-[#D4AF37]/25 shadow-[0_0_15px_rgba(212,175,55,0.12)]'
+                      : 'bg-[#05101E] border-rose-500/10 hover:border-rose-500/30 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <span className="text-[9px] font-mono font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded border border-[#D4AF37]/20 shrink-0">
+                  <span className="text-[9px] font-sans font-black text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded border border-[#D4AF37]/25 shrink-0 uppercase tracking-wider">
                     {m.id}
                   </span>
-                  <div className="text-[11px] font-medium font-serif min-w-[130px]">
+                  <div className="text-[11px] font-sans font-black min-w-[130px] uppercase tracking-wider">
                     <div className="flex justify-between items-center gap-4">
-                      <span className={`truncate max-w-[85px] ${isActive ? 'text-slate-800 dark:text-white font-bold' : 'text-slate-600 dark:text-[#9CA3AF]'}`}>
+                      <span className={`truncate max-w-[85px] ${isActive ? 'text-white font-black' : 'text-slate-400 font-bold'}`}>
                         {p1Local?.name.split(' ').slice(-1)[0] || 'P1'}
                       </span>
-                      <span className="font-mono font-bold text-[#D4AF37]">{m.score1 ?? 0}</span>
+                      <span className="text-[#D4AF37]">{m.score1 ?? 0}</span>
                     </div>
                     <div className="flex justify-between items-center mt-0.5 gap-4">
-                      <span className={`truncate max-w-[85px] ${isActive ? 'text-slate-800 dark:text-white font-bold' : 'text-slate-600 dark:text-[#9CA3AF]'}`}>
+                      <span className={`truncate max-w-[85px] ${isActive ? 'text-white font-black' : 'text-slate-400 font-bold'}`}>
                         {p2Local?.name.split(' ').slice(-1)[0] || 'P2'}
                       </span>
-                      <span className="font-mono font-bold text-[#D4AF37]">{m.score2 ?? 0}</span>
+                      <span className="text-[#D4AF37]">{m.score2 ?? 0}</span>
                     </div>
                   </div>
                 </button>
@@ -609,17 +609,17 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
       {/* Broadcast Banner / Arena Board */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-xs font-extrabold uppercase tracking-widest text-[#D4AF37] flex items-center gap-2">
+          <div className="text-xs font-sans font-black uppercase tracking-[0.12em] text-[#D4AF37] flex items-center gap-2">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
             </span>
             {liveMatches.length > 0 ? `Live Started Match (${liveIndex + 1} of ${liveMatches.length})` : 'CLASS 46 SNOOKER CHAMPIONSHIP Broadcast Feed'}
           </div>
           
           <button
             onClick={() => setIsMaximized(true)}
-            className="bg-white hover:bg-slate-50 dark:bg-[#1A1D23] dark:hover:bg-[#15181F] border border-slate-200 dark:border-[#2A2E37] hover:border-[#D4AF37]/50 text-slate-700 dark:text-[#E0E2E6] font-bold text-xs py-1.5 px-3.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="bg-[#091A2E] hover:bg-[#0D2642] border border-rose-500/15 hover:border-rose-500/30 text-slate-200 font-sans font-black uppercase tracking-wider text-[10px] py-2 px-4 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
           >
             <Maximize2 className="w-3.5 h-3.5 text-[#D4AF37]" /> Maximize Screen
           </button>
@@ -630,7 +630,7 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
             <SportLiveScoreboard activeMatch={activeMatch} actP1={actP1} actP2={actP2} />
           </div>
         ) : (
-          <div className="bg-slate-900 dark:bg-[#0F1115] border border-slate-800 rounded-2xl p-10 text-center text-slate-400 shadow-xl">
+          <div className="bg-[#091A2E] border border-rose-500/15 rounded-2xl p-10 text-center text-slate-400 shadow-xl">
             <Tv className="w-8 h-8 text-[#D4AF37] mx-auto mb-3 opacity-40 animate-pulse" />
             No active snooker matches at the moment. Commence a match to display live broadcast data.
           </div>

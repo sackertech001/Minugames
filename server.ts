@@ -3,6 +3,9 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const PORT = 3000;
 const DATA_FILE = path.join(process.cwd(), "data.json");
@@ -214,6 +217,27 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: "15mb" }));
 
+  // Log Supabase configuration on boot
+  console.log("\n=======================================================");
+  console.log("   SNOOKER CHAMPIONSHIP BACKEND INITIALIZATION");
+  console.log("=======================================================");
+  const bootSupabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const bootServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+  const bootSupabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+  console.log(`- Supabase URL:       ${bootSupabaseUrl && bootSupabaseUrl !== "YOUR_SUPABASE_URL" ? `FOUND (${bootSupabaseUrl})` : "❌ NOT FOUND"}`);
+  console.log(`- Service Role Key:   ${bootServiceRoleKey && bootServiceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY" ? "FOUND (Secret Masked)" : "❌ NOT FOUND"}`);
+  console.log(`- Anon/Public Key:    ${bootSupabaseAnonKey && bootSupabaseAnonKey !== "YOUR_SUPABASE_ANON_KEY" ? "FOUND (Secret Masked)" : "❌ NOT FOUND"}`);
+
+  if (!bootSupabaseUrl || bootSupabaseUrl === "YOUR_SUPABASE_URL") {
+    console.warn("⚠️  WARNING: Supabase connection will be SKIPPED! Set VITE_SUPABASE_URL / SUPABASE_URL.");
+  } else if (!bootServiceRoleKey || bootServiceRoleKey === "YOUR_SUPABASE_SERVICE_ROLE_KEY") {
+    console.warn("⚠️  WARNING: No service role key found. Server will run in read-only / limited public signup fallback mode!");
+  } else {
+    console.log("✅ SUCCESS: Backend has fully-authorized Admin Service Role access to Supabase.");
+  }
+  console.log("=======================================================\n");
+
   let lastSupabaseFetchTime = 0;
   let cachedProfiles: any[] = [];
 
@@ -337,6 +361,9 @@ async function startServer() {
       appliedAt: new Date().toISOString()
     };
 
+    let supabaseSyncStatus = "skipped";
+    let supabaseSyncError: string | null = null;
+
     // Try registering in Supabase from the server side to trigger the SQL profiles trigger
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
@@ -347,6 +374,7 @@ async function startServer() {
 
     if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
       try {
+        supabaseSyncStatus = useServiceRole ? "active_service_role" : "active_anon_fallback";
         console.log(`[Supabase Sync] Attempting registration for ${newApp.fullName} (${newApp.email || "no-email"}) using ${useServiceRole ? 'Service Role (Admin)' : 'Anon Key (Signup)'}`);
         const supabase = createClient(supabaseUrl, activeKey, {
           auth: {
@@ -506,17 +534,25 @@ async function startServer() {
             });
 
           if (upsertError) {
+            supabaseSyncStatus = "warning_profiles_upsert_failed";
+            supabaseSyncError = upsertError.message;
             console.error('[Supabase DB Sync Error]: Direct profiles upsert failed:', upsertError.message);
           } else {
+            supabaseSyncStatus = "success";
             console.log('[Supabase DB Sync Success]: Successfully upserted player profile directly.');
           }
         } else {
+          supabaseSyncStatus = "warning_no_target_user_id";
+          supabaseSyncError = "Could not create or find target user ID in Supabase Auth.";
           console.warn('[Supabase Sync Warning] Could not determine target UUID for file upload and profile upsert.');
         }
       } catch (err: any) {
+        supabaseSyncStatus = "error";
+        supabaseSyncError = err?.message || String(err);
         console.error('[Supabase Sync Exception]:', err?.message || err);
       }
     } else {
+      supabaseSyncStatus = "skipped_missing_credentials";
       console.log('[Supabase Sync] Skipped. Supabase keys not set or using placeholder values.');
     }
 
@@ -527,7 +563,12 @@ async function startServer() {
     // Invalidate Supabase cache so the next GET reflects the new profile instantly
     lastSupabaseFetchTime = 0;
 
-    res.json({ success: true, application: newApp });
+    res.json({
+      success: true,
+      application: newApp,
+      supabaseSyncStatus,
+      supabaseSyncError
+    });
   });
 
   // Serve Vite or static files

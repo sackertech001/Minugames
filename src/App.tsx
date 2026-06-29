@@ -13,6 +13,7 @@ import {
   Tv,
   Info,
   Calendar,
+  MapPin,
   Sparkles,
   RefreshCw,
   Award,
@@ -169,14 +170,38 @@ export default function App() {
   };
 
   const saveStateToServer = async (patch: any) => {
+    let succeeded = false;
     try {
-      await fetch('/api/state', {
+      const res = await fetch('/api/state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch)
       });
+      if (res.ok) {
+        succeeded = true;
+      }
     } catch (e) {
       console.warn('Could not sync state to server:', e);
+    }
+
+    // Direct Client-side Supabase updates if server API is unavailable/404 and Supabase is configured
+    if (!succeeded) {
+      const supabase = getSupabase();
+      if (supabase && patch.playerApplications && Array.isArray(patch.playerApplications)) {
+        try {
+          for (const app of patch.playerApplications) {
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ status: app.status })
+              .eq('id', app.id);
+            if (updateError) {
+              console.error(`[Client Supabase DB Update Error] Failed to update profile status for ${app.id}:`, updateError.message);
+            }
+          }
+        } catch (err: any) {
+          console.error('[Client Supabase Status Sync Exception]:', err?.message || err);
+        }
+      }
     }
   };
 
@@ -325,9 +350,11 @@ export default function App() {
     };
 
     const pollSync = async () => {
+      let apiSucceeded = false;
       try {
         const res = await fetch('/api/state');
         if (res.ok) {
+          apiSucceeded = true;
           const data = await res.json();
           
           setPlayers((prev) => {
@@ -468,6 +495,45 @@ export default function App() {
             }
             return prev;
           });
+        }
+
+        // Direct Client-side Supabase fetch fallback if API failed and Supabase is configured
+        if (!apiSucceeded) {
+          const supabase = getSupabase();
+          if (supabase) {
+            try {
+              const { data: dbProfiles, error: fetchError } = await supabase
+                .from('profiles')
+                .select('*');
+
+              if (!fetchError && dbProfiles) {
+                const mappedApps = dbProfiles.map((p: any) => ({
+                  id: p.id,
+                  fullName: p.full_name || '',
+                  nickname: p.nickname || '',
+                  club: p.club || '',
+                  phoneNumber: p.phone_number || '',
+                  whatsappNumber: p.whatsapp_number || '',
+                  socialMediaPage: p.social_media_page || '',
+                  photoUrl: p.photo_url || '',
+                  documentUrl: p.document_url || '',
+                  documentName: p.document_name || '',
+                  status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
+                  appliedAt: p.created_at || p.applied_at || new Date().toISOString()
+                }));
+
+                setPlayerApplications((prev) => {
+                  if (JSON.stringify(prev) !== JSON.stringify(mappedApps)) {
+                    safeStorage.setItem('snooker_player_applications', JSON.stringify(mappedApps));
+                    return mappedApps;
+                  }
+                  return prev;
+                });
+              }
+            } catch (dbErr) {
+              console.error('[Client Supabase DB Sync Exception]:', dbErr);
+            }
+          }
         }
 
         const savedReg = safeStorage.getItem('snooker_public_registration_enabled');
@@ -1073,14 +1139,14 @@ export default function App() {
   if (isApplyMode) {
     if (!publicRegistrationEnabled) {
       return (
-        <div className="min-h-screen bg-[#0F1115] text-slate-100 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-[#1A1D23] border border-red-500/20 rounded-2xl p-8 text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+        <div className="min-h-screen bg-bg-primary text-text-primary flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-bg-secondary border border-rose-500/20 rounded-2xl p-8 text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
             <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-500">
               <AlertCircle className="w-8 h-8" />
             </div>
             <div className="space-y-2">
               <h2 className="font-serif font-bold text-xl uppercase tracking-wider">Registration Closed</h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-text-muted">
                 The public player registration portal for <span className="text-[#D4AF37] font-semibold">{tournamentConfig.tournamentName}</span> is currently closed or has concluded.
               </p>
             </div>
@@ -1089,7 +1155,7 @@ export default function App() {
                 onClick={() => {
                   window.location.search = '';
                 }}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs py-3 rounded-xl transition-all border border-slate-700 cursor-pointer"
+                className="w-full bg-bg-tertiary hover:bg-bg-primary text-text-secondary hover:text-text-primary font-bold text-xs py-3 rounded-xl transition-all border border-rose-500/10 cursor-pointer"
               >
                 Go to Tournament Dashboard
               </button>
@@ -1100,6 +1166,7 @@ export default function App() {
     }
 
     const handleSubmitApplication = async (app: Omit<PlayerApplication, 'id' | 'status' | 'appliedAt'>) => {
+      let isSyncedWithSupabase = false;
       try {
         const res = await fetch('/api/applications', {
           method: 'POST',
@@ -1107,6 +1174,7 @@ export default function App() {
           body: JSON.stringify(app)
         });
         if (res.ok) {
+          isSyncedWithSupabase = true;
           // Trigger instant page refresh/sync
           try {
             const syncRes = await fetch('/api/state');
@@ -1121,7 +1189,165 @@ export default function App() {
         console.error('Failed to submit application to server, using local fallback:', e);
       }
 
-      // Fallback
+      // If server submission failed (404/Netlify/Offline) and client-side Supabase is configured
+      const supabase = getSupabase();
+      if (!isSyncedWithSupabase && supabase) {
+        try {
+          // Generate a unique dummy email for this registration record
+          const cleanName = app.fullName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'player';
+          const userEmail = app.email || `${cleanName}-${Date.now()}@example.com`;
+          const userPassword = `PlayerPass123_Secure!`;
+
+          console.log('[Client Supabase Sync] Registering user:', userEmail);
+
+          // 1. Sign up the user via Supabase Auth
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: userEmail,
+            password: userPassword,
+            options: {
+              data: {
+                full_name: app.fullName || "",
+                nickname: app.nickname || "",
+                club: app.club || "",
+                phone_number: app.phoneNumber || "",
+                whatsapp_number: app.whatsappNumber || "",
+                social_media_page: app.socialMediaPage || "",
+                document_name: app.documentName || "",
+              }
+            }
+          });
+
+          if (signUpError) {
+            console.error('[Client Supabase SignUp Error]:', signUpError.message);
+          }
+
+          const targetUserId = signUpData?.user?.id;
+          if (targetUserId) {
+            let finalPhotoUrl = app.photoUrl;
+            let finalDocumentUrl = app.documentUrl;
+
+            // Helper to convert base64 to Blob
+            const base64ToBlob = (base64String: string) => {
+              if (!base64String || !base64String.startsWith('data:')) return null;
+              const parts = base64String.split(',');
+              if (parts.length < 2) return null;
+              const metadata = parts[0];
+              const base64Data = parts[1];
+              const contentTypeMatch = metadata.match(/data:([^;]+);/);
+              const contentType = contentTypeMatch ? contentTypeMatch[1] : 'application/octet-stream';
+              
+              let binary: string;
+              if (metadata.includes('base64')) {
+                binary = atob(base64Data);
+              } else {
+                binary = decodeURIComponent(base64Data);
+              }
+              const len = binary.length;
+              const buffer = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                buffer[i] = binary.charCodeAt(i);
+              }
+              return { blob: new Blob([buffer], { type: contentType }), contentType };
+            };
+
+            // Upload photo to Supabase storage if it's base64 data
+            if (app.photoUrl && app.photoUrl.startsWith('data:')) {
+              try {
+                const fileRes = base64ToBlob(app.photoUrl);
+                if (fileRes) {
+                  const ext = fileRes.contentType.split('/')[1] || 'png';
+                  const fileName = `${targetUserId}_photo_${Date.now()}.${ext}`;
+                  const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('player photos')
+                    .upload(fileName, fileRes.blob, { contentType: fileRes.contentType, upsert: true });
+
+                  if (uploadError) {
+                    console.error('[Client Supabase Photo Upload Error]:', uploadError.message);
+                  } else if (uploadData) {
+                    const { data: { publicUrl } } = supabase.storage.from('player photos').getPublicUrl(fileName);
+                    finalPhotoUrl = publicUrl;
+                  }
+                }
+              } catch (photoErr) {
+                console.error('[Client Supabase Photo Upload Exception]:', photoErr);
+              }
+            }
+
+            // Upload verification document to Supabase storage if it's base64 data
+            if (app.documentUrl && app.documentUrl.startsWith('data:')) {
+              try {
+                const fileRes = base64ToBlob(app.documentUrl);
+                if (fileRes) {
+                  const ext = app.documentName?.split('.').pop() || fileRes.contentType.split('/')[1] || 'pdf';
+                  const fileName = `${targetUserId}_document_${Date.now()}.${ext}`;
+                  const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('player documents')
+                    .upload(fileName, fileRes.blob, { contentType: fileRes.contentType, upsert: true });
+
+                  if (uploadError) {
+                    console.error('[Client Supabase Document Upload Error]:', uploadError.message);
+                  } else if (uploadData) {
+                    const { data: { publicUrl } } = supabase.storage.from('player documents').getPublicUrl(fileName);
+                    finalDocumentUrl = publicUrl;
+                  }
+                }
+              } catch (docErr) {
+                console.error('[Client Supabase Document Upload Exception]:', docErr);
+              }
+            }
+
+            // Direct profile table upsert with the storage URLs
+            const { error: upsertError } = await supabase
+              .from('profiles')
+              .upsert({
+                id: targetUserId,
+                full_name: app.fullName || "",
+                nickname: app.nickname || null,
+                club: app.club || null,
+                phone_number: app.phoneNumber || null,
+                whatsapp_number: app.whatsappNumber || null,
+                social_media_page: app.socialMediaPage || null,
+                photo_url: finalPhotoUrl || null,
+                document_url: finalDocumentUrl || null,
+                document_name: app.documentName || null,
+                status: 'pending'
+              });
+
+            if (upsertError) {
+              console.error('[Client Supabase profiles upsert error]:', upsertError.message);
+            } else {
+              console.log('[Client Supabase Sync Success] Application fully registered and synced.');
+              isSyncedWithSupabase = true;
+
+              // Force update frontend profiles list instantly
+              const { data: dbProfiles } = await supabase.from('profiles').select('*');
+              if (dbProfiles) {
+                const mappedApps = dbProfiles.map((p: any) => ({
+                  id: p.id,
+                  fullName: p.full_name || '',
+                  nickname: p.nickname || '',
+                  club: p.club || '',
+                  phoneNumber: p.phone_number || '',
+                  whatsappNumber: p.whatsapp_number || '',
+                  socialMediaPage: p.social_media_page || '',
+                  photoUrl: p.photo_url || '',
+                  documentUrl: p.document_url || '',
+                  documentName: p.document_name || '',
+                  status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
+                  appliedAt: p.created_at || p.applied_at || new Date().toISOString()
+                }));
+                setPlayerApplications(mappedApps);
+                safeStorage.setItem('snooker_player_applications', JSON.stringify(mappedApps));
+                return;
+              }
+            }
+          }
+        } catch (err: any) {
+          console.error('[Client Supabase Sync Exception]:', err?.message || err);
+        }
+      }
+
+      // Local Fallback
       const newApp: PlayerApplication = {
         ...app,
         id: `app-${Date.now()}`,
@@ -1171,51 +1397,74 @@ export default function App() {
       
       <div className="flex-1 ml-72">
         {/* Premium Luxury Header Bar */}
-        <header className="bg-white/95 dark:bg-[#15181F]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#2A2E37] py-6 px-4 md:px-8 sticky top-0 z-30 shadow-sm dark:shadow-lg dark:shadow-black/40 transition-colors duration-300">
+        <header className="bg-bg-secondary border-b border-rose-500/15 py-4 px-4 md:px-8 sticky top-0 z-30 shadow-[0_0_20px_rgba(239,68,68,0.05)] transition-colors duration-300">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           
           {/* Logo & Headline */}
           <div className="flex items-center gap-4">
-            {systemLogo ? (
-              <img
-                src={systemLogo}
-                alt="System Logo"
-                className="w-11 h-11 object-contain rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 bg-white dark:bg-[#1A1D23] shrink-0"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(212,175,55,0.3)] shrink-0">
-                <div className="w-3 h-3 bg-white rounded-full"></div>
-              </div>
-            )}
+            <div className="relative w-12 h-14 shrink-0">
+              <svg viewBox="0 0 100 115" className="w-full h-full drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]">
+                {/* Shield Outer border */}
+                <path d="M 50,5 L 85,20 C 85,60 70,95 50,110 C 30,95 15,60 15,20 Z" fill="var(--bg-secondary)" stroke="#EF4444" strokeWidth="3" />
+                <path d="M 50,10 L 80,24 C 80,58 67,90 50,103 C 33,90 20,58 20,24 Z" fill="none" stroke="#EF4444" strokeWidth="1.5" opacity="0.4" />
+                
+                {/* Crown on top */}
+                <path d="M 35,32 L 40,24 L 50,30 L 60,24 L 65,32 Z" fill="#F59E0B" />
+                <circle cx="35" cy="32" r="1.5" fill="#F59E0B" />
+                <circle cx="40" cy="24" r="1.5" fill="#F59E0B" />
+                <circle cx="50" cy="30" r="1.5" fill="#F59E0B" />
+                <circle cx="60" cy="24" r="1.5" fill="#F59E0B" />
+                <circle cx="65" cy="32" r="1.5" fill="#F59E0B" />
+
+                {/* Central Red Glowing Circle */}
+                <circle cx="50" cy="55" r="16" fill="var(--bg-primary)" stroke="#EF4444" strokeWidth="2" />
+                <text x="50" y="60" textAnchor="middle" fill="#EF4444" fontSize="15" fontWeight="900" fontFamily="sans-serif">46</text>
+              </svg>
+            </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-serif font-bold text-lg md:text-xl text-[#1E293B] dark:text-[#E0E2E6] tracking-tight uppercase">
-                  {tournamentConfig.tournamentName.split(' ').slice(0, -1).join(' ')}<span className="text-[#D4AF37]"> {tournamentConfig.tournamentName.split(' ').slice(-1)}</span>
-                </h1>
-                <span className="text-[10px] font-bold font-mono bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-0.5 rounded border border-[#D4AF37]/20">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-sans font-black text-rose-500 tracking-[0.2em] uppercase">
+                    CLASS 46
+                  </span>
+                  <h1 className="font-sans font-black text-lg md:text-xl text-text-primary tracking-[0.05em] uppercase">
+                    SNOOKER CHAMPIONSHIP
+                  </h1>
+                </div>
+                <span className="text-[9px] font-sans font-extrabold bg-rose-500/10 text-rose-500 px-2.5 py-0.5 rounded-full border border-rose-500/20 uppercase tracking-widest">
                   {tournamentConfig.playersCount} PLAYERS
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5 font-medium">
-                {tournamentConfig.dateRange} • Venue:{' '}
-                <span className="text-[#D4AF37] font-bold uppercase">{tournamentConfig.venue}</span>
-              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-muted mt-1 font-medium">
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-rose-500" />
+                  {tournamentConfig.dateRange}
+                </span>
+                <span className="text-rose-500/30">|</span>
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                  Venue: <span className="text-text-primary font-black uppercase">{tournamentConfig.venue}</span>
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Quick Actions (Simulation, resets, theme toggle) */}
-          <div className="flex items-center gap-3.5 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             {/* User Session Info & Log Out */}
             {currentUser && (
-              <div className="flex items-center gap-2.5 bg-slate-100 dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] px-3.5 py-1.5 rounded-xl text-xs shadow-sm transition-all">
-                <div className="flex flex-col text-left">
-                  <span className="font-bold text-slate-700 dark:text-[#E0E2E6]">{currentUser.username}</span>
-                  <span className="text-[9px] text-[#D4AF37] uppercase font-mono tracking-wider font-extrabold">{currentUser.role}</span>
+              <div className="flex items-center gap-3 bg-bg-primary border border-rose-500/20 px-4 py-1.5 rounded-xl text-xs shadow-[0_0_15px_rgba(225,29,72,0.05)] transition-all">
+                <div className="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                  <span className="text-rose-500 font-bold text-xs">👤</span>
                 </div>
+                <div className="flex flex-col text-left leading-tight pr-1">
+                  <span className="font-black text-text-primary">{currentUser.username}</span>
+                  <span className="text-[9px] text-rose-500 uppercase tracking-widest font-black">{currentUser.role}</span>
+                </div>
+                <div className="h-6 w-[1px] bg-rose-500/15" />
                 <button
                   onClick={() => handleLogin(null)}
-                  className="p-1.5 rounded-lg text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
                   title="Sign Out / Lock Session"
                 >
                   <LogOut className="w-4 h-4" />
@@ -1227,7 +1476,7 @@ export default function App() {
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               id="theme-toggle"
-              className="flex items-center justify-center p-2.5 rounded-xl bg-slate-100 dark:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] text-slate-700 dark:text-[#D4AF37] hover:bg-slate-200 dark:hover:bg-[#12151A] transition-colors cursor-pointer"
+              className="flex items-center justify-center p-2.5 rounded-xl bg-bg-primary border border-rose-500/10 text-text-muted hover:text-rose-500 hover:border-rose-500/30 transition-all cursor-pointer shadow-sm"
               title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -1237,17 +1486,17 @@ export default function App() {
               <button
                 onClick={handleAutoSimulateAllReady}
                 id="btn-auto-simulate-round"
-                className="flex items-center gap-1.5 text-xs font-bold text-[#D4AF37] hover:text-[#D4AF37]/80 bg-[#D4AF37]/10 border border-[#D4AF37]/25 px-3 py-2 rounded-xl transition-all cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-bold text-rose-500 hover:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-md"
                 title="Autofills and advances matches for the currently ready brackets"
               >
-                <Sparkles className="w-3.5 h-3.5" /> Fast Sim Matches
+                <Sparkles className="w-3.5 h-3.5 text-rose-500 animate-pulse" /> Fast Sim
               </button>
             )}
 
             <button
               onClick={handleResetEntireTournament}
               id="btn-reset-tournament"
-              className="flex items-center gap-1.5 text-xs font-bold text-red-500 hover:text-red-400 bg-red-500/5 border border-red-500/15 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-xs font-extrabold text-rose-500 hover:text-rose-400 bg-rose-500/5 border border-rose-500/20 px-3.5 py-2 rounded-xl transition-colors cursor-pointer uppercase tracking-wider shadow-[0_0_12px_rgba(225,29,72,0.05)]"
               title="Wipe all data and reset system to defaults (Requires Admin PIN)"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Wipe System

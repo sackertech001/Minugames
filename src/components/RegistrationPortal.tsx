@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Player, PlayerApplication } from '../types';
 import { 
-  UserPlus, Trash2, Upload, Sparkles, AlertCircle, Edit, ShieldCheck, CheckCircle2,
+  UserPlus, Trash2, Upload, Sparkles, AlertCircle, Edit, ShieldCheck, CheckCircle2, Trophy,
   Check, XCircle, Users, FileText, Globe, Phone, MessageSquare, Calendar, ListFilter
 } from 'lucide-react';
 import { getDemoPlayers } from '../utils/demoData';
@@ -250,31 +250,40 @@ export default function RegistrationPortal({
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
       {/* Registration Form (1 Column on XL) */}
-      <div className="stadium-panel rounded-2xl p-6 shadow-xl h-fit transition-colors duration-300">
-        <div className="flex items-center justify-between border-b border-slate-200/20 dark:border-[#2A2E37] pb-4 mb-5">
-          <div className="flex items-center gap-2.5">
-            <UserPlus className="w-5 h-5 text-[#D4AF37]" />
-            <h3 className="font-serif font-bold text-lg text-slate-800 dark:text-[#E0E2E6] uppercase tracking-wider">
-              {editingPlayerId ? 'Edit Player' : 'Register Player'}
-            </h3>
+      <div className="bg-bg-secondary dark:bg-[#091A2E] border border-rose-500/15 dark:border-rose-500/20 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_0_20px_rgba(239,68,68,0.1)] h-fit transition-all duration-300">
+        <div className="flex items-center justify-between border-b border-rose-500/10 dark:border-rose-500/15 pb-4 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="relative p-2 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/20 rounded-xl">
+              <UserPlus className="w-5 h-5 text-rose-500 animate-pulse" />
+            </div>
+            <div className="flex flex-col leading-none text-left">
+              <span className="text-[10px] font-sans font-black text-text-muted dark:text-slate-400 tracking-[0.2em] uppercase">REGISTER</span>
+              <span className="text-base font-sans font-black text-rose-500 tracking-wider uppercase">PLAYER</span>
+            </div>
           </div>
           {!isTournamentStarted && players.length === 0 && (
             <button
               onClick={handleAutoFill}
               id="btn-auto-fill-players"
-              className="flex items-center gap-1 text-xs font-bold text-[#D4AF37] hover:text-[#D4AF37]/80 bg-[#D4AF37]/10 border border-[#D4AF37]/20 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+              className="bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 dark:border-rose-500/25 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-[0_0_12px_rgba(239,68,68,0.05)]"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Quick Fill {playersCount}
+              <div className="flex items-center justify-center text-rose-500">
+                <Users className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex flex-col leading-none text-left">
+                <span className="text-[8px] font-sans font-black text-rose-500 tracking-wider uppercase">QUICK FILL</span>
+                <span className="text-xs font-sans font-black text-text-primary dark:text-slate-200">{playersCount}</span>
+              </div>
             </button>
           )}
         </div>
 
         {isTournamentStarted && !editingPlayerId ? (
-          <div className="bg-[#D4AF37]/5 border border-[#D4AF37]/15 text-[#D4AF37]/90 rounded-xl p-4 text-xs flex gap-3 animate-in fade-in duration-200">
-            <ShieldCheck className="w-5 h-5 text-[#D4AF37] shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold uppercase tracking-wider mb-1 font-serif">Tournament Active</p>
-              <p className="leading-relaxed text-slate-600 dark:text-[#9CA3AF]">
+          <div className="bg-bg-primary dark:bg-[#0E1116] border border-rose-500/15 dark:border-rose-500/20 text-rose-600 dark:text-rose-400/90 rounded-xl p-4 text-xs flex gap-3 animate-in fade-in duration-200">
+            <ShieldCheck className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+            <div className="text-left">
+              <p className="font-sans font-black uppercase tracking-wider mb-1">Tournament Active</p>
+              <p className="leading-relaxed text-text-secondary dark:text-slate-400">
                 The championship has commenced. Adding new players or deleting existing slots is disabled, but you can select any player from the active roster list on the right to edit their profile details.
               </p>
             </div>
@@ -282,15 +291,15 @@ export default function RegistrationPortal({
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 p-3 rounded-xl text-xs flex items-start gap-2">
+              <div className="bg-red-500/5 dark:bg-red-500/10 border border-red-500/15 dark:border-red-500/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-xs flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-wider mb-1.5">
-                Player Full Name *
+            <div className="text-left">
+              <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
+                Player Full Name <span className="text-rose-500 font-bold">*</span>
               </label>
               <input
                 type="text"
@@ -298,15 +307,15 @@ export default function RegistrationPortal({
                 id="input-player-name"
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Ronnie O'Sullivan"
-                className="w-full bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-[#E0E2E6] placeholder-slate-400 dark:placeholder-slate-700 outline-none transition-colors"
+                className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                 maxLength={40}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 text-left">
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-wider mb-1.5">
-                  Nickname <span className="text-slate-400 font-normal">(Optional)</span>
+                <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
+                  Nickname <span className="text-text-muted dark:text-slate-500 font-normal lowercase">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -314,14 +323,14 @@ export default function RegistrationPortal({
                   id="input-player-nickname"
                   onChange={(e) => setNickname(e.target.value)}
                   placeholder="e.g. The Rocket"
-                  className="w-full bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-[#E0E2E6] placeholder-slate-400 dark:placeholder-slate-700 outline-none transition-colors"
+                  className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                   maxLength={30}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-wider mb-1.5">
-                  Seed Rank (1-{playersCount}) *
+                <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
+                  Seed Rank (1-{playersCount}) <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="number"
@@ -331,14 +340,14 @@ export default function RegistrationPortal({
                   onChange={(e) => setSeed(e.target.value === '' ? '' : Number(e.target.value))}
                   min={1}
                   max={playersCount}
-                  className="w-full bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-[#E0E2E6] placeholder-slate-400 dark:placeholder-slate-700 outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-wider mb-1.5">
-                Representing Club / Region <span className="text-slate-400 font-normal">(Optional)</span>
+            <div className="text-left">
+              <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
+                Representing Club / Region <span className="text-text-muted dark:text-slate-500 font-normal lowercase">(optional)</span>
               </label>
               <input
                 type="text"
@@ -346,33 +355,33 @@ export default function RegistrationPortal({
                 id="input-player-club"
                 onChange={(e) => setClub(e.target.value)}
                 placeholder="e.g. London Snooker Academy"
-                className="w-full bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] focus:border-[#D4AF37] rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-[#E0E2E6] placeholder-slate-400 dark:placeholder-slate-700 outline-none transition-colors"
+                className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                 maxLength={50}
               />
             </div>
 
             {/* Drag and Drop File Upload */}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-wider mb-1.5">
+            <div className="text-left">
+              <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
                 Player Photo / Profile Cover
               </label>
 
               {photoDataUrl ? (
-                <div className="relative border border-slate-200 dark:border-[#2A2E37] rounded-xl p-3 bg-slate-50 dark:bg-[#0F1115] flex items-center gap-4">
+                <div className="relative border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-3 bg-bg-primary dark:bg-[#05101E] flex items-center gap-4">
                   <img
                     src={photoDataUrl}
                     alt="Uploaded avatar preview"
-                    className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-[#2A2E37]"
+                    className="w-16 h-16 rounded-lg object-cover border border-rose-500/25 shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                     referrerPolicy="no-referrer"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 dark:text-[#E0E2E6] truncate">Custom photo loaded</p>
-                    <p className="text-[10px] text-slate-400 dark:text-[#6B7280]">Will be stored locally in database</p>
+                    <p className="text-xs font-semibold text-text-primary dark:text-slate-200 truncate">Custom photo loaded</p>
+                    <p className="text-[10px] text-rose-500/60 dark:text-rose-500/60">Will be stored locally in database</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setPhotoDataUrl('')}
-                    className="p-1.5 text-slate-400 dark:text-[#6B7280] hover:text-red-500 hover:bg-slate-100 dark:hover:bg-[#12151A] rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                     title="Remove Image"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -387,16 +396,16 @@ export default function RegistrationPortal({
                   onClick={triggerFileInput}
                   className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
                     isDragActive
-                      ? 'border-[#D4AF37] bg-[#D4AF37]/5'
-                      : 'border-slate-200 dark:border-[#2A2E37] hover:border-[#D4AF37]/50 bg-slate-50 dark:bg-[#0F1115]'
+                      ? 'border-rose-500 bg-rose-500/5'
+                      : 'border-rose-500/15 hover:border-rose-500/40 bg-bg-primary dark:bg-[#05101E]'
                   }`}
                 >
-                  <Upload className="w-6 h-6 text-slate-400 dark:text-[#6B7280] mx-auto mb-2" />
-                  <p className="text-xs font-medium text-slate-800 dark:text-[#E0E2E6] mb-0.5">
-                    Drag & Drop Player photo or <span className="text-[#D4AF37] font-semibold">Browse</span>
+                  <Upload className="w-6 h-6 text-rose-500/50 mx-auto mb-2" />
+                  <p className="text-xs font-medium text-text-primary dark:text-slate-200 mb-0.5">
+                    Drag & Drop Player photo or <span className="text-rose-500 font-black hover:underline">Browse</span>
                   </p>
-                  <p className="text-[10px] text-slate-400 dark:text-[#6B7280]">Supports PNG, JPG, WEBP. Max 2MB.</p>
-                  <p className="text-[9px] text-[#D4AF37]/40 mt-1.5">Leave empty to auto-generate a premium thematic avatar</p>
+                  <p className="text-[10px] text-text-muted dark:text-slate-500">Supports PNG, JPG, WEBP. Max 2MB.</p>
+                  <p className="text-[9px] text-rose-500/40 mt-1.5 font-medium">Leave empty to auto-generate a premium thematic avatar</p>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -421,7 +430,7 @@ export default function RegistrationPortal({
                     setSeed(getNextAvailableSeed());
                     setError('');
                   }}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-[#12151A] dark:hover:bg-[#1A1D23] border border-slate-200 dark:border-[#2A2E37] text-slate-700 dark:text-[#E0E2E6] font-bold text-sm py-2.5 rounded-xl transition-colors cursor-pointer"
+                  className="flex-1 bg-bg-primary hover:bg-bg-tertiary dark:bg-[#0E1116] dark:hover:bg-[#1A1D23] border border-rose-500/15 dark:border-rose-500/20 text-text-secondary dark:text-slate-300 font-extrabold text-xs py-2.5 rounded-xl transition-colors cursor-pointer uppercase tracking-wider"
                 >
                   Cancel
                 </button>
@@ -429,7 +438,7 @@ export default function RegistrationPortal({
               <button
                 type="submit"
                 id="btn-save-player"
-                className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]/85 text-[#0F1115] font-bold text-sm py-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/10 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 bg-gradient-to-r from-rose-950 via-rose-600 to-rose-950 border border-rose-500/40 hover:from-rose-900 hover:via-rose-500 hover:to-rose-900 text-white font-sans font-black text-xs tracking-[0.2em] py-3.5 rounded-xl transition-all shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer uppercase"
               >
                 {editingPlayerId ? <Edit className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
                 {editingPlayerId ? 'Update Player' : 'Register Player'}
@@ -443,14 +452,14 @@ export default function RegistrationPortal({
       <div className="xl:col-span-2 space-y-6">
         
         {/* Registration Sub-tab Toggle */}
-        <div className="flex border-b border-slate-200 dark:border-[#2A2E37] gap-6 pb-px">
+        <div className="flex border-b border-rose-500/10 dark:border-rose-500/15 gap-6 pb-px">
           <button
             type="button"
             onClick={() => setActiveSubTab('roster')}
             className={`pb-3 text-xs uppercase tracking-wider font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'roster'
-                ? 'border-[#D4AF37] text-[#D4AF37]'
-                : 'border-transparent text-slate-400 hover:text-slate-800 hover:dark:text-[#E0E2E6]'
+                ? 'border-rose-500 text-rose-500'
+                : 'border-transparent text-text-muted hover:text-text-primary dark:text-slate-500 dark:hover:text-slate-300'
             }`}
           >
             <Users className="w-4 h-4" /> Active Roster ({players.length}/{playersCount})
@@ -460,13 +469,13 @@ export default function RegistrationPortal({
             onClick={() => setActiveSubTab('applications')}
             className={`pb-3 text-xs uppercase tracking-wider font-extrabold transition-all border-b-2 flex items-center gap-2 relative cursor-pointer ${
               activeSubTab === 'applications'
-                ? 'border-[#D4AF37] text-[#D4AF37]'
-                : 'border-transparent text-slate-400 hover:text-slate-800 hover:dark:text-[#E0E2E6]'
+                ? 'border-rose-500 text-rose-500'
+                : 'border-transparent text-text-muted hover:text-text-primary dark:text-slate-500 dark:hover:text-slate-300'
             }`}
           >
             <FileText className="w-4 h-4" /> Applications Register
             {applications.filter(a => a.status === 'pending').length > 0 && (
-              <span className="bg-amber-500 text-[#0F1115] font-mono text-[9px] font-black px-1.5 py-0.5 rounded-full ml-1 border border-amber-600 animate-pulse-subtle">
+              <span className="bg-rose-500 text-white font-sans text-[9px] font-black px-1.5 py-0.5 rounded-full ml-1 border border-rose-600 animate-pulse">
                 {applications.filter(a => a.status === 'pending').length} New
               </span>
             )}
@@ -476,21 +485,26 @@ export default function RegistrationPortal({
         {activeSubTab === 'roster' ? (
           <>
             {/* Progress & Quick Actions */}
-            <div className="stadium-panel rounded-2xl p-6 shadow-xl transition-colors duration-300">
+            <div className="bg-bg-secondary dark:bg-[#091A2E] border border-rose-500/15 dark:border-rose-500/20 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_0_20px_rgba(239,68,68,0.1)] transition-colors duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h4 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider mb-1">
-                    Championship Readiness
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
-                    A perfect {playersCount}-player registration is required to draw the knockout bracket.
-                  </p>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/20 flex items-center justify-center shrink-0">
+                    <Trophy className="w-5 h-5 text-rose-500" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="font-sans font-black text-text-primary dark:text-slate-100 text-sm uppercase tracking-wider mb-0.5">
+                      Championship Readiness
+                    </h4>
+                    <p className="text-xs text-text-secondary dark:text-slate-400">
+                      A perfect {playersCount}-player registration is required to draw the knockout bracket.
+                    </p>
+                  </div>
                 </div>
                 {!isTournamentStarted && players.length > 0 && (
                   <button
                     onClick={handleClearAll}
                     id="btn-clear-all-players"
-                    className="self-start sm:self-center text-xs font-bold text-red-500 hover:text-red-400 bg-red-500/5 border border-red-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="self-start sm:self-center text-xs font-bold text-rose-500 hover:text-rose-400 bg-rose-500/5 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Reset Board
                   </button>
@@ -499,17 +513,13 @@ export default function RegistrationPortal({
 
               {/* Progress bar */}
               <div className="mt-5">
-                <div className="flex justify-between text-xs font-bold font-mono text-slate-500 dark:text-[#9CA3AF] mb-2">
+                <div className="flex justify-between text-[11px] font-sans font-black text-rose-600 dark:text-rose-500/70 tracking-wider mb-2">
                   <span>REGISTERED PLAYERS</span>
-                  <span className="text-[#D4AF37]">{players.length} / {playersCount} Slots Filled</span>
+                  <span className="text-rose-500">{players.length} / {playersCount} Slots Filled</span>
                 </div>
-                <div className="w-full bg-slate-50 dark:bg-[#0F1115] rounded-full h-3.5 overflow-hidden border border-slate-200 dark:border-[#2A2E37]">
+                <div className="w-full bg-bg-primary dark:bg-[#05101E] rounded-full h-3.5 overflow-hidden border border-rose-500/10 dark:border-rose-500/15 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)]">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      players.length === playersCount
-                        ? 'bg-gradient-to-r from-[#D4AF37] to-emerald-500'
-                        : 'bg-gradient-to-r from-[#D4AF37]/60 to-[#D4AF37]'
-                    }`}
+                    className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r from-rose-950 via-rose-500 to-rose-400 shadow-[0_0_10px_rgba(239,68,68,0.3)] dark:shadow-[0_0_10px_rgba(239,68,68,0.5)]`}
                     style={{ width: `${(players.length / playersCount) * 100}%` }}
                   ></div>
                 </div>
@@ -517,18 +527,18 @@ export default function RegistrationPortal({
 
               {/* Unlock Tournament Action */}
               {players.length === playersCount && !isTournamentStarted && (
-                <div className="mt-5 bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
+                <div className="mt-5 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-6 h-6 text-[#D4AF37] shrink-0" />
-                    <div>
-                      <h5 className="text-sm font-bold text-[#D4AF37] uppercase tracking-wide font-serif">Ready to Draw Bracket</h5>
-                      <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">All {playersCount} slots are registered. Generate the schedule now.</p>
+                    <CheckCircle2 className="w-6 h-6 text-rose-500 shrink-0" />
+                    <div className="text-left">
+                      <h5 className="text-sm font-black text-rose-500 uppercase tracking-wide">Ready to Draw Bracket</h5>
+                      <p className="text-xs text-text-secondary dark:text-slate-400">All {playersCount} slots are registered. Generate the schedule now.</p>
                     </div>
                   </div>
                   <button
                     onClick={onStartTournament}
                     id="btn-draw-brackets"
-                    className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#D4AF37]/85 text-[#0F1115] font-bold text-sm px-6 py-2.5 rounded-xl shadow-lg shadow-[#D4AF37]/15 transition-all cursor-pointer"
+                    className="w-full sm:w-auto bg-gradient-to-r from-rose-950 via-rose-600 to-rose-950 border border-rose-500/40 hover:from-rose-900 hover:via-rose-500 hover:to-rose-900 text-white font-sans font-black text-xs tracking-[0.15em] px-6 py-3 rounded-xl shadow-[0_0_15px_rgba(239,68,68,0.25)] transition-all cursor-pointer uppercase"
                   >
                     Commence Championship
                   </button>
@@ -537,17 +547,19 @@ export default function RegistrationPortal({
             </div>
 
             {/* Players List Grid */}
-            <div className="stadium-panel rounded-2xl p-6 shadow-xl transition-colors duration-300">
-              <h4 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider mb-4">
+            <div className="bg-bg-secondary dark:bg-[#091A2E] border border-rose-500/15 dark:border-rose-500/20 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_0_20px_rgba(239,68,68,0.1)] transition-colors duration-300">
+              <h4 className="font-sans font-black text-text-primary dark:text-slate-100 text-sm uppercase tracking-wider mb-4 text-left">
                 Registered Slots (Sorted by Seed)
               </h4>
 
               {players.length === 0 ? (
-                <div className="text-center py-16 border-2 border-dashed border-slate-200 dark:border-[#2A2E37] rounded-xl bg-slate-50 dark:bg-[#12151A]/20">
-                  <UserPlus className="w-10 h-10 text-slate-400 dark:text-[#6B7280] mx-auto mb-3" />
-                  <p className="text-slate-500 dark:text-[#9CA3AF] text-sm font-medium">No players registered yet</p>
-                  <p className="text-slate-400 dark:text-[#6B7280] text-xs mt-1 max-w-sm mx-auto leading-relaxed">
-                    Use the form on the left to register players, or click the <span className="text-[#D4AF37] font-semibold cursor-pointer hover:underline" onClick={handleAutoFill}>Quick Fill {playersCount}</span> button to auto-populate with the world's finest professionals!
+                <div className="text-center py-16 border border-dashed border-rose-500/15 dark:border-rose-500/20 rounded-xl bg-bg-primary dark:bg-[#05101E] flex flex-col items-center justify-center">
+                  <div className="w-14 h-14 bg-rose-500/5 border border-rose-500/15 rounded-full flex items-center justify-center mb-4 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
+                    <UserPlus className="w-6 h-6 text-rose-500/50" />
+                  </div>
+                  <p className="text-text-primary dark:text-slate-100 text-sm font-black uppercase tracking-wider">No players registered yet</p>
+                  <p className="text-text-secondary dark:text-slate-400 text-xs mt-1.5 max-w-sm mx-auto leading-relaxed px-4">
+                    Use the form on the left to register players, or click the <span className="text-rose-500 font-black cursor-pointer hover:underline" onClick={handleAutoFill}>Quick Fill {playersCount}</span> button to auto-populate with the world's finest professionals!
                   </p>
                 </div>
               ) : (
@@ -555,33 +567,33 @@ export default function RegistrationPortal({
                   {players.map((p) => (
                     <div
                       key={p.id}
-                      className="bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-[#2A2E37] rounded-xl p-3 hover:border-[#D4AF37]/45 dark:hover:border-[#D4AF37]/45 transition-all flex items-center gap-3 relative group"
+                      className="bg-bg-primary dark:bg-[#05101E] border border-rose-500/10 dark:border-rose-500/15 rounded-xl p-3 hover:border-rose-500/50 transition-all flex items-center gap-3 relative group"
                     >
-                      <div className="relative">
+                      <div className="relative shrink-0">
                         <img
                           src={p.photoUrl}
                           alt={p.name}
-                          className="w-10 h-10 rounded-lg object-cover border border-slate-200 dark:border-[#2A2E37] shrink-0"
+                          className="w-10 h-10 rounded-lg object-cover border border-rose-500/15 dark:border-rose-500/20 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.05)] dark:shadow-[0_0_8px_rgba(239,68,68,0.1)]"
                           referrerPolicy="no-referrer"
                         />
-                        <span className="absolute -top-1.5 -left-1.5 bg-white dark:bg-[#12151A] text-[9px] font-bold font-mono text-[#D4AF37] px-1 rounded border border-slate-200 dark:border-[#2A2E37]">
+                        <span className="absolute -top-1.5 -left-1.5 bg-bg-secondary dark:bg-[#091A2E] text-[9px] font-black text-rose-500 px-1.5 py-0.5 rounded border border-rose-500/15 dark:border-rose-500/20">
                           #{p.seed}
                         </span>
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-slate-800 dark:text-[#E0E2E6] truncate group-hover:text-[#D4AF37] transition-colors">
+                      <div className="min-w-0 flex-1 text-left">
+                        <p className="text-xs font-black text-text-primary dark:text-slate-100 truncate group-hover:text-rose-500 transition-colors">
                           {p.name}
                         </p>
-                        <p className="text-[10px] text-slate-400 dark:text-[#6B7280] italic truncate">
+                        <p className="text-[10px] text-text-secondary dark:text-slate-400 italic truncate font-sans">
                           {p.nickname ? `"${p.nickname}"` : p.club || 'Independent'}
                         </p>
                       </div>
 
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         <button
                           onClick={() => handleEdit(p)}
-                          className="p-1 hover:bg-slate-200 dark:hover:bg-[#12151A] text-slate-400 dark:text-[#6B7280] hover:text-[#D4AF37] rounded transition-colors cursor-pointer"
+                          className="p-1 hover:bg-rose-500/10 text-text-muted hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 rounded transition-colors cursor-pointer"
                           title="Edit Player"
                         >
                           <Edit className="w-3.5 h-3.5" />
@@ -589,7 +601,7 @@ export default function RegistrationPortal({
                         {!isTournamentStarted && (
                           <button
                             onClick={() => handleDelete(p.id)}
-                            className="p-1 hover:bg-slate-200 dark:hover:bg-[#12151A] text-slate-400 dark:text-[#6B7280] hover:text-red-500 rounded transition-colors cursor-pointer"
+                            className="p-1 hover:bg-rose-500/10 text-text-muted hover:text-rose-500 rounded transition-colors cursor-pointer"
                             title="Delete Player"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -608,14 +620,14 @@ export default function RegistrationPortal({
                         return (
                           <div
                             key={`empty-${idx}`}
-                            className="border border-dashed border-slate-200 dark:border-[#2A2E37] bg-slate-50/50 dark:bg-[#12151A]/10 rounded-xl p-3 flex items-center gap-3 text-slate-400 dark:text-[#6B7280]"
+                            className="border border-dashed border-rose-500/10 dark:border-rose-500/15 bg-bg-primary/40 dark:bg-[#05101E]/30 rounded-xl p-3 flex items-center gap-3 text-text-muted"
                           >
-                            <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-[#0F1115]/80 border border-dashed border-slate-200 dark:border-[#2A2E37] flex items-center justify-center font-mono text-xs text-slate-400 dark:text-[#6B7280]/60 shrink-0">
+                            <div className="w-10 h-10 rounded-lg bg-bg-secondary dark:bg-[#05101E] border border-dashed border-rose-500/15 dark:border-rose-500/20 flex items-center justify-center font-sans text-xs text-rose-500/50 font-black shrink-0">
                               #{emptySeed}
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-semibold text-slate-400 dark:text-[#6B7280] italic">Empty Slot</p>
-                              <p className="text-[10px] text-slate-300 dark:text-[#6B7280]/40">Awaiting...</p>
+                            <div className="min-w-0 flex-1 text-left">
+                              <p className="text-xs font-semibold text-text-muted dark:text-slate-500 italic">Empty Slot</p>
+                              <p className="text-[10px] text-rose-500/30">Awaiting...</p>
                             </div>
                           </div>
                         );
@@ -628,15 +640,18 @@ export default function RegistrationPortal({
           </>
         ) : (
           /* APPLICATIONS REGISTER DASHBOARD */
-          <div className="stadium-panel rounded-2xl p-6 shadow-xl space-y-6 transition-colors duration-300">
+          <div className="bg-gradient-to-b from-bg-secondary to-bg-primary dark:from-[#091A2E] dark:to-[#05101E] rounded-2xl p-6 border border-rose-500/15 shadow-xl dark:shadow-2xl dark:shadow-black/80 space-y-6 transition-all duration-300">
             
             {/* Header row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100/20 dark:border-[#2A2E37]/50 pb-4">
-              <div>
-                <h4 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-sm uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-[#D4AF37]" /> Player Application Register
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rose-500/10 pb-4">
+              <div className="text-left">
+                <span className="text-[9px] font-sans font-black text-rose-600 dark:text-rose-500 tracking-[0.2em] uppercase block mb-1">
+                  Public Enrollment Portal
+                </span>
+                <h4 className="font-sans font-black text-text-primary dark:text-white text-base uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-5 h-5 text-rose-500" /> Player Application Register
                 </h4>
-                <p className="text-[11px] text-slate-400 dark:text-[#6B7280] mt-0.5">
+                <p className="text-[11px] text-text-secondary dark:text-slate-400 mt-0.5">
                   Review entries submitted via the public registration link and sync selected players into the tournament seeds.
                 </p>
               </div>
@@ -687,17 +702,17 @@ export default function RegistrationPortal({
                   ];
                   onApplicationsChange([...demoApps, ...applications]);
                 }}
-                className="text-[10px] font-bold text-[#D4AF37] hover:bg-[#D4AF37]/10 border border-[#D4AF37]/25 px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                className="text-[10px] font-sans font-black text-rose-500 hover:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md uppercase tracking-wider self-start sm:self-auto"
               >
                 <Sparkles className="w-3.5 h-3.5" /> Simulate 3 Applications
               </button>
             </div>
 
             {/* Filter buttons bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-[#0F1115] p-2.5 rounded-xl border border-slate-200/60 dark:border-[#2A2E37]/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-bg-primary dark:bg-[#05101E] p-3 rounded-xl border border-rose-500/10 dark:border-rose-500/15">
               <div className="flex items-center gap-1.5">
-                <ListFilter className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider mr-1">Filter status:</span>
+                <ListFilter className="w-3.5 h-3.5 text-rose-500/60" />
+                <span className="text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mr-1">Filter status:</span>
               </div>
               <div className="flex gap-1.5 flex-wrap">
                 {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => {
@@ -710,15 +725,15 @@ export default function RegistrationPortal({
                       key={status}
                       type="button"
                       onClick={() => setAppFilter(status)}
-                      className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all capitalize cursor-pointer flex items-center gap-1 border ${
+                      className={`px-3.5 py-1.5 text-[10px] font-sans font-black rounded-lg transition-all uppercase tracking-wider cursor-pointer flex items-center gap-1.5 border ${
                         isActive
-                          ? 'bg-[#D4AF37] text-[#0F1115] border-[#D4AF37]'
-                          : 'bg-white dark:bg-[#1A1D23] text-slate-500 dark:text-[#9CA3AF] border-slate-200 dark:border-[#2A2E37] hover:border-[#D4AF37]/50'
+                          ? 'bg-rose-500 text-white border-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                          : 'bg-bg-primary dark:bg-[#05101E]/50 text-text-secondary dark:text-slate-400 border-rose-500/15 hover:border-rose-500/40 hover:text-rose-500 dark:hover:text-rose-400'
                       }`}
                     >
                       {status}
                       <span className={`text-[9px] font-mono font-black px-1.5 py-0.2 rounded-full ${
-                        isActive ? 'bg-[#0F1115]/15 text-[#0F1115]' : 'bg-slate-100 dark:bg-[#0F1115] text-slate-400'
+                        isActive ? 'bg-bg-primary dark:bg-[#05101E] text-rose-600 dark:text-rose-400' : 'bg-bg-secondary dark:bg-[#091A2E]/50 text-text-muted dark:text-slate-500'
                       }`}>
                         {count}
                       </span>
@@ -730,15 +745,15 @@ export default function RegistrationPortal({
 
             {/* Applications List */}
             {applications.length === 0 ? (
-              <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-[#2A2E37] rounded-2xl bg-slate-50/45 dark:bg-[#12151A]/10">
-                <FileText className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-                <p className="text-sm font-bold text-slate-600 dark:text-[#9CA3AF]">No applications in register yet</p>
-                <p className="text-xs text-slate-400 dark:text-[#6B7280] max-w-sm mx-auto mt-1 leading-relaxed">
+              <div className="text-center py-20 border border-dashed border-rose-500/15 dark:border-rose-500/10 rounded-2xl bg-bg-primary dark:bg-[#05101E]/40">
+                <FileText className="w-12 h-12 text-rose-500/35 mx-auto mb-3" />
+                <p className="text-sm font-sans font-black text-text-primary dark:text-slate-200 uppercase tracking-wider">No applications in register yet</p>
+                <p className="text-xs text-text-secondary dark:text-slate-400 max-w-sm mx-auto mt-1.5 leading-relaxed">
                   Generate the public registration link in the Settings page and share it to players, or use the simulator button above to load demo entries!
                 </p>
               </div>
             ) : applications.filter(a => appFilter === 'all' ? true : a.status === appFilter).length === 0 ? (
-              <div className="text-center py-16 text-slate-400 dark:text-slate-600 text-xs italic">
+              <div className="text-center py-16 text-rose-500/40 text-xs italic font-sans uppercase tracking-wider">
                 No entries match the "{appFilter}" status filter.
               </div>
             ) : (
@@ -760,12 +775,12 @@ export default function RegistrationPortal({
                     return (
                       <div 
                         key={app.id}
-                        className={`border rounded-xl p-4 space-y-4 transition-all relative group ${
+                        className={`border rounded-xl p-4 space-y-4 transition-all relative group bg-gradient-to-b from-bg-secondary to-bg-primary dark:from-[#091A2E] dark:to-[#05101E] ${
                           app.status === 'approved' 
-                            ? 'bg-emerald-500/5 border-emerald-500/20' 
+                            ? 'bg-emerald-500/5 border-emerald-500/25' 
                             : app.status === 'rejected'
-                            ? 'bg-red-500/5 border-red-500/20'
-                            : 'bg-slate-50/50 dark:bg-[#12151A]/40 border-slate-200 dark:border-[#2A2E37] hover:border-[#D4AF37]/35'
+                            ? 'bg-red-500/5 border-rose-500/25'
+                            : 'border-rose-500/15 hover:border-rose-500/40'
                         }`}
                       >
                         {/* Upper row: Avatar + details */}
@@ -774,24 +789,24 @@ export default function RegistrationPortal({
                             <img
                               src={app.photoUrl}
                               alt={app.fullName}
-                              className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-[#2A2E37] shrink-0"
+                              className="w-12 h-12 rounded-xl object-cover border border-rose-500/20 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.1)]"
                               referrerPolicy="no-referrer"
                             />
-                            <div className="min-w-0">
+                            <div className="min-w-0 text-left">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <h5 className="font-serif font-bold text-slate-800 dark:text-[#E0E2E6] text-xs">
+                                <h5 className="font-sans font-black text-text-primary dark:text-slate-100 text-sm uppercase tracking-wide">
                                   {app.fullName}
                                 </h5>
                                 {app.nickname && (
-                                  <span className="text-[10px] text-[#D4AF37] font-bold tracking-tight bg-[#D4AF37]/10 px-1.5 py-0.2 rounded border border-[#D4AF37]/20">
+                                  <span className="text-[10px] text-rose-500 font-sans font-black tracking-widest bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
                                     "{app.nickname}"
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[10px] text-slate-400 dark:text-[#6B7280] italic mt-0.5">
+                              <p className="text-[10px] text-text-secondary dark:text-slate-400 italic mt-0.5">
                                 Representing: {app.club || 'Independent'}
                               </p>
-                              <div className="flex items-center gap-1 text-[9px] text-slate-400 font-mono mt-1">
+                              <div className="flex items-center gap-1 text-[9px] text-rose-600/80 dark:text-rose-500/60 font-sans mt-1 uppercase tracking-wide font-black">
                                 <Calendar className="w-3 h-3" /> Applied: {new Date(app.appliedAt).toLocaleDateString()}
                               </div>
                             </div>
@@ -799,12 +814,12 @@ export default function RegistrationPortal({
 
                           {/* Top right badges or actions */}
                           <div className="flex items-center gap-2 self-start sm:self-auto">
-                            <span className={`px-2 py-1 rounded text-[9px] font-extrabold uppercase tracking-wider border ${
+                            <span className={`px-2.5 py-1 rounded text-[9px] font-sans font-black uppercase tracking-widest border ${
                               app.status === 'approved'
-                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                                 : app.status === 'rejected'
-                                ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                                : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                : 'bg-rose-500/10 text-rose-500 border-rose-500/20 animate-pulse'
                             }`}>
                               {app.status === 'approved' ? '✓ Approved & Synced' : app.status === 'rejected' ? '✗ Rejected' : '● Pending Review'}
                             </span>
@@ -816,7 +831,7 @@ export default function RegistrationPortal({
                                 const updated = applications.filter(a => a.id !== app.id);
                                 onApplicationsChange(updated);
                               }}
-                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-[#12151A] rounded-lg transition-all cursor-pointer"
+                              className="p-1.5 text-text-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer"
                               title="Delete application entry"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -825,48 +840,48 @@ export default function RegistrationPortal({
                         </div>
 
                         {/* Middle row: contacts metadata */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white dark:bg-[#12151A] p-2.5 rounded-xl border border-slate-100 dark:border-[#2A2E37]/30 text-[11px] font-medium text-slate-600 dark:text-[#9CA3AF]">
-                          <a href={`tel:${app.phoneNumber}`} className="flex items-center gap-1.5 hover:text-[#D4AF37] transition-all truncate">
-                            <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-bg-primary dark:bg-[#05101E] p-2.5 rounded-xl border border-rose-500/10 text-[11px] font-medium text-text-secondary dark:text-slate-300">
+                          <a href={`tel:${app.phoneNumber}`} className="flex items-center gap-1.5 hover:text-rose-400 transition-all truncate">
+                            <Phone className="w-3.5 h-3.5 text-rose-500/50 shrink-0" />
                             <span className="truncate">{app.phoneNumber}</span>
                           </a>
                           
                           {app.whatsappNumber ? (
-                            <a href={`https://wa.me/${app.whatsappNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-emerald-500 transition-all truncate">
+                            <a href={`https://wa.me/${app.whatsappNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-emerald-400 transition-all truncate">
                               <MessageSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                               <span className="truncate">{app.whatsappNumber}</span>
                             </a>
                           ) : (
-                            <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-600 italic">
-                              <MessageSquare className="w-3.5 h-3.5 text-slate-300 dark:text-slate-800 shrink-0" /> No WhatsApp
+                            <div className="flex items-center gap-1.5 text-text-muted dark:text-slate-500 italic text-left">
+                              <MessageSquare className="w-3.5 h-3.5 text-rose-500/20 shrink-0" /> No WhatsApp
                             </div>
                           )}
 
                           {app.socialMediaPage ? (
-                            <a href={app.socialMediaPage.startsWith('http') ? app.socialMediaPage : `https://${app.socialMediaPage}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-[#D4AF37] transition-all truncate">
-                              <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <a href={app.socialMediaPage.startsWith('http') ? app.socialMediaPage : `https://${app.socialMediaPage}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-rose-400 transition-all truncate">
+                              <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                               <span className="truncate hover:underline">{app.socialMediaPage.replace('https://', '').replace('http://', '')}</span>
                             </a>
                           ) : (
-                            <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-600 italic">
-                              <Globe className="w-3.5 h-3.5 text-slate-300 dark:text-slate-800 shrink-0" /> No Social Page
+                            <div className="flex items-center gap-1.5 text-text-muted dark:text-slate-500 italic text-left">
+                              <Globe className="w-3.5 h-3.5 text-rose-500/20 shrink-0" /> No Social Page
                             </div>
                           )}
                         </div>
 
                         {/* Document verification block */}
                         {app.documentUrl && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-500/5 dark:bg-[#D4AF37]/5 border border-[#D4AF37]/20 p-2.5 rounded-xl text-[11px]">
-                            <div className="flex items-center gap-2 truncate text-slate-700 dark:text-[#E0E2E6] font-medium">
-                              <FileText className="w-4 h-4 text-[#D4AF37] shrink-0" />
-                              <span className="truncate">Verification Doc: <strong className="text-slate-900 dark:text-slate-100">{app.documentName || 'document.pdf'}</strong></span>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-rose-500/5 border border-rose-500/15 p-2.5 rounded-xl text-[11px]">
+                            <div className="flex items-center gap-2 truncate text-text-secondary dark:text-slate-300 font-medium">
+                              <FileText className="w-4 h-4 text-rose-500 shrink-0" />
+                              <span className="truncate">Verification Doc: <strong className="text-text-primary dark:text-slate-100">{app.documentName || 'document.pdf'}</strong></span>
                             </div>
                             <a
                               href={app.documentUrl}
                               download={app.documentName || 'verification_document'}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-3 py-1 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] font-extrabold text-[9px] uppercase tracking-wider rounded-lg border border-[#D4AF37]/30 transition-all cursor-pointer shrink-0 text-center"
+                              className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-sans font-black text-[10px] uppercase tracking-wider rounded-lg border border-rose-500/20 transition-all cursor-pointer shrink-0 text-center"
                             >
                               View / Download Document
                             </a>
@@ -875,16 +890,16 @@ export default function RegistrationPortal({
 
                         {/* Bottom row: Sync/Selection actions if pending */}
                         {app.status === 'pending' && (
-                          <div className="pt-2 border-t border-slate-100 dark:border-[#2A2E37]/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="pt-2 border-t border-rose-500/10 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div className="flex items-center gap-2 w-full sm:w-auto">
-                              <span className="text-[10px] font-bold text-slate-400 dark:text-[#6B7280] uppercase tracking-wider">Assign Seed Rank:</span>
+                              <span className="text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest">Assign Seed Rank:</span>
                               <select
                                 value={selectedSeed}
                                 disabled={isRosterFull}
                                 onChange={(e) => {
                                   setSelectedSeeds(prev => ({ ...prev, [app.id]: Number(e.target.value) }));
                                 }}
-                                className="bg-white dark:bg-[#12151A] border border-slate-200 dark:border-[#2A2E37] text-xs font-mono font-bold text-slate-800 dark:text-[#E0E2E6] px-2 py-1 rounded-lg focus:border-[#D4AF37] outline-none cursor-pointer"
+                                className="bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 dark:border-rose-500/20 focus:border-rose-500/50 text-xs font-mono font-black text-text-primary dark:text-slate-100 px-2.5 py-1.5 rounded-lg focus:shadow-[0_0_10px_rgba(239,68,68,0.15)] outline-none cursor-pointer"
                               >
                                 {availableSeeds.map((s) => (
                                   <option key={s} value={s}>Seed #{s}</option>
@@ -904,7 +919,7 @@ export default function RegistrationPortal({
                                   });
                                   onApplicationsChange(updated);
                                 }}
-                                className="flex-1 sm:flex-none text-xs font-bold text-red-500 hover:bg-red-500/10 px-3.5 py-1.5 rounded-lg border border-red-500/15 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                className="flex-1 sm:flex-none text-xs font-sans font-black text-red-500 hover:bg-red-500/10 px-3.5 py-2 rounded-xl border border-red-500/20 transition-all flex items-center justify-center gap-1 cursor-pointer uppercase tracking-wider"
                               >
                                 <XCircle className="w-3.5 h-3.5" /> Reject
                               </button>
@@ -950,10 +965,10 @@ export default function RegistrationPortal({
                                   });
                                   onApplicationsChange(updated);
                                 }}
-                                className={`flex-1 sm:flex-none text-xs font-black px-4.5 py-2 rounded-xl border transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                className={`flex-1 sm:flex-none text-xs font-sans font-black px-4.5 py-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
                                   isRosterFull || isTournamentStarted || availableSeeds.length === 0
-                                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed dark:bg-[#12151A] dark:border-[#2A2E37]'
-                                    : 'bg-[#D4AF37] border-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#0F1115] shadow-md shadow-[#D4AF37]/5'
+                                    ? 'bg-bg-primary dark:bg-[#05101E] border-rose-500/10 dark:border-rose-500/15 text-text-muted dark:text-slate-500 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-rose-950 via-rose-600 to-rose-950 border border-rose-500/40 hover:from-rose-900 hover:via-rose-500 hover:to-rose-900 text-white shadow-[0_0_15px_rgba(239,68,68,0.25)] hover:scale-[1.01]'
                                 }`}
                               >
                                 <Check className="w-4 h-4 text-inherit" /> Sync to Tournament
@@ -964,7 +979,7 @@ export default function RegistrationPortal({
                         
                         {/* Status notification if roster is full */}
                         {app.status === 'pending' && isRosterFull && (
-                          <p className="text-[10px] text-amber-500 font-bold text-right italic">
+                          <p className="text-[10px] text-rose-600 dark:text-rose-500 font-sans font-black text-right italic uppercase tracking-wider">
                             * Roster is full ({playersCount}/{playersCount}). Free up a seed slot in Active Roster to sync.
                           </p>
                         )}
