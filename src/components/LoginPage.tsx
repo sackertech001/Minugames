@@ -60,7 +60,7 @@ export default function LoginPage({
         <div className="flex items-center gap-3">
           {systemLogo ? (
             <img
-              src={systemLogo || undefined}
+              src={systemLogo || null}
               alt="System Logo"
               className="w-10 h-10 object-contain rounded-xl border border-[#1A2740] p-1 bg-[#121F32]"
               referrerPolicy="no-referrer"
@@ -96,7 +96,7 @@ export default function LoginPage({
           <div className="mx-auto w-16 h-16 rounded-2xl bg-[#04142B] border-2 border-[#F1C317] flex items-center justify-center mb-6 shadow-inner relative overflow-hidden">
             {systemLogo ? (
               <img
-                src={systemLogo || undefined}
+                src={systemLogo || null}
                 alt="System Logo"
                 className="w-full h-full object-cover p-1"
                 referrerPolicy="no-referrer"

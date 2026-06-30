@@ -102,7 +102,6 @@ export default function App() {
       first: '₦350,000 + Certificate',
       second: '₦150,000 + Certificate',
       third: 'Meal of Choice',
-      highestBreak: '₦50,000',
     },
     tournamentTypes: ['Soccer', 'Snooker', 'Table Tennis'],
     selectedTournamentType: 'Snooker'
@@ -1129,7 +1128,6 @@ export default function App() {
         first: '₦350,000 + Certificate',
         second: '₦150,000 + Certificate',
         third: 'Meal of Choice',
-        highestBreak: '₦50,000',
       },
       tournamentTypes: ['Soccer', 'Snooker', 'Table Tennis'],
       selectedTournamentType: 'Snooker'

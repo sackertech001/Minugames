@@ -91,7 +91,6 @@ export interface TournamentConfig {
     first: string;
     second: string;
     third: string;
-    highestBreak?: string;
   };
   tournamentTypes?: string[];
   selectedTournamentType?: string;

@@ -98,17 +98,6 @@ export default function TournamentInfo({ config }: TournamentInfoProps) {
               <p className="text-base font-black text-slate-100">{config.prizes.third || "Meal of Choice"}</p>
             </div>
           </div>
-
-          {/* Highest Break */}
-          <div className="flex items-center gap-4 bg-rose-500/5 border border-rose-500/10 p-3 rounded-xl hover:bg-rose-500/10 transition-all duration-200">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-500 via-rose-600 to-rose-700 flex items-center justify-center font-sans font-bold text-white text-sm shadow-[0_0_10px_rgba(225,29,72,0.15)] shrink-0">
-              ★
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Highest Break Bonus</p>
-              <p className="text-base font-black text-slate-100">{config.prizes.highestBreak || "₦50,000"}</p>
-            </div>
-          </div>
         </div>
       </div>
 

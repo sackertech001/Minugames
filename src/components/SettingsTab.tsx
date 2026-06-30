@@ -91,7 +91,6 @@ export default function SettingsTab({
   const [prize1, setPrize1] = useState(config.prizes.first);
   const [prize2, setPrize2] = useState(config.prizes.second);
   const [prize3, setPrize3] = useState(config.prizes.third);
-  const [prizeBreak, setPrizeBreak] = useState(config.prizes.highestBreak || '');
 
   // Dynamic configuration states
   const [playersCount, setPlayersCount] = useState(config.playersCount);
@@ -249,7 +248,6 @@ export default function SettingsTab({
         first: prize1,
         second: prize2,
         third: prize3,
-        highestBreak: prizeBreak,
       }
     };
 
@@ -656,7 +654,7 @@ export default function SettingsTab({
             {logoUrl ? (
               <div className="relative group w-full h-full flex items-center justify-center">
                 <img
-                  src={logoUrl || undefined}
+                  src={logoUrl || null}
                   alt="System Logo Preview"
                   className="max-h-28 max-w-full object-contain rounded-lg shadow-md border border-rose-500/20 p-1.5 bg-bg-primary"
                   referrerPolicy="no-referrer"
@@ -975,7 +973,7 @@ export default function SettingsTab({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
                   <div className="space-y-1.5">
                     <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       3rd Place Finish
@@ -984,18 +982,6 @@ export default function SettingsTab({
                       type="text"
                       value={prize3}
                       onChange={(e) => setPrize3(e.target.value)}
-                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
-                      Highest Break Bonus
-                    </label>
-                    <input
-                      type="text"
-                      value={prizeBreak}
-                      placeholder="e.g. ₦50,000"
-                      onChange={(e) => setPrizeBreak(e.target.value)}
                       className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   </div>

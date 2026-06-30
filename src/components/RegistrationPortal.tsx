@@ -352,7 +352,7 @@ export default function RegistrationPortal({
                 {photoDataUrl ? (
                   <div className="relative inline-block">
                     <img 
-                      src={photoDataUrl} 
+                      src={photoDataUrl || null} 
                       alt="Selected avatar" 
                       className="w-16 h-16 rounded-2xl object-cover border-2 border-[#1A6DFF] mx-auto shadow-md"
                     />
@@ -662,7 +662,7 @@ export default function RegistrationPortal({
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="relative shrink-0">
                           <img
-                            src={p.photoUrl}
+                            src={p.photoUrl || null}
                             alt={p.name}
                             className="w-11 h-11 rounded-2xl object-cover border-2 border-[#1A2740] group-hover:border-[#1A6DFF]/50 transition-colors"
                             referrerPolicy="no-referrer"
@@ -811,7 +811,7 @@ export default function RegistrationPortal({
                         {/* Profile segment */}
                         <div className="flex gap-4 items-start pr-16">
                           <img
-                            src={app.photoUrl}
+                            src={app.photoUrl || null}
                             alt={app.fullName}
                             className="w-12 h-12 rounded-2xl object-cover border border-[#1A2740] shrink-0"
                             referrerPolicy="no-referrer"

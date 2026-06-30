@@ -46,7 +46,7 @@ function ShieldBadge({ color, photoUrl, seed }: { color: 'blue' | 'red'; photoUr
         {photoUrl ? (
           <div className="relative w-12 h-12 rounded-full p-[2px] bg-gradient-to-b from-slate-200 to-slate-400 shadow-md z-10 overflow-hidden">
             <img 
-              src={photoUrl || undefined} 
+              src={photoUrl || null} 
               alt="Player avatar" 
               className="w-full h-full rounded-full object-cover"
               referrerPolicy="no-referrer"
@@ -195,7 +195,7 @@ function SportLiveScoreboard({ activeMatch, actP1, actP2 }: SportLiveScoreboardP
         </div>
 
         {/* Player 2 details */}
-        <div className="flex items-center gap-4 w-full md:w-2/5 justify-center md:justify-start flex-row-reverse">
+        <div className="flex items-center gap-4 w-full md:w-2/5 justify-center md:justify-end flex-row-reverse">
           <div className="text-center md:text-left">
             <h3 className="font-sans font-black tracking-wider text-xl sm:text-2xl md:text-3xl text-slate-100 uppercase truncate max-w-[200px]">
               {actP2 ? actP2.name : 'VACANT PLAYER'}
