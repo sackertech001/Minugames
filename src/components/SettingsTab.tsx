@@ -656,7 +656,7 @@ export default function SettingsTab({
             {logoUrl ? (
               <div className="relative group w-full h-full flex items-center justify-center">
                 <img
-                  src={logoUrl}
+                  src={logoUrl || undefined}
                   alt="System Logo Preview"
                   className="max-h-28 max-w-full object-contain rounded-lg shadow-md border border-rose-500/20 p-1.5 bg-bg-primary"
                   referrerPolicy="no-referrer"

@@ -59,7 +59,7 @@ export default function LoginPage({
         <div className="flex items-center gap-3">
           {systemLogo ? (
             <img
-              src={systemLogo}
+              src={systemLogo || undefined}
               alt="System Logo"
               className="w-10 h-10 object-contain rounded border border-white/10 p-0.5 bg-slate-900"
               referrerPolicy="no-referrer"
@@ -95,7 +95,7 @@ export default function LoginPage({
           <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-slate-900 to-slate-800 dark:from-[#1E222A] dark:to-[#12151A] border-2 border-[#D4AF37] flex items-center justify-center mb-6 shadow-inner relative overflow-hidden">
             {systemLogo ? (
               <img
-                src={systemLogo}
+                src={systemLogo || undefined}
                 alt="System Logo"
                 className="w-full h-full object-cover p-1"
                 referrerPolicy="no-referrer"
@@ -180,42 +180,6 @@ export default function LoginPage({
               <LogIn className="w-4 h-4" /> Sign In securely
             </button>
           </form>
-
-          {/* COLLAPSIBLE REGISTERED ROLES INFO BOX */}
-          <div className="mt-8 border-t border-slate-700/40 pt-5">
-            <button
-              onClick={() => setShowAccountsInfo(!showAccountsInfo)}
-              className="text-xs text-slate-400 hover:text-[#D4AF37] transition-colors flex items-center justify-center gap-1.5 mx-auto font-semibold focus:outline-none cursor-pointer"
-            >
-              <Award className="w-3.5 h-3.5" />
-              {showAccountsInfo ? 'Hide System Accounts & PINs' : 'View Authorized Credentials & Roles'}
-            </button>
-
-            {showAccountsInfo && (
-              <div className="mt-4 bg-slate-950/40 rounded-2xl p-4 border border-slate-700/30 text-[11px] text-slate-400 space-y-2 max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
-                <p className="font-bold text-[#D4AF37] uppercase tracking-wider mb-2 font-mono">
-                  🔑 CURRENT ACTIVE CREDENTIALS:
-                </p>
-                <div className="grid grid-cols-3 gap-1 font-mono pb-2 border-b border-slate-800/60 text-slate-300">
-                  <span>Username</span>
-                  <span>System Role</span>
-                  <span className="text-right">PIN Code</span>
-                </div>
-                {users.map((u) => (
-                  <div key={u.id} className="grid grid-cols-3 gap-1 font-mono hover:text-white transition-colors">
-                    <span className="font-bold text-slate-300">{u.username}</span>
-                    <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded self-start w-fit">
-                      {u.role}
-                    </span>
-                    <span className="text-right text-[#D4AF37] font-bold">{u.pin}</span>
-                  </div>
-                ))}
-                <p className="text-[9px] text-slate-500 pt-2 leading-tight">
-                  💡 Administrators can register or manage accounts and generate unique PINs inside the <strong>System Settings</strong> tab.
-                </p>
-              </div>
-            )}
-          </div>
         </div>
       </main>
 

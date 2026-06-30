@@ -46,7 +46,7 @@ function ShieldBadge({ color, photoUrl, seed }: { color: 'blue' | 'red'; photoUr
         {photoUrl ? (
           <div className="relative w-12 h-12 rounded-full p-[2px] bg-gradient-to-b from-slate-200 to-slate-400 shadow-md z-10 overflow-hidden">
             <img 
-              src={photoUrl} 
+              src={photoUrl || undefined} 
               alt="Player avatar" 
               className="w-full h-full rounded-full object-cover"
               referrerPolicy="no-referrer"

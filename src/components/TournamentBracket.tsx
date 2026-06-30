@@ -110,7 +110,7 @@ export default function TournamentBracket({
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="relative shrink-0">
             <img
-              src={p.photoUrl}
+              src={p.photoUrl || undefined}
               alt={p.name}
               className={`w-7 h-7 rounded-lg object-cover border shrink-0 ${
                 isWinner ? 'border-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.2)]' : 'border-rose-500/15'

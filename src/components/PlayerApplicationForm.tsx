@@ -229,7 +229,7 @@ export default function PlayerApplicationForm({
           {systemLogo && (
             <div className="flex justify-center mb-2 animate-in fade-in zoom-in duration-300">
               <img
-                src={systemLogo}
+                src={systemLogo || undefined}
                 alt="System Logo"
                 className="max-h-24 max-w-[240px] object-contain rounded-xl shadow-2xl border border-slate-800 p-2 bg-[#1A1D23]/60"
                 referrerPolicy="no-referrer"
@@ -295,7 +295,7 @@ export default function PlayerApplicationForm({
               {photoDataUrl ? (
                 <div className="relative border border-slate-800 rounded-xl p-3 bg-[#061224] flex items-center gap-4">
                   <img
-                    src={photoDataUrl}
+                    src={photoDataUrl || undefined}
                     alt="Preview"
                     className="w-16 h-16 rounded-lg object-cover border border-slate-800"
                     referrerPolicy="no-referrer"

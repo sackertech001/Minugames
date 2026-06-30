@@ -240,77 +240,98 @@ async function startServer() {
   }
   console.log("=======================================================\n");
 
+  function withTimeout<T>(promise: Promise<T>, ms: number, timeoutErrorMsg: string): Promise<T> {
+    let timer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(timeoutErrorMsg));
+      }, ms);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+      clearTimeout(timer);
+    });
+  }
+
   let lastSupabaseFetchTime = 0;
   let cachedProfiles: any[] = [];
+  let cachedPlayers: any[] = [];
+  let isSyncing = false;
 
-  // API Endpoints
-  app.get("/api/state", async (req, res) => {
-    const state = readState();
-
+  async function syncWithSupabase() {
+    if (isSyncing) return;
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
     const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
     const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
     const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
 
-    if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
-      const now = Date.now();
-      if (now - lastSupabaseFetchTime > 3000) {
-        try {
-          const supabase = createClient(supabaseUrl, activeKey, {
-            auth: {
-              persistSession: false,
-              autoRefreshToken: false,
-            }
-          });
-          const { data: dbProfiles, error: fetchError } = await supabase
-            .from('profiles')
-            .select('*');
+    if (!supabaseUrl || !activeKey || supabaseUrl === "YOUR_SUPABASE_URL" || activeKey === "YOUR_SUPABASE_ANON_KEY") {
+      return;
+    }
 
-          if (fetchError) {
-            console.error('[Supabase DB Sync Error] Failed to fetch profiles:', fetchError.message);
-          } else if (dbProfiles) {
-            console.log(`[Supabase DB Sync Success] Fetched ${dbProfiles.length} profiles from database.`);
-            const mappedApps = dbProfiles.map((p: any) => ({
+    isSyncing = true;
+    lastSupabaseFetchTime = Date.now();
+    try {
+      await withTimeout((async () => {
+        const supabase = createClient(supabaseUrl, activeKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          }
+        });
+
+        console.log("[Supabase Background Sync] Fetching profiles...");
+        const { data: dbProfiles, error: fetchError } = await supabase
+          .from('profiles')
+          .select('*');
+
+        if (fetchError) {
+          console.log('[Supabase DB Sync] Fetch profiles notice:', fetchError.message);
+        } else if (dbProfiles) {
+          console.log(`[Supabase DB Sync Success] Fetched ${dbProfiles.length} profiles from database.`);
+          const mappedApps = dbProfiles.map((p: any) => ({
+            id: p.id,
+            fullName: p.full_name || '',
+            nickname: p.nickname || '',
+            club: p.club || '',
+            phoneNumber: p.phone_number || '',
+            whatsappNumber: p.whatsapp_number || '',
+            socialMediaPage: p.social_media_page || '',
+            photoUrl: p.photo_url || '',
+            documentUrl: p.document_url || '',
+            documentName: p.document_name || '',
+            status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
+            appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
+            tournamentType: p.tournament_type || ''
+          }));
+          cachedProfiles = mappedApps;
+
+          // Pick players that have approved/active status from profiles to populate state.players
+          const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+          const dbPlayers = dbProfiles
+            .filter((p: any) => approvedStatuses.includes(p.status))
+            .map((p: any) => ({
               id: p.id,
-              fullName: p.full_name || '',
+              name: p.full_name || 'Tournament Player',
               nickname: p.nickname || '',
               club: p.club || '',
-              phoneNumber: p.phone_number || '',
-              whatsappNumber: p.whatsapp_number || '',
-              socialMediaPage: p.social_media_page || '',
+              seed: p.seed || 1,
               photoUrl: p.photo_url || '',
-              documentUrl: p.document_url || '',
-              documentName: p.document_name || '',
-              status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
-              appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
+              matchesPlayed: p.matches_played || 0,
+              matchesWon: p.matches_won || 0,
+              totalPoints: p.total_points || 0,
+              highestBreak: p.highest_break || 0,
+              status: p.status === 'approved' ? 'active' : p.status,
               tournamentType: p.tournament_type || ''
-            }));
-            cachedProfiles = mappedApps;
+            }))
+            .sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
-            // Pick players that have approved/active status from profiles to populate state.players
-            const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
-            const dbPlayers = dbProfiles
-              .filter((p: any) => approvedStatuses.includes(p.status))
-              .map((p: any) => ({
-                id: p.id,
-                name: p.full_name || 'Tournament Player',
-                nickname: p.nickname || '',
-                club: p.club || '',
-                seed: p.seed || 1,
-                photoUrl: p.photo_url || '',
-                matchesPlayed: p.matches_played || 0,
-                matchesWon: p.matches_won || 0,
-                totalPoints: p.total_points || 0,
-                highestBreak: p.highest_break || 0,
-                status: p.status === 'approved' ? 'active' : p.status,
-                tournamentType: p.tournament_type || ''
-              }))
-              .sort((a, b) => (a.seed || 0) - (b.seed || 0));
+          cachedPlayers = dbPlayers;
+          lastSupabaseFetchTime = Date.now();
 
-            state.players = dbPlayers;
-            lastSupabaseFetchTime = now;
-          }
+          const state = readState();
+          state.players = dbPlayers;
+          state.playerApplications = mappedApps;
 
           const { data: dbTypes, error: typesError } = await supabase
             .from('tournament_types')
@@ -322,22 +343,26 @@ async function startServer() {
             state.tournamentConfig.tournamentTypes = typesList;
             state.tournamentConfig.selectedTournamentType = activeType;
           }
-        } catch (err: any) {
-          console.error('[Supabase DB Sync Exception] Failed to fetch or merge profiles:', err?.message || err);
-        }
-      }
 
-      if (cachedProfiles.length > 0) {
-        // Merge cached profiles into state.playerApplications, preserving any that are unique
-        const mergedApps = [...cachedProfiles];
-        for (const localApp of state.playerApplications) {
-          if (!mergedApps.some(dbApp => dbApp.id === localApp.id)) {
-            mergedApps.push(localApp);
-          }
+          writeState(state);
         }
-        state.playerApplications = mergedApps;
-        writeState(state);
-      }
+      })(), 12000, "Supabase connection timed out");
+    } catch (err: any) {
+      console.log('[Supabase DB Sync] Fetch profiles notice (deferred):', err?.message || err);
+    } finally {
+      isSyncing = false;
+    }
+  }
+
+  // API Endpoints
+  app.get("/api/state", async (req, res) => {
+    const state = readState();
+
+    const now = Date.now();
+    if (now - lastSupabaseFetchTime > 30000) {
+      syncWithSupabase().catch(err => {
+        console.log("[Supabase Background Sync] Sync notice:", err?.message || err);
+      });
     }
 
     res.json(state);
@@ -380,7 +405,7 @@ async function startServer() {
               .in('id', ids);
 
             if (deleteProfilesErr) {
-              console.error('[Supabase Wipe Error] Failed to delete profiles:', deleteProfilesErr.message);
+              console.log('[Supabase Wipe Status] Delete profiles outcome:', deleteProfilesErr.message);
             }
 
             // 3. Delete corresponding auth.users data using service role / admin auth API
@@ -388,13 +413,13 @@ async function startServer() {
             for (const id of ids) {
               const { error: deleteAuthErr } = await supabase.auth.admin.deleteUser(id);
               if (deleteAuthErr) {
-                console.error(`[Supabase Wipe Error] Failed to delete auth.user ${id}:`, deleteAuthErr.message);
+                console.log(`[Supabase Wipe Status] Delete auth.user ${id} outcome:`, deleteAuthErr.message);
               }
             }
           }
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
-          console.error('[Supabase Wipe Players Exception]:', err?.message || err);
+          console.log('[Supabase Wipe Status] Players wipe details:', err?.message || err);
         }
       }
     }
@@ -415,20 +440,27 @@ async function startServer() {
               autoRefreshToken: false,
             }
           });
-          for (const app of req.body.playerApplications) {
-            const { error: updateError } = await supabase
+          
+          // Update statuses in parallel using Promise.all
+          const updatePromises = req.body.playerApplications.map((app: any) =>
+            supabase
               .from('profiles')
               .update({ status: app.status })
-              .eq('id', app.id);
-
-            if (updateError) {
-              console.error(`[Supabase Status Sync Error] Failed to update profile status for user ${app.id}:`, updateError.message);
+              .eq('id', app.id)
+          );
+          
+          const results = await Promise.all(updatePromises);
+          results.forEach((res, index) => {
+            if (res.error) {
+              const app = req.body.playerApplications[index];
+              console.log(`[Supabase Status Sync] Update status details for user ${app?.id}:`, res.error.message);
             }
-          }
+          });
+
           // Invalidate cache so next GET is direct
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
-          console.error('[Supabase Status Sync Exception]:', err?.message || err);
+          console.log('[Supabase Status Sync] Operation details:', err?.message || err);
         }
       }
     }
@@ -449,8 +481,10 @@ async function startServer() {
               autoRefreshToken: false,
             }
           });
-          for (const player of req.body.players) {
-            const { error: updateError } = await supabase
+
+          // Update stats in parallel using Promise.all
+          const updatePromises = req.body.players.map((player: any) =>
+            supabase
               .from('profiles')
               .update({
                 status: player.status,
@@ -460,15 +494,20 @@ async function startServer() {
                 total_points: player.totalPoints,
                 highest_break: player.highestBreak,
               })
-              .eq('id', player.id);
+              .eq('id', player.id)
+          );
 
-            if (updateError) {
-              console.error(`[Supabase Player Stats Sync Error] Failed to update stats for user ${player.id}:`, updateError.message);
+          const results = await Promise.all(updatePromises);
+          results.forEach((res, index) => {
+            if (res.error) {
+              const player = req.body.players[index];
+              console.log(`[Supabase Player Stats Sync] Update details for user ${player?.id}:`, res.error.message);
             }
-          }
+          });
+
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
-          console.error('[Supabase Player Stats Sync Exception]:', err?.message || err);
+          console.log('[Supabase Player Stats Sync] Operation details:', err?.message || err);
         }
       }
     }
@@ -508,7 +547,7 @@ async function startServer() {
                   .from('tournament_types')
                   .delete()
                   .in('name', toDelete);
-                if (delErr) console.error('[Supabase Type Sync Error] Failed to delete tournament types:', delErr.message);
+                if (delErr) console.log('[Supabase Type Sync] Delete tournament types notice:', delErr.message);
               }
 
               // Insert or update remaining types
@@ -521,7 +560,7 @@ async function startServer() {
                     is_active: isActive
                   }, { onConflict: 'name' });
                 
-                if (upsertErr) console.error(`[Supabase Type Sync Error] Failed to upsert tournament type "${type}":`, upsertErr.message);
+                if (upsertErr) console.log(`[Supabase Type Sync] Upsert tournament type "${type}" notice:`, upsertErr.message);
               }
             }
           } else if (selectedTournamentType) {
@@ -531,17 +570,17 @@ async function startServer() {
               .update({ is_active: false })
               .not('name', 'eq', selectedTournamentType);
             
-            if (resetErr) console.error('[Supabase Type Sync Error] Failed to reset active states:', resetErr.message);
+            if (resetErr) console.log('[Supabase Type Sync] Reset active states notice:', resetErr.message);
 
             const { error: setErr } = await supabase
               .from('tournament_types')
               .update({ is_active: true })
               .eq('name', selectedTournamentType);
             
-            if (setErr) console.error(`[Supabase Type Sync Error] Failed to set active state for "${selectedTournamentType}":`, setErr.message);
+            if (setErr) console.log(`[Supabase Type Sync] Set active state for "${selectedTournamentType}" notice:`, setErr.message);
           }
         } catch (err: any) {
-          console.error('[Supabase Tournament Types Sync Exception]:', err?.message || err);
+          console.log('[Supabase Tournament Types Sync] Operation details:', err?.message || err);
         }
       }
     }
@@ -624,7 +663,7 @@ async function startServer() {
                 }
               }
             } else {
-              console.error('[Supabase Admin Sync Error]:', error.message);
+              console.log('[Supabase Admin Sync] Create user details:', error.message);
             }
           } else if (data && data.user) {
             targetUserId = data.user.id;
@@ -644,7 +683,7 @@ async function startServer() {
             if (error.message.includes('already been registered') || error.message.includes('already exists')) {
               console.log(`[Supabase SignUp Sync] User already exists for ${userEmail}. We will try direct database upsert if we can.`);
             } else {
-              console.error('[Supabase SignUp Sync Error]:', error.message);
+              console.log('[Supabase SignUp Sync] Signup details:', error.message);
             }
           } else if (data && data.user) {
             targetUserId = data.user.id;
@@ -713,7 +752,7 @@ async function startServer() {
               });
               console.log('[Supabase Admin Sync]: Updated user auth metadata with new file URLs.');
             } catch (metaErr: any) {
-              console.error('[Supabase Admin Sync Error] Updating user auth metadata failed:', metaErr?.message || metaErr);
+              console.log('[Supabase Admin Sync] Auth metadata update details:', metaErr?.message || metaErr);
             }
           }
 
@@ -739,7 +778,7 @@ async function startServer() {
           if (upsertError) {
             supabaseSyncStatus = "warning_profiles_upsert_failed";
             supabaseSyncError = upsertError.message;
-            console.error('[Supabase DB Sync Error]: Direct profiles upsert failed:', upsertError.message);
+            console.log('[Supabase DB Sync] Direct profiles upsert notice:', upsertError.message);
           } else {
             supabaseSyncStatus = "success";
             console.log('[Supabase DB Sync Success]: Successfully upserted player profile directly.');
@@ -752,7 +791,7 @@ async function startServer() {
       } catch (err: any) {
         supabaseSyncStatus = "error";
         supabaseSyncError = err?.message || String(err);
-        console.error('[Supabase Sync Exception]:', err?.message || err);
+        console.log('[Supabase Sync] Operation details:', err?.message || err);
       }
     } else {
       supabaseSyncStatus = "skipped_missing_credentials";

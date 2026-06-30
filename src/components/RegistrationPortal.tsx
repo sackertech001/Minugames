@@ -399,7 +399,7 @@ export default function RegistrationPortal({
               {photoDataUrl ? (
                 <div className="relative border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-3 bg-bg-primary dark:bg-[#05101E] flex items-center gap-4">
                   <img
-                    src={photoDataUrl}
+                    src={photoDataUrl || undefined}
                     alt="Uploaded avatar preview"
                     className="w-16 h-16 rounded-lg object-cover border border-rose-500/25 shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                     referrerPolicy="no-referrer"
@@ -601,7 +601,7 @@ export default function RegistrationPortal({
                     >
                       <div className="relative shrink-0">
                         <img
-                          src={p.photoUrl}
+                          src={p.photoUrl || undefined}
                           alt={p.name}
                           className="w-10 h-10 rounded-lg object-cover border border-rose-500/15 dark:border-rose-500/20 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.05)] dark:shadow-[0_0_8px_rgba(239,68,68,0.1)]"
                           referrerPolicy="no-referrer"
@@ -828,7 +828,7 @@ export default function RegistrationPortal({
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                           <div className="flex items-center gap-3.5">
                             <img
-                              src={app.photoUrl}
+                              src={app.photoUrl || undefined}
                               alt={app.fullName}
                               className="w-12 h-12 rounded-xl object-cover border border-rose-500/20 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.1)]"
                               referrerPolicy="no-referrer"
@@ -988,7 +988,7 @@ export default function RegistrationPortal({
 
                                   // Create player
                                   const newPlayer: Player = {
-                                    id: `p-${Date.now()}`,
+                                    id: app.id,
                                     name: app.fullName,
                                     nickname: app.nickname,
                                     club: app.club,

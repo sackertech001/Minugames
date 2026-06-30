@@ -198,11 +198,11 @@ export default function App() {
                 .update({ status: app.status })
                 .eq('id', app.id);
               if (updateError) {
-                console.error(`[Client Supabase DB Update Error] Failed to update profile status for ${app.id}:`, updateError.message);
+                console.log(`[Client Supabase] Update profile status notice for ${app.id}:`, updateError.message);
               }
             }
           } catch (err: any) {
-            console.error('[Client Supabase Status Sync Exception]:', err?.message || err);
+            console.log('[Client Supabase] Status sync notice:', err?.message || err);
           }
         }
 
@@ -221,11 +221,11 @@ export default function App() {
                 })
                 .eq('id', player.id);
               if (updateError) {
-                console.error(`[Client Supabase Player Stats Sync Error] Failed to update stats for user ${player.id}:`, updateError.message);
+                console.log(`[Client Supabase] Update stats notice for user ${player.id}:`, updateError.message);
               }
             }
           } catch (err: any) {
-            console.error('[Client Supabase Player Stats Sync Exception]:', err?.message || err);
+            console.log('[Client Supabase] Player stats sync notice:', err?.message || err);
           }
         }
 
@@ -241,7 +241,7 @@ export default function App() {
                 .delete()
                 .in('id', ids);
               if (deleteProfilesErr) {
-                console.error('[Client Supabase Wipe Error] Failed to delete profiles:', deleteProfilesErr.message);
+                console.log('[Client Supabase] Delete profiles notice:', deleteProfilesErr.message);
               }
 
               for (const id of ids) {
@@ -251,7 +251,7 @@ export default function App() {
               }
             }
           } catch (err: any) {
-            console.error('[Client Supabase Wipe Exception]:', err?.message || err);
+            console.log('[Client Supabase] Wipe notice:', err?.message || err);
           }
         }
 
@@ -295,7 +295,7 @@ export default function App() {
                 .eq('name', selectedTournamentType);
             }
           } catch (err: any) {
-            console.error('[Client Supabase Tournament Types Sync Exception]:', err?.message || err);
+            console.log('[Client Supabase] Tournament types sync notice:', err?.message || err);
           }
         }
       }
@@ -369,9 +369,6 @@ export default function App() {
       const savedApplications = safeStorage.getItem('snooker_player_applications');
       const savedLogo = safeStorage.getItem('snooker_system_logo');
 
-      if (savedPlayers) {
-        setPlayers(JSON.parse(savedPlayers));
-      }
       if (savedMatches) {
         setMatches(JSON.parse(savedMatches));
       }
@@ -405,14 +402,11 @@ export default function App() {
       if (savedCurrentUser) {
         setCurrentUser(JSON.parse(savedCurrentUser));
       }
-      if (savedApplications) {
-        setPlayerApplications(JSON.parse(savedApplications));
-      }
       if (savedLogo) {
         setSystemLogo(savedLogo);
       }
     } catch (e) {
-      console.error('Failed to parse state from storage:', e);
+      console.log('Storage read notice:', e);
     }
   }, []);
 
@@ -421,17 +415,7 @@ export default function App() {
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       try {
-        if (e.key === 'snooker_player_applications') {
-          if (e.newValue) {
-            setPlayerApplications(JSON.parse(e.newValue));
-          } else {
-            setPlayerApplications([]);
-          }
-        } else if (e.key === 'snooker_players') {
-          if (e.newValue) {
-            setPlayers(JSON.parse(e.newValue));
-          }
-        } else if (e.key === 'snooker_matches') {
+        if (e.key === 'snooker_matches') {
           if (e.newValue) {
             setMatches(JSON.parse(e.newValue));
           }
@@ -449,7 +433,7 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.error('Failed to parse synchronized state from other tab:', err);
+        console.log('Synchronization parsing notice:', err);
       }
     };
 
@@ -463,7 +447,6 @@ export default function App() {
           
           setPlayers((prev) => {
             if (JSON.stringify(prev) !== JSON.stringify(data.players)) {
-              safeStorage.setItem('snooker_players', JSON.stringify(data.players));
               return data.players;
             }
             return prev;
@@ -511,7 +494,6 @@ export default function App() {
 
           setPlayerApplications((prev) => {
             if (JSON.stringify(prev) !== JSON.stringify(data.playerApplications)) {
-              safeStorage.setItem('snooker_player_applications', JSON.stringify(data.playerApplications));
               return data.playerApplications;
             }
             return prev;
@@ -541,33 +523,6 @@ export default function App() {
 
       // Local storage fallback sync
       try {
-        const savedApps = safeStorage.getItem('snooker_player_applications');
-        if (savedApps) {
-          const parsed = JSON.parse(savedApps);
-          setPlayerApplications((prev) => {
-            if (JSON.stringify(prev) !== savedApps) {
-              return parsed;
-            }
-            return prev;
-          });
-        } else {
-          setPlayerApplications((prev) => {
-            if (prev.length > 0) return [];
-            return prev;
-          });
-        }
-
-        const savedPlayers = safeStorage.getItem('snooker_players');
-        if (savedPlayers) {
-          const parsed = JSON.parse(savedPlayers);
-          setPlayers((prev) => {
-            if (JSON.stringify(prev) !== savedPlayers) {
-              return parsed;
-            }
-            return prev;
-          });
-        }
-
         const savedMatches = safeStorage.getItem('snooker_matches');
         if (savedMatches) {
           const parsed = JSON.parse(savedMatches);
@@ -629,7 +584,6 @@ export default function App() {
 
                 setPlayerApplications((prev) => {
                   if (JSON.stringify(prev) !== JSON.stringify(mappedApps)) {
-                    safeStorage.setItem('snooker_player_applications', JSON.stringify(mappedApps));
                     return mappedApps;
                   }
                   return prev;
@@ -657,7 +611,6 @@ export default function App() {
 
                 setPlayers((prev) => {
                   if (JSON.stringify(prev) !== JSON.stringify(dbPlayers)) {
-                    safeStorage.setItem('snooker_players', JSON.stringify(dbPlayers));
                     return dbPlayers;
                   }
                   return prev;
@@ -685,7 +638,7 @@ export default function App() {
                 });
               }
             } catch (dbErr) {
-              console.error('[Client Supabase DB Sync Exception]:', dbErr);
+              console.log('[Client Supabase] DB sync notice:', dbErr);
             }
           }
         }
@@ -705,7 +658,7 @@ export default function App() {
           });
         }
       } catch (err) {
-        console.error('Error polling sync from localStorage:', err);
+        console.log('Polling sync notice:', err);
       }
     };
 
@@ -729,7 +682,6 @@ export default function App() {
     newMatches: Match[],
     started: boolean
   ) => {
-    safeStorage.setItem('snooker_players', JSON.stringify(newPlayers));
     safeStorage.setItem('snooker_matches', JSON.stringify(newMatches));
     safeStorage.setItem('snooker_started', JSON.stringify(started));
     saveStateToServer({ players: newPlayers, matches: newMatches, isTournamentStarted: started });
@@ -1243,7 +1195,6 @@ export default function App() {
 
   const handleApplicationsChange = (newApps: PlayerApplication[]) => {
     setPlayerApplications(newApps);
-    safeStorage.setItem('snooker_player_applications', JSON.stringify(newApps));
     saveStateToServer({ playerApplications: newApps });
   };
 
@@ -1343,7 +1294,7 @@ export default function App() {
           return;
         }
       } catch (e) {
-        console.error('Failed to submit application to server, using local fallback:', e);
+        console.log('Application submission notice:', e);
       }
 
       // If server submission failed (404/Netlify/Offline) and client-side Supabase is configured
@@ -1375,7 +1326,7 @@ export default function App() {
           });
 
           if (signUpError) {
-            console.error('[Client Supabase SignUp Error]:', signUpError.message);
+            console.log('[Client Supabase] SignUp notice:', signUpError.message);
           }
 
           const targetUserId = signUpData?.user?.id;
@@ -1419,14 +1370,14 @@ export default function App() {
                     .upload(fileName, fileRes.blob, { contentType: fileRes.contentType, upsert: true });
 
                   if (uploadError) {
-                    console.error('[Client Supabase Photo Upload Error]:', uploadError.message);
+                    console.log('[Client Supabase] Photo upload notice:', uploadError.message);
                   } else if (uploadData) {
                     const { data: { publicUrl } } = supabase.storage.from('player photos').getPublicUrl(fileName);
                     finalPhotoUrl = publicUrl;
                   }
                 }
               } catch (photoErr) {
-                console.error('[Client Supabase Photo Upload Exception]:', photoErr);
+                console.log('[Client Supabase] Photo upload issue:', photoErr);
               }
             }
 
@@ -1442,14 +1393,14 @@ export default function App() {
                     .upload(fileName, fileRes.blob, { contentType: fileRes.contentType, upsert: true });
 
                   if (uploadError) {
-                    console.error('[Client Supabase Document Upload Error]:', uploadError.message);
+                    console.log('[Client Supabase] Document upload notice:', uploadError.message);
                   } else if (uploadData) {
                     const { data: { publicUrl } } = supabase.storage.from('player documents').getPublicUrl(fileName);
                     finalDocumentUrl = publicUrl;
                   }
                 }
               } catch (docErr) {
-                console.error('[Client Supabase Document Upload Exception]:', docErr);
+                console.log('[Client Supabase] Document upload issue:', docErr);
               }
             }
 
@@ -1472,7 +1423,7 @@ export default function App() {
               });
 
             if (upsertError) {
-              console.error('[Client Supabase profiles upsert error]:', upsertError.message);
+              console.log('[Client Supabase] Profiles upsert notice:', upsertError.message);
             } else {
               console.log('[Client Supabase Sync Success] Application fully registered and synced.');
               isSyncedWithSupabase = true;
@@ -1496,13 +1447,12 @@ export default function App() {
                   tournamentType: p.tournament_type || ''
                 }));
                 setPlayerApplications(mappedApps);
-                safeStorage.setItem('snooker_player_applications', JSON.stringify(mappedApps));
                 return;
               }
             }
           }
         } catch (err: any) {
-          console.error('[Client Supabase Sync Exception]:', err?.message || err);
+          console.log('[Client Supabase] Operation details:', err?.message || err);
         }
       }
 
@@ -1514,17 +1464,7 @@ export default function App() {
         appliedAt: new Date().toISOString()
       };
       
-      let currentApps: PlayerApplication[] = [];
-      try {
-        const savedApps = safeStorage.getItem('snooker_player_applications');
-        if (savedApps) {
-          currentApps = JSON.parse(savedApps);
-        }
-      } catch (e) {
-        console.error('Failed to parse current applications from storage:', e);
-      }
-      
-      const updated = [...currentApps, newApp];
+      const updated = [...playerApplications, newApp];
       handleApplicationsChange(updated);
     };
 

@@ -245,7 +245,7 @@ export default function MatchScorerModal({
                 <div className="flex flex-col items-center text-center w-5/12">
                   <div className="relative p-1 rounded-full bg-gradient-to-b from-[#D4AF37] to-transparent shadow-lg shadow-black/40">
                     <img
-                      src={p1.photoUrl}
+                      src={p1.photoUrl || undefined}
                       alt={p1.name}
                       className="w-14 h-14 rounded-full object-cover border-2 border-[#05101E]"
                       referrerPolicy="no-referrer"
@@ -271,7 +271,7 @@ export default function MatchScorerModal({
                 <div className="flex flex-col items-center text-center w-5/12">
                   <div className="relative p-1 rounded-full bg-gradient-to-b from-[#D4AF37] to-transparent shadow-lg shadow-black/40">
                     <img
-                      src={p2.photoUrl}
+                      src={p2.photoUrl || undefined}
                       alt={p2.name}
                       className="w-14 h-14 rounded-full object-cover border-2 border-[#05101E]"
                       referrerPolicy="no-referrer"
