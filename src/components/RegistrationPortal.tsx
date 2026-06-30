@@ -55,10 +55,11 @@ export default function RegistrationPortal({
   const [selectedSeeds, setSelectedSeeds] = useState<Record<string, number>>({});
 
 
-  // Find next available seed (1-playersCount)
+  // Find next available seed
   const getNextAvailableSeed = (): number => {
     const registeredSeeds = players.map((p) => p.seed);
-    for (let s = 1; s <= playersCount; s++) {
+    const maxSearch = Math.max(playersCount, players.length + 100);
+    for (let s = 1; s <= maxSearch; s++) {
       if (!registeredSeeds.includes(s)) {
         return s;
       }
@@ -154,8 +155,8 @@ export default function RegistrationPortal({
     }
 
     const seedNum = Number(seed);
-    if (isNaN(seedNum) || seedNum < 1 || seedNum > playersCount) {
-      setError(`Seed must be a number between 1 and ${playersCount}.`);
+    if (isNaN(seedNum) || seedNum < 1) {
+      setError(`Seed must be a positive number starting from 1.`);
       return;
     }
 
@@ -192,10 +193,6 @@ export default function RegistrationPortal({
       setEditingPlayerId(null);
     } else {
       // Add mode
-      if (players.length >= playersCount) {
-        setError(`Maximum limit of ${playersCount} players reached. You cannot register more.`);
-        return;
-      }
 
       const newPlayer: Player = {
         id: `p-${Date.now()}`,
@@ -360,7 +357,7 @@ export default function RegistrationPortal({
 
               <div>
                 <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
-                  Seed Rank (1-{playersCount}) <span className="text-rose-500 font-bold">*</span>
+                  Seed Rank <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="number"
@@ -369,7 +366,6 @@ export default function RegistrationPortal({
                   disabled={isTournamentStarted}
                   onChange={(e) => setSeed(e.target.value === '' ? '' : Number(e.target.value))}
                   min={1}
-                  max={playersCount}
                   className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -492,7 +488,7 @@ export default function RegistrationPortal({
                 : 'border-transparent text-text-muted hover:text-text-primary dark:text-slate-500 dark:hover:text-slate-300'
             }`}
           >
-            <Users className="w-4 h-4" /> Active Roster ({players.length}/{playersCount})
+            <Users className="w-4 h-4" /> Active Roster ({players.length})
           </button>
           <button
             type="button"
@@ -545,24 +541,24 @@ export default function RegistrationPortal({
               <div className="mt-5">
                 <div className="flex justify-between text-[11px] font-sans font-black text-rose-600 dark:text-rose-500/70 tracking-wider mb-2">
                   <span>REGISTERED PLAYERS</span>
-                  <span className="text-rose-500">{players.length} / {playersCount} Slots Filled</span>
+                  <span className="text-rose-500">{players.length} Players Registered</span>
                 </div>
                 <div className="w-full bg-bg-primary dark:bg-[#05101E] rounded-full h-3.5 overflow-hidden border border-rose-500/10 dark:border-rose-500/15 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)]">
                   <div
                     className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r from-rose-950 via-rose-500 to-rose-400 shadow-[0_0_10px_rgba(239,68,68,0.3)] dark:shadow-[0_0_10px_rgba(239,68,68,0.5)]`}
-                    style={{ width: `${(players.length / playersCount) * 100}%` }}
+                    style={{ width: `${Math.min(100, (players.length / playersCount) * 100)}%` }}
                   ></div>
                 </div>
               </div>
 
               {/* Unlock Tournament Action */}
-              {players.length === playersCount && !isTournamentStarted && (
-                <div className="mt-5 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
+              {players.length >= playersCount && !isTournamentStarted && (
+                <div className="mt-5 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <CheckCircle2 className="w-6 h-6 text-rose-500 shrink-0" />
                     <div className="text-left">
                       <h5 className="text-sm font-black text-rose-500 uppercase tracking-wide">Ready to Draw Bracket</h5>
-                      <p className="text-xs text-text-secondary dark:text-slate-400">All {playersCount} slots are registered. Generate the schedule now.</p>
+                      <p className="text-xs text-text-secondary dark:text-slate-400">{players.length} players registered (bracket requires at least {playersCount}). Generate the schedule now.</p>
                     </div>
                   </div>
                   <button
@@ -804,13 +800,14 @@ export default function RegistrationPortal({
                   .map((app) => {
                     const assignedSeeds = players.map(p => p.seed);
                     const availableSeeds = [];
-                    for (let i = 1; i <= playersCount; i++) {
+                    const maxSearch = Math.max(playersCount, players.length + 100);
+                    for (let i = 1; i <= maxSearch; i++) {
                       if (!assignedSeeds.includes(i)) {
                         availableSeeds.push(i);
                       }
                     }
                     
-                    const isRosterFull = players.length >= playersCount;
+                    const isRosterFull = false;
                     const selectedSeed = selectedSeeds[app.id] || availableSeeds[0] || 1;
 
                     return (

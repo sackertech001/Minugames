@@ -437,88 +437,97 @@ export default function App() {
       }
     };
 
+    let apiPermanentlyUnavailable = false;
+    let lastSupabaseFetchTime = 0;
+
     const pollSync = async () => {
+      const now = Date.now();
       let apiSucceeded = false;
-      try {
-        const res = await fetch('/api/state');
-        if (res.ok) {
-          apiSucceeded = true;
-          const data = await res.json();
-          
-          setPlayers((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(data.players)) {
-              return data.players;
-            }
-            return prev;
-          });
+      if (!apiPermanentlyUnavailable) {
+        try {
+          const res = await fetch('/api/state');
+          if (res.ok) {
+            apiSucceeded = true;
+            const data = await res.json();
+            
+            setPlayers((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(data.players)) {
+                return data.players;
+              }
+              return prev;
+            });
 
-          setMatches((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(data.matches)) {
-              safeStorage.setItem('snooker_matches', JSON.stringify(data.matches));
-              return data.matches;
-            }
-            return prev;
-          });
+            setMatches((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(data.matches)) {
+                safeStorage.setItem('snooker_matches', JSON.stringify(data.matches));
+                return data.matches;
+              }
+              return prev;
+            });
 
-          setIsTournamentStarted((prev) => {
-            if (prev !== data.isTournamentStarted) {
-              safeStorage.setItem('snooker_started', JSON.stringify(data.isTournamentStarted));
-              return data.isTournamentStarted;
-            }
-            return prev;
-          });
+            setIsTournamentStarted((prev) => {
+              if (prev !== data.isTournamentStarted) {
+                safeStorage.setItem('snooker_started', JSON.stringify(data.isTournamentStarted));
+                return data.isTournamentStarted;
+              }
+              return prev;
+            });
 
-          setTournamentConfig((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(data.tournamentConfig)) {
-              safeStorage.setItem('snooker_config', JSON.stringify(data.tournamentConfig));
-              return data.tournamentConfig;
-            }
-            return prev;
-          });
+            setTournamentConfig((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(data.tournamentConfig)) {
+                safeStorage.setItem('snooker_config', JSON.stringify(data.tournamentConfig));
+                return data.tournamentConfig;
+              }
+              return prev;
+            });
 
-          setSystemUsers((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(data.systemUsers)) {
-              safeStorage.setItem('snooker_users', JSON.stringify(data.systemUsers));
-              return data.systemUsers;
-            }
-            return prev;
-          });
+            setSystemUsers((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(data.systemUsers)) {
+                safeStorage.setItem('snooker_users', JSON.stringify(data.systemUsers));
+                return data.systemUsers;
+              }
+              return prev;
+            });
 
-          setRolePermissions((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(data.rolePermissions)) {
-              safeStorage.setItem('snooker_role_permissions', JSON.stringify(data.rolePermissions));
-              return data.rolePermissions;
-            }
-            return prev;
-          });
+            setRolePermissions((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(data.rolePermissions)) {
+                safeStorage.setItem('snooker_role_permissions', JSON.stringify(data.rolePermissions));
+                return data.rolePermissions;
+              }
+              return prev;
+            });
 
-          setPlayerApplications((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(data.playerApplications)) {
-              return data.playerApplications;
-            }
-            return prev;
-          });
+            setPlayerApplications((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(data.playerApplications)) {
+                return data.playerApplications;
+              }
+              return prev;
+            });
 
-          setPublicRegistrationEnabled((prev) => {
-            if (prev !== data.publicRegistrationEnabled) {
-              safeStorage.setItem('snooker_public_registration_enabled', String(data.publicRegistrationEnabled));
-              return data.publicRegistrationEnabled;
-            }
-            return prev;
-          });
+            setPublicRegistrationEnabled((prev) => {
+              if (prev !== data.publicRegistrationEnabled) {
+                safeStorage.setItem('snooker_public_registration_enabled', String(data.publicRegistrationEnabled));
+                return data.publicRegistrationEnabled;
+              }
+              return prev;
+            });
 
-          setSystemLogo((prev) => {
-            if (prev !== data.systemLogo) {
-              safeStorage.setItem('snooker_system_logo', data.systemLogo || '');
-              return data.systemLogo || '';
-            }
-            return prev;
-          });
+            setSystemLogo((prev) => {
+              if (prev !== data.systemLogo) {
+                safeStorage.setItem('snooker_system_logo', data.systemLogo || '');
+                return data.systemLogo || '';
+              }
+              return prev;
+            });
 
-          return;
+            return;
+          } else if (res.status === 404) {
+            apiPermanentlyUnavailable = true;
+            console.log('Backend API /api/state returned 404. This is normal for static web hosting (like Hostinger). Switching to pure client-side Supabase and LocalStorage mode.');
+          }
+        } catch (err) {
+          console.warn('API sync unavailable, falling back to local storage sync:', err);
         }
-      } catch (err) {
-        console.warn('API sync unavailable, falling back to local storage sync:', err);
       }
 
       // Local storage fallback sync
@@ -560,85 +569,89 @@ export default function App() {
         if (!apiSucceeded) {
           const supabase = getSupabase();
           if (supabase) {
-            try {
-              const { data: dbProfiles, error: fetchError } = await supabase
-                .from('profiles')
-                .select('*');
+            // Throttle client-side Supabase queries to every 10 seconds to avoid API limits exhaustion
+            if (now - lastSupabaseFetchTime >= 10000) {
+              lastSupabaseFetchTime = now;
+              try {
+                const { data: dbProfiles, error: fetchError } = await supabase
+                  .from('profiles')
+                  .select('*');
 
-              if (!fetchError && dbProfiles) {
-                const mappedApps = dbProfiles.map((p: any) => ({
-                  id: p.id,
-                  fullName: p.full_name || '',
-                  nickname: p.nickname || '',
-                  club: p.club || '',
-                  phoneNumber: p.phone_number || '',
-                  whatsappNumber: p.whatsapp_number || '',
-                  socialMediaPage: p.social_media_page || '',
-                  photoUrl: p.photo_url || '',
-                  documentUrl: p.document_url || '',
-                  documentName: p.document_name || '',
-                  status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
-                  appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
-                  tournamentType: p.tournament_type || ''
-                }));
-
-                setPlayerApplications((prev) => {
-                  if (JSON.stringify(prev) !== JSON.stringify(mappedApps)) {
-                    return mappedApps;
-                  }
-                  return prev;
-                });
-
-                // Pick players that have approved/active status from profiles to populate players state
-                const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
-                const dbPlayers = dbProfiles
-                  .filter((p: any) => approvedStatuses.includes(p.status))
-                  .map((p: any) => ({
+                if (!fetchError && dbProfiles) {
+                  const mappedApps = dbProfiles.map((p: any) => ({
                     id: p.id,
-                    name: p.full_name || 'Tournament Player',
+                    fullName: p.full_name || '',
                     nickname: p.nickname || '',
                     club: p.club || '',
-                    seed: p.seed || 1,
+                    phoneNumber: p.phone_number || '',
+                    whatsappNumber: p.whatsapp_number || '',
+                    socialMediaPage: p.social_media_page || '',
                     photoUrl: p.photo_url || '',
-                    matchesPlayed: p.matches_played || 0,
-                    matchesWon: p.matches_won || 0,
-                    totalPoints: p.total_points || 0,
-                    highestBreak: p.highest_break || 0,
-                    status: p.status === 'approved' ? 'active' : p.status,
+                    documentUrl: p.document_url || '',
+                    documentName: p.document_name || '',
+                    status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
+                    appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
                     tournamentType: p.tournament_type || ''
-                  }))
-                  .sort((a, b) => (a.seed || 0) - (b.seed || 0));
+                  }));
 
-                setPlayers((prev) => {
-                  if (JSON.stringify(prev) !== JSON.stringify(dbPlayers)) {
-                    return dbPlayers;
-                  }
-                  return prev;
-                });
+                  setPlayerApplications((prev) => {
+                    if (JSON.stringify(prev) !== JSON.stringify(mappedApps)) {
+                      return mappedApps;
+                    }
+                    return prev;
+                  });
+
+                  // Pick players that have approved/active status from profiles to populate players state
+                  const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+                  const dbPlayers = dbProfiles
+                    .filter((p: any) => approvedStatuses.includes(p.status))
+                    .map((p: any) => ({
+                      id: p.id,
+                      name: p.full_name || 'Tournament Player',
+                      nickname: p.nickname || '',
+                      club: p.club || '',
+                      seed: p.seed || 1,
+                      photoUrl: p.photo_url || '',
+                      matchesPlayed: p.matches_played || 0,
+                      matchesWon: p.matches_won || 0,
+                      totalPoints: p.total_points || 0,
+                      highestBreak: p.highest_break || 0,
+                      status: p.status === 'approved' ? 'active' : p.status,
+                      tournamentType: p.tournament_type || ''
+                    }))
+                    .sort((a, b) => (a.seed || 0) - (b.seed || 0));
+
+                  setPlayers((prev) => {
+                    if (JSON.stringify(prev) !== JSON.stringify(dbPlayers)) {
+                      return dbPlayers;
+                    }
+                    return prev;
+                  });
+                }
+
+                const { data: dbTypes, error: typesError } = await supabase
+                  .from('tournament_types')
+                  .select('*');
+
+                if (!typesError && dbTypes && dbTypes.length > 0) {
+                  const typesList = dbTypes.map((t: any) => t.name);
+                  const activeType = dbTypes.find((t: any) => t.is_active)?.name || typesList[0] || 'Snooker';
+                  setTournamentConfig((prev) => {
+                    const updated = {
+                      ...prev,
+                      tournamentTypes: typesList,
+                      selectedTournamentType: activeType
+                    };
+                    if (JSON.stringify(prev) !== JSON.stringify(updated)) {
+                      safeStorage.setItem('snooker_config', JSON.stringify(updated));
+                      return updated;
+                    }
+                    return prev;
+                  });
+                }
+              } catch (dbErr) {
+                console.log('[Client Supabase] DB sync notice:', dbErr);
               }
-
-              const { data: dbTypes, error: typesError } = await supabase
-                .from('tournament_types')
-                .select('*');
-
-              if (!typesError && dbTypes && dbTypes.length > 0) {
-                const typesList = dbTypes.map((t: any) => t.name);
-                const activeType = dbTypes.find((t: any) => t.is_active)?.name || typesList[0] || 'Snooker';
-                setTournamentConfig((prev) => {
-                  const updated = {
-                    ...prev,
-                    tournamentTypes: typesList,
-                    selectedTournamentType: activeType
-                  };
-                  if (JSON.stringify(prev) !== JSON.stringify(updated)) {
-                    safeStorage.setItem('snooker_config', JSON.stringify(updated));
-                    return updated;
-                  }
-                  return prev;
-                });
-              }
-            } catch (dbErr) {
-              console.log('[Client Supabase] DB sync notice:', dbErr);
             }
           }
         }
@@ -735,17 +748,22 @@ export default function App() {
 
   // 2. Start Championship Action
   const handleStartTournament = () => {
-    if (players.length !== tournamentConfig.playersCount) {
-      showToast(`Please register exactly ${tournamentConfig.playersCount} players to commence!`, 'error');
+    if (players.length < tournamentConfig.playersCount) {
+      showToast(`Please register at least ${tournamentConfig.playersCount} players to commence! (Currently: ${players.length})`, 'error');
       return;
     }
+
+    // Slice players to configured bracket size based on seed order
+    const activePlayers = [...players]
+      .sort((a, b) => a.seed - b.seed)
+      .slice(0, tournamentConfig.playersCount);
 
     // Create the scheduled matches list depending on configured playersCount
     let matchesToSet: Match[] = [];
     if (tournamentConfig.formatType === 'group' && tournamentConfig.groups) {
       matchesToSet = generateGroupFixtures(tournamentConfig.groups);
     } else {
-      matchesToSet = createInitialMatches(players, tournamentConfig.playersCount);
+      matchesToSet = createInitialMatches(activePlayers, tournamentConfig.playersCount);
     }
     
     setMatches(matchesToSet);
