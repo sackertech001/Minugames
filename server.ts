@@ -126,6 +126,34 @@ function writeState(state: TournamentState) {
   }
 }
 
+// Ensure Supabase Storage bucket exists and is public
+async function ensureBucketExists(supabase: any, bucketName: string) {
+  try {
+    console.log(`[Supabase Storage] Checking if bucket "${bucketName}" exists...`);
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    if (listError) {
+      console.error(`[Supabase Storage] Error listing buckets:`, listError.message);
+      return;
+    }
+    const exists = buckets && buckets.some((b: any) => b.name === bucketName);
+    if (!exists) {
+      console.log(`[Supabase Storage] Bucket "${bucketName}" not found. Creating it as a public bucket...`);
+      const { error: createError } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+      });
+      if (createError) {
+        console.error(`[Supabase Storage] Error creating bucket "${bucketName}":`, createError.message);
+      } else {
+        console.log(`[Supabase Storage] Successfully created public bucket "${bucketName}".`);
+      }
+    } else {
+      console.log(`[Supabase Storage] Bucket "${bucketName}" already exists.`);
+    }
+  } catch (err: any) {
+    console.error(`[Supabase Storage] Exception while ensuring bucket "${bucketName}" exists:`, err?.message || err);
+  }
+}
+
 // Helper to decode Base64 data and upload it directly to Supabase Storage bucket
 async function uploadBase64ToSupabase(
   supabase: any,
@@ -140,6 +168,8 @@ async function uploadBase64ToSupabase(
   }
 
   try {
+    // Proactively ensure the target bucket exists before attempting upload
+    await ensureBucketExists(supabase, bucketName);
     const parts = base64String.split(",");
     if (parts.length < 2) return null;
 
@@ -238,6 +268,31 @@ async function startServer() {
   } else {
     console.log("✅ SUCCESS: Backend has fully-authorized Admin Service Role access to Supabase.");
   }
+
+  // Proactively ensure storage buckets are created and configured as public on startup
+  if (bootSupabaseUrl && bootSupabaseUrl !== "YOUR_SUPABASE_URL") {
+    const activeKey = (bootServiceRoleKey && bootServiceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY") 
+      ? bootServiceRoleKey 
+      : (bootSupabaseAnonKey && bootSupabaseAnonKey !== "YOUR_SUPABASE_ANON_KEY" ? bootSupabaseAnonKey : null);
+    
+    if (activeKey) {
+      try {
+        const initSupabase = createClient(bootSupabaseUrl, activeKey, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+        console.log("[Supabase Storage] Proactively initializing storage buckets on server boot...");
+        ensureBucketExists(initSupabase, 'player photos');
+        ensureBucketExists(initSupabase, 'player documents');
+        ensureBucketExists(initSupabase, 'player-photos');
+        ensureBucketExists(initSupabase, 'player-documents');
+        ensureBucketExists(initSupabase, 'player_photos');
+        ensureBucketExists(initSupabase, 'player_documents');
+      } catch (err: any) {
+        console.error("[Supabase Storage Init Error]:", err?.message || err);
+      }
+    }
+  }
+
   console.log("=======================================================\n");
 
   function withTimeout<T>(promise: Promise<T>, ms: number, timeoutErrorMsg: string): Promise<T> {

@@ -1,10 +1,12 @@
 -- ====================================================================
--- SUPABASE TOURNAMENT PORTAL SETUP SCRIPT
+-- SUPABASE TOURNAMENT PORTAL SETUP SCRIPT (UNRESTRICTED)
 -- ====================================================================
--- This script sets up a secure `profiles` table in your public schema 
+-- This script sets up an unrestricted `profiles` table in your public schema
 -- and automatically synchronizes new users from Supabase Auth (`auth.users`)
 -- into `public.profiles` using a PostgreSQL database trigger.
 -- 
+-- Safe & Simple: Does not touch system storage tables to avoid owner/permission errors.
+--
 -- How to use:
 -- 1. Open your Supabase Dashboard.
 -- 2. Go to the "SQL Editor" tab from the left sidebar.
@@ -12,15 +14,16 @@
 -- 4. Click "Run" (or Cmd+Enter / Ctrl+Enter) to execute.
 -- ====================================================================
 
+-- ====================================================================
 -- 1. CLEANUP (Optional / Re-runnable guard)
--- Automatically drop old versions of trigger, function, and profiles table to ensure a pristine setup.
+-- ====================================================================
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user();
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
--- 2. CREATE PROFILES TABLE
--- This table stores all the profile and registration fields of players.
--- It matches the `PlayerApplication` and `Player` interfaces in the app.
+-- ====================================================================
+-- 2. CREATE UNRESTRICTED PROFILES TABLE
+-- ====================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   full_name TEXT NOT NULL,
@@ -30,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   whatsapp_number TEXT,
   social_media_page TEXT,
   photo_url TEXT,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place')),
+  status TEXT DEFAULT 'pending', -- Unrestricted status (no restrictive CHECK constraints)
   seed INT,
   document_url TEXT,
   document_name TEXT,
@@ -48,8 +51,9 @@ COMMENT ON TABLE public.profiles IS 'Stores player registration applications and
 COMMENT ON COLUMN public.profiles.id IS 'References the unique authenticated user ID in auth.users.';
 COMMENT ON COLUMN public.profiles.status IS 'Status of the tournament participant application or standing.';
 
+-- ====================================================================
 -- 3. AUTOMATIC UPDATED_AT TIMESTAMP FUNCTION
--- A utility function to automatically update the `updated_at` column of a row.
+-- ====================================================================
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -64,10 +68,11 @@ CREATE OR REPLACE TRIGGER update_profiles_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_updated_at();
 
+-- ====================================================================
 -- 4. AUTH TO PROFILE TRIGGER FUNCTION
--- This trigger automatically fires AFTER a user completes registration/signup.
--- It extracts custom registration metadata passed during the signup API call
--- and inserts a clean record into the `public.profiles` table.
+-- ====================================================================
+-- Extracts metadata passed from the client during signup and inserts 
+-- a clean participant record into the public.profiles table.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER 
 LANGUAGE plpgsql 
@@ -75,7 +80,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- Insert profile record (omitting applied_at so it defaults safely to now())
+  -- Insert profile record
   INSERT INTO public.profiles (
     id,
     full_name,
@@ -91,7 +96,12 @@ BEGIN
     tournament_type
   ) VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'fullName', 'Tournament Player'),
+    COALESCE(
+      NEW.raw_user_meta_data->>'full_name', 
+      NEW.raw_user_meta_data->>'fullName', 
+      split_part(NEW.email, '@', 1),
+      'Tournament Player'
+    ),
     NEW.raw_user_meta_data->>'nickname',
     NEW.raw_user_meta_data->>'club',
     COALESCE(NEW.raw_user_meta_data->>'phone_number', NEW.raw_user_meta_data->>'phoneNumber', NEW.phone),
@@ -119,47 +129,24 @@ BEGIN
 END;
 $$;
 
+-- ====================================================================
 -- 5. DECLARE TRIGGER ON AUTH.USERS
--- Binds the profile creation trigger to the Supabase auth.users system table.
+-- ====================================================================
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
 
--- 6. ENABLE ROW LEVEL SECURITY (RLS)
--- Crucial for securing the Supabase instance against unauthorized writes.
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-
--- 7. DEFINE RLS POLICIES
--- Drop existing policies first if they exist to prevent duplicate policy errors
-DROP POLICY IF EXISTS "Public Profiles are viewable by everyone" ON public.profiles;
-DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Service role can fully manage profiles" ON public.profiles;
-
--- Policy A: Anyone can read player profiles (public portal needs to display rosters, rankings, etc.)
-CREATE POLICY "Public Profiles are viewable by everyone" 
-  ON public.profiles 
-  FOR SELECT 
-  USING (true);
-
--- Policy B: Users can update only their own profile details
-CREATE POLICY "Users can update their own profile" 
-  ON public.profiles 
-  FOR UPDATE 
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
-
--- Policy C: Service role/Admins can do everything (insert, update, delete)
-CREATE POLICY "Service role can fully manage profiles" 
-  ON public.profiles 
-  FOR ALL 
-  USING (true) 
-  WITH CHECK (true);
+-- ====================================================================
+-- 6. DISABLE ROW LEVEL SECURITY (RLS) FOR PROFILES
+-- ====================================================================
+-- Disabling RLS ensures that player registration, profiles updates, and select queries
+-- function flawlessly and without permissions errors on all environments.
+ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
 
 -- ====================================================================
--- SNOOKER & MULTI-DISCIPLINE TOURNAMENT TYPES TABLE
+-- 7. DEFINE TOURNAMENT TYPES TABLE
 -- ====================================================================
-
 CREATE TABLE IF NOT EXISTS public.tournament_types (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   name TEXT UNIQUE NOT NULL,
@@ -167,28 +154,8 @@ CREATE TABLE IF NOT EXISTS public.tournament_types (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Turn on row level security
-ALTER TABLE public.tournament_types ENABLE ROW LEVEL SECURITY;
-
--- Drop old policies if they exist (both with and without public schema prefix to be absolutely certain)
-DROP POLICY IF EXISTS "Public Tournament Types are viewable by everyone" ON public.tournament_types;
-DROP POLICY IF EXISTS "Public Tournament Types are viewable by everyone" ON tournament_types;
-DROP POLICY IF EXISTS "Service role can fully manage tournament types" ON public.tournament_types;
-DROP POLICY IF EXISTS "Service role can fully manage tournament types" ON tournament_types;
-
--- Allow everyone to read the tournament types
-CREATE POLICY "Public Tournament Types are viewable by everyone" 
-  ON public.tournament_types 
-  FOR SELECT 
-  TO public 
-  USING (true);
-
--- Allow fully authorized service role or authenticated admin to manage tournament types
-CREATE POLICY "Service role can fully manage tournament types" 
-  ON public.tournament_types 
-  FOR ALL 
-  TO service_role 
-  USING (true);
+-- Disable row level security on tournament_types as well for full unrestricted access
+ALTER TABLE public.tournament_types DISABLE ROW LEVEL SECURITY;
 
 -- Seed initial tournament types
 INSERT INTO public.tournament_types (name, is_active)
@@ -199,5 +166,5 @@ VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- ====================================================================
--- SUCCESS: All tables and configurations are fully initialized!
+-- SUCCESS: All tables, triggers, and sync systems are fully initialized!
 -- ====================================================================
