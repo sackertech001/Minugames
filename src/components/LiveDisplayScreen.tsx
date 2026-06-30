@@ -502,7 +502,7 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
           {!showOnlyScoreboard && (
             <div className="bg-[#05101E] border border-rose-500/15 rounded-xl p-2.5 overflow-hidden text-center max-w-2xl mx-auto shadow-inner">
               <div className="inline-flex items-center gap-4 animate-pulse text-[9px] font-sans font-black tracking-widest text-slate-400 uppercase">
-                <span className="text-[#D4AF37]">🔴 BROADCAST STATION ACTIVE</span>
+                <span className="text-red-500 animate-pulse font-black">🔴 BROADCAST STATION ACTIVE</span>
                 <span>•</span>
                 <span>TOP SCORER: {topScoringPlayer ? `${topScoringPlayer.name} (${topScoringPlayer.totalPoints} PTS)` : 'NONE'}</span>
                 <span>•</span>

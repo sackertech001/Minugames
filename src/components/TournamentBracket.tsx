@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, Match, TournamentConfig } from '../types';
-import { Zap, Calendar, Play, Trophy, Users } from 'lucide-react';
+import { Zap, Calendar, Play, Trophy, Users, Award, Star } from 'lucide-react';
 
 interface TournamentBracketProps {
   matches: Match[];
@@ -35,7 +35,7 @@ export default function TournamentBracket({
   // Helper to get round info based on playersCount
   const getRoundInfo = (round: string) => {
     if (tournamentConfig.playersCount === 8) {
-      if (round === 'QF') return { title: 'ROUND OF 8', subtitle: 'Day 1 • 4 Matches' };
+      if (round === 'QF') return { title: 'QUARTER FINALS', subtitle: 'Day 1 • 4 Matches' };
       if (round === 'SF') return { title: 'SEMI FINALS', subtitle: 'Day 2 • 2 Matches' };
       if (round === 'F') return { title: 'CHAMPIONSHIP FINALS', subtitle: 'Day 3 • 2 Matches' };
     }
@@ -92,19 +92,19 @@ export default function TournamentBracket({
 
     if (!p) {
       return (
-        <div className="flex items-center justify-between py-2.5 px-3.5 bg-[#05101E]/50 text-slate-500 text-xs italic font-medium">
+        <div className="flex items-center justify-between py-3 px-4 bg-[#04142B]/40 text-[#787E90] text-xs italic font-medium">
           <span className="truncate">{placeholderText}</span>
-          <span className="font-sans text-slate-600 font-bold">-</span>
+          <span className="font-sans text-[#787E90]/50 font-black">-</span>
         </div>
       );
     }
 
     return (
       <div
-        className={`flex items-center justify-between py-2.5 px-3.5 transition-all duration-200 ${
+        className={`flex items-center justify-between py-3 px-4 transition-all duration-300 ${
           isWinner 
-            ? 'bg-rose-500/5 text-white' 
-            : 'bg-[#091A2E] text-slate-300'
+            ? 'bg-[#1A6DFF]/10 text-white font-bold' 
+            : 'bg-[#121F32] text-[#B2B6C2]'
         }`}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -112,35 +112,40 @@ export default function TournamentBracket({
             <img
               src={p.photoUrl || undefined}
               alt={p.name}
-              className={`w-7 h-7 rounded-lg object-cover border shrink-0 ${
-                isWinner ? 'border-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.2)]' : 'border-rose-500/15'
+              className={`w-8 h-8 rounded-xl object-cover border-2 shrink-0 ${
+                isWinner ? 'border-[#F1C317] shadow-[0_0_12px_rgba(241,195,23,0.3)]' : 'border-[#1A2740]'
               }`}
               referrerPolicy="no-referrer"
             />
+            {isWinner && (
+              <span className="absolute -top-1 -right-1 bg-[#F1C317] text-[#010C1E] p-0.5 rounded-full shadow-sm">
+                <Star className="w-2.5 h-2.5 fill-current" />
+              </span>
+            )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className={`text-xs font-black truncate flex flex-wrap items-baseline gap-x-1.5 ${isWinner ? 'text-white' : 'text-slate-200'}`}>
+            <p className={`text-xs font-black truncate flex items-center gap-x-1.5 ${isWinner ? 'text-[#EEF1F5]' : 'text-[#B2B6C2]'}`}>
               <span>{p.name}</span>
               {p.nickname && (
-                <span className="text-[10px] text-slate-400 font-sans font-medium italic">"{p.nickname}"</span>
+                <span className="text-[10px] text-[#787E90] font-sans font-medium italic">"{p.nickname}"</span>
               )}
             </p>
             {points !== null && (
-              <span className="text-[10px] text-rose-500/60 font-bold block mt-0.5">
+              <span className="text-[10px] text-[#1A6DFF] font-black block mt-0.5">
                 Pts: {points} {highBreak ? `• Break: ${highBreak}` : ''}
               </span>
             )}
           </div>
-          <span className="text-[9px] bg-[#05101E] border border-rose-500/15 px-1.5 py-0.5 rounded font-sans font-black text-rose-500 shrink-0">
+          <span className="text-[9px] bg-[#04142B] border border-[#1A2740] px-2 py-0.5 rounded-md font-sans font-black text-[#F1C317] shrink-0">
             #{p.seed}
           </span>
         </div>
         <div className="flex items-center gap-2 ml-4 shrink-0">
           <span
-            className={`font-sans font-black text-sm px-2.5 py-1 rounded-md transition-all ${
+            className={`font-sans font-black text-xs px-3 py-1 rounded-lg transition-all ${
               isWinner 
-                ? 'bg-rose-500/20 text-rose-500 border border-rose-500/30 font-black shadow-[0_0_8px_rgba(239,68,68,0.15)]' 
-                : 'text-slate-400 bg-slate-500/5 border border-white/5'
+                ? 'bg-[#F1C317]/20 text-[#FFD43B] border border-[#F1C317]/35 font-black shadow-[0_0_10px_rgba(241,195,23,0.2)]' 
+                : 'text-[#787E90] bg-[#04142B] border border-[#1A2740]'
             }`}
           >
             {score ?? 0}
@@ -193,29 +198,29 @@ export default function TournamentBracket({
       <div
         key={match.id}
         onClick={() => onSelectMatch(match.id)}
-        className={`bg-[#091A2E] rounded-2xl cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-[1.01] flex flex-col justify-between border ${
+        className={`bg-[#121F32] rounded-2xl cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] flex flex-col justify-between border ${
           match.status === 'playing'
-            ? 'border-rose-500 shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-pulse'
+            ? 'border-[#EF4444] shadow-[0_0_20px_rgba(239,68,68,0.3)] animate-pulse'
             : isCompleted
-            ? 'border-rose-500/15 hover:border-rose-500/30'
+            ? 'border-[#1A2740] hover:border-[#1A6DFF]/30'
             : hasPlayers
-            ? 'border-rose-500/20 hover:border-rose-500/40'
-            : 'border-rose-500/10 opacity-70'
+            ? 'border-[#1A2740] hover:border-[#1A6DFF]/50'
+            : 'border-[#1A2740]/40 opacity-70'
         }`}
       >
         {/* Match label and header */}
-        <div className="bg-[#05101E] px-3.5 py-2 flex justify-between items-center border-b border-rose-500/15">
-          <span className="text-[10px] font-sans font-black text-slate-300 uppercase tracking-[0.1em] flex items-center gap-1.5">
-            <Zap className="w-3 h-3 text-rose-500 shrink-0" />
+        <div className="bg-[#04142B] px-4 py-2.5 flex justify-between items-center border-b border-[#1A2740]">
+          <span className="text-[10px] font-sans font-black text-[#EEF1F5] uppercase tracking-[0.12em] flex items-center gap-1.5">
+            <Zap className={`w-3.5 h-3.5 shrink-0 ${match.status === 'playing' ? 'text-[#EF4444] animate-bounce' : 'text-[#1A6DFF]'}`} />
             {match.id}
           </span>
-          <span className="text-[10px] text-rose-500 font-sans tracking-wide font-black">
+          <span className={`text-[10px] font-sans tracking-wide font-black ${match.status === 'playing' ? 'text-[#EF4444]' : 'text-[#B2B6C2]'}`}>
             {displayTime}
           </span>
         </div>
 
         {/* Player slots */}
-        <div className="divide-y divide-rose-500/10">
+        <div className="divide-y divide-[#1A2740]/50">
           {renderPlayerRow(
             match.player1Id,
             match.score1,
@@ -236,7 +241,7 @@ export default function TournamentBracket({
 
         {/* Start Match button or Live Now badge */}
         {hasPlayers && match.status === 'scheduled' && (
-          <div className="p-2.5 bg-[#05101E] border-t border-rose-500/10">
+          <div className="p-3 bg-[#04142B] border-t border-[#1A2740]">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -244,18 +249,18 @@ export default function TournamentBracket({
                   onStartMatch(match.id);
                 }
               }}
-              className="w-full bg-[#1A1813] hover:bg-[#252119] text-[#F59E0B] hover:text-[#FBBF24] border border-[#F59E0B]/20 hover:border-[#F59E0B]/40 text-[10px] font-black py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-widest shadow-[0_0_12px_rgba(245,158,11,0.05)]"
+              className="w-full bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] hover:from-[#4088FF] hover:to-[#1A6DFF] text-white text-[10px] font-black py-2.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-widest shadow-md hover:scale-[1.01]"
             >
-              <span className="text-xs">▶</span> Start Match
+              ▶ Start Match
             </button>
           </div>
         )}
         {match.status === 'playing' && (
-          <div className="p-2.5 bg-rose-500/5 border-t border-rose-500/10 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span> Live Now
+          <div className="p-3 bg-[#EF4444]/10 border-t border-[#EF4444]/20 flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[9px] font-black text-[#EF4444] uppercase tracking-widest animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#EF4444] animate-ping"></span> Live Now
             </span>
-            <span className="text-[9px] text-slate-400 font-bold italic">Scoring Active</span>
+            <span className="text-[9px] text-[#B2B6C2] font-bold italic">Scoring Feed Active</span>
           </div>
         )}
       </div>
@@ -287,7 +292,7 @@ export default function TournamentBracket({
 
   return (
     <div className="space-y-6">
-      {/* Schedule Overview */}
+      {/* Schedule Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[1, 2, 3].map((day) => {
           const isActive = bracketView === `day${day}`;
@@ -295,24 +300,24 @@ export default function TournamentBracket({
             <button
               key={day}
               onClick={() => setBracketView(`day${day}` as any)}
-              className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 border ${
+              className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 border cursor-pointer ${
                 isActive
-                  ? 'bg-[#05101E] border-rose-500/40 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
-                  : 'bg-[#091A2E]/70 border-rose-500/10 hover:border-rose-500/25 hover:bg-[#05101E]/40'
+                  ? 'bg-[#121F32] border-[#1A6DFF] shadow-[0_8px_24px_rgba(26,109,255,0.15)]'
+                  : 'bg-[#121F32]/50 border-[#1A2740] hover:border-[#1A2740]/80 hover:bg-[#121F32]'
               }`}
             >
               <div className="flex justify-between items-center mb-3">
-                <span className={`text-[11px] font-sans font-black tracking-[0.2em] uppercase ${isActive ? 'text-rose-500' : 'text-slate-400'}`}>
+                <span className={`text-[10px] font-sans font-black tracking-[0.2em] uppercase ${isActive ? 'text-[#F1C317]' : 'text-[#787E90]'}`}>
                   DAY {day}
                 </span>
-                <span className="text-[10px] text-slate-500 font-sans tracking-wider font-semibold">
+                <span className="text-[10px] text-[#787E90] font-sans tracking-wider font-semibold">
                   {getDayDate(day as 1 | 2 | 3)}
                 </span>
               </div>
-              <p className="text-sm font-sans font-black text-white uppercase tracking-wider mb-1.5 leading-snug">
+              <p className="text-sm font-sans font-black text-[#EEF1F5] uppercase tracking-wider mb-1.5 leading-snug">
                 {getRoundTitles(day as 1 | 2 | 3)}
               </p>
-              <p className="text-[11px] text-slate-500 font-sans font-bold tracking-wide uppercase">
+              <p className="text-[11px] text-[#B2B6C2] font-sans font-bold tracking-wide uppercase">
                 {getMatchesCountForDay(day as 1 | 2 | 3)} Matches
               </p>
             </button>
@@ -321,23 +326,23 @@ export default function TournamentBracket({
       </div>
 
       {/* Top filter dashboard */}
-      <div className="bg-[#091A2E] border border-rose-500/20 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_0_15px_rgba(239,68,68,0.05)]">
+      <div className="bg-[#121F32] border border-[#1A2740] rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl">
-            <Calendar className="w-5 h-5 text-rose-500" />
+          <div className="p-2.5 bg-[#1A6DFF]/10 border border-[#1A6DFF]/20 rounded-xl">
+            <Calendar className="w-5 h-5 text-[#1A6DFF]" />
           </div>
-          <span className="font-sans font-black text-base text-white uppercase tracking-[0.1em]">
+          <span className="font-sans font-black text-base text-[#EEF1F5] uppercase tracking-[0.1em]">
             Fixture Schedule
           </span>
         </div>
 
-        <div className="flex bg-[#05101E] p-1.5 rounded-xl border border-rose-500/10 gap-1.5 self-start md:self-auto items-center">
+        <div className="flex bg-[#04142B] p-1.5 rounded-xl border border-[#1A2740] gap-1.5 self-start md:self-auto items-center">
           <button
             onClick={() => setBracketView('full')}
-            className={`text-xs font-black px-4 py-2 rounded-lg transition-all cursor-pointer uppercase tracking-wider ${
+            className={`text-xs font-black px-4 py-2.5 rounded-lg transition-all cursor-pointer uppercase tracking-wider ${
               bracketView === 'full'
-                ? 'bg-gradient-to-r from-rose-950 via-rose-600 to-rose-950 text-white border border-rose-500/30 shadow-[0_0_12px_rgba(239,68,68,0.25)]'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                ? 'bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] text-white border border-[#1A6DFF]/20 shadow-md'
+                : 'text-[#B2B6C2] hover:text-[#EEF1F5] hover:bg-white/5'
             }`}
           >
             Full Bracket Tree
@@ -345,7 +350,7 @@ export default function TournamentBracket({
           {bracketView !== 'minimized' && (
             <button
               onClick={() => setBracketView('minimized')}
-              className="text-xs font-black px-4 py-2 rounded-lg transition-all cursor-pointer text-slate-400 hover:text-white hover:bg-white/5 uppercase tracking-wider"
+              className="text-xs font-black px-4 py-2.5 rounded-lg transition-all cursor-pointer text-[#B2B6C2] hover:text-[#EEF1F5] hover:bg-white/5 uppercase tracking-wider"
             >
               Minimize
             </button>
@@ -359,9 +364,9 @@ export default function TournamentBracket({
           <div className="flex gap-8 px-2 min-w-[1280px]">
             {showRound('R32') && (
               <div className="flex-1 space-y-4">
-                <div className="sticky top-0 bg-[#05101E] z-20 py-2.5 border-b border-rose-500/15 text-center mb-4 transition-colors">
-                  <p className="text-xs font-sans font-black text-slate-100 uppercase tracking-widest">{getRoundInfo('R32').title}</p>
-                  <p className="text-[10px] text-rose-500/60 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('R32').subtitle}</p>
+                <div className="sticky top-0 bg-[#010C1E] z-20 py-2.5 border-b border-[#1A2740] text-center mb-4 transition-colors">
+                  <p className="text-xs font-sans font-black text-[#EEF1F5] uppercase tracking-widest">{getRoundInfo('R32').title}</p>
+                  <p className="text-[10px] text-[#1A6DFF]/80 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('R32').subtitle}</p>
                 </div>
                 <div className="space-y-4 pr-2">
                   {getMatchesByRound('R32').map((m) => renderMatchCard(m))}
@@ -370,9 +375,9 @@ export default function TournamentBracket({
             )}
             {showRound('R16') && (
               <div className="flex-1 space-y-4 flex flex-col">
-                <div className="sticky top-0 bg-[#05101E] z-20 py-2.5 border-b border-rose-500/15 text-center mb-4 transition-colors">
-                  <p className="text-xs font-sans font-black text-slate-100 uppercase tracking-widest">{getRoundInfo('R16').title}</p>
-                  <p className="text-[10px] text-rose-500/60 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('R16').subtitle}</p>
+                <div className="sticky top-0 bg-[#010C1E] z-20 py-2.5 border-b border-[#1A2740] text-center mb-4 transition-colors">
+                  <p className="text-xs font-sans font-black text-[#EEF1F5] uppercase tracking-widest">{getRoundInfo('R16').title}</p>
+                  <p className="text-[10px] text-[#1A6DFF]/80 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('R16').subtitle}</p>
                 </div>
                 <div className="flex-1 flex flex-col justify-around space-y-8 pr-2">
                   {getMatchesByRound('R16').map((m) => renderMatchCard(m))}
@@ -381,9 +386,9 @@ export default function TournamentBracket({
             )}
             {showRound('QF') && (
               <div className="flex-1 space-y-4 flex flex-col">
-                <div className="sticky top-0 bg-[#05101E] z-20 py-2.5 border-b border-rose-500/15 text-center mb-4 transition-colors">
-                  <p className="text-xs font-sans font-black text-slate-100 uppercase tracking-widest">{getRoundInfo('QF').title}</p>
-                  <p className="text-[10px] text-rose-500/60 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('QF').subtitle}</p>
+                <div className="sticky top-0 bg-[#010C1E] z-20 py-2.5 border-b border-[#1A2740] text-center mb-4 transition-colors">
+                  <p className="text-xs font-sans font-black text-[#EEF1F5] uppercase tracking-widest">{getRoundInfo('QF').title}</p>
+                  <p className="text-[10px] text-[#1A6DFF]/80 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('QF').subtitle}</p>
                 </div>
                 <div className="flex-1 flex flex-col justify-around space-y-16 pr-2">
                   {getMatchesByRound('QF').map((m) => renderMatchCard(m))}
@@ -392,9 +397,9 @@ export default function TournamentBracket({
             )}
             {showRound('SF') && (
               <div className="flex-1 space-y-4 flex flex-col">
-                <div className="sticky top-0 bg-[#05101E] z-20 py-2.5 border-b border-rose-500/15 text-center mb-4 transition-colors">
-                  <p className="text-xs font-sans font-black text-slate-100 uppercase tracking-widest">{getRoundInfo('SF').title}</p>
-                  <p className="text-[10px] text-rose-500/60 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('SF').subtitle}</p>
+                <div className="sticky top-0 bg-[#010C1E] z-20 py-2.5 border-b border-[#1A2740] text-center mb-4 transition-colors">
+                  <p className="text-xs font-sans font-black text-[#EEF1F5] uppercase tracking-widest">{getRoundInfo('SF').title}</p>
+                  <p className="text-[10px] text-[#1A6DFF]/80 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('SF').subtitle}</p>
                 </div>
                 <div className="flex-1 flex flex-col justify-around space-y-24 pr-2">
                   {getMatchesByRound('SF').map((m) => renderMatchCard(m))}
@@ -403,20 +408,20 @@ export default function TournamentBracket({
             )}
             {showRound('F') && (
               <div className="flex-1 space-y-4 flex flex-col">
-                <div className="sticky top-0 bg-[#05101E] z-20 py-2.5 border-b border-rose-500/15 text-center mb-4 transition-colors">
-                  <p className="text-xs font-sans font-black text-slate-100 uppercase tracking-widest">{getRoundInfo('F').title}</p>
-                  <p className="text-[10px] text-rose-500/60 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('F').subtitle}</p>
+                <div className="sticky top-0 bg-[#010C1E] z-20 py-2.5 border-b border-[#1A2740] text-center mb-4 transition-colors">
+                  <p className="text-xs font-sans font-black text-[#EEF1F5] uppercase tracking-widest">{getRoundInfo('F').title}</p>
+                  <p className="text-[10px] text-[#1A6DFF]/80 font-sans tracking-wider font-bold mt-0.5">{getRoundInfo('F').subtitle}</p>
                 </div>
                 <div className="flex-1 flex flex-col justify-center space-y-16 pr-2">
                   <div>
                     <div className="text-center mb-2">
-                      <span className="text-[9px] font-sans font-black text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20 uppercase tracking-widest">
+                      <span className="text-[9px] font-sans font-black text-[#FFD43B] bg-[#F1C317]/10 px-2.5 py-1 rounded border border-[#F1C317]/20 uppercase tracking-widest">
                         Grand Final Match
                       </span>
                     </div>
                     {getMatchesByRound('F').map((m) => renderMatchCard(m))}
                   </div>
-                  <div>
+                  <div className="mt-8">
                     <div className="text-center mb-2">
                       <span className="text-[9px] font-sans font-black text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 uppercase tracking-widest">
                         3rd Place Match
@@ -435,11 +440,11 @@ export default function TournamentBracket({
             <div className="col-span-full space-y-6">
               {getRoundForDay(1).map(round => (
                 <div key={round} className="space-y-4">
-                  <div className="border-b border-rose-500/15 pb-2 flex items-center justify-between">
-                    <h4 className="text-sm font-sans font-black text-rose-500 uppercase tracking-widest">
+                  <div className="border-b border-[#1A2740] pb-2 flex items-center justify-between">
+                    <h4 className="text-sm font-sans font-black text-[#1A6DFF] uppercase tracking-widest">
                       Day 1: {getRoundInfo(round).title}
                     </h4>
-                    <span className="text-xs text-slate-400 font-bold">
+                    <span className="text-xs text-[#B2B6C2] font-bold">
                       {getMatchesByRound(round).length} Matches
                     </span>
                   </div>
@@ -455,11 +460,11 @@ export default function TournamentBracket({
             <div className="col-span-full grid grid-cols-1 lg:grid-cols-3 gap-6">
               {getRoundForDay(2).map(round => (
                 <div key={round} className={round === 'R16' ? 'lg:col-span-2 space-y-4' : 'space-y-4'}>
-                  <div className="border-b border-rose-500/15 pb-2 flex items-center justify-between">
-                    <h4 className="text-sm font-sans font-black text-rose-500 uppercase tracking-widest">
+                  <div className="border-b border-[#1A2740] pb-2 flex items-center justify-between">
+                    <h4 className="text-sm font-sans font-black text-[#1A6DFF] uppercase tracking-widest">
                       Day 2: {getRoundInfo(round).title}
                     </h4>
-                    <span className="text-xs text-slate-400 font-bold">
+                    <span className="text-xs text-[#B2B6C2] font-bold">
                       {getMatchesByRound(round).length} Matches
                     </span>
                   </div>
@@ -475,11 +480,11 @@ export default function TournamentBracket({
             <div className="col-span-full grid grid-cols-1 md:grid-cols-3 gap-6">
               {getRoundForDay(3).map(round => (
                 <div key={round} className="space-y-4">
-                  <div className="border-b border-rose-500/15 pb-2 flex items-center justify-between">
-                    <h4 className={`text-sm font-sans font-black uppercase tracking-widest ${round === '3RD' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  <div className="border-b border-[#1A2740] pb-2 flex items-center justify-between">
+                    <h4 className={`text-sm font-sans font-black uppercase tracking-widest ${round === '3RD' ? 'text-emerald-500' : 'text-[#1A6DFF]'}`}>
                       Day 3: {getRoundInfo(round).title}
                     </h4>
-                    <span className="text-xs text-slate-400 font-bold">
+                    <span className="text-xs text-[#B2B6C2] font-bold">
                       {getMatchesByRound(round).length} Match{getMatchesByRound(round).length !== 1 ? 'es' : ''}
                     </span>
                   </div>

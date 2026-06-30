@@ -1,33 +1,43 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&family=Oswald:wght@400;500;600&family=Rajdhani:wght@400;500;600;700&family=Herr+Von+Muellerhoff&family=Alex+Brush&family=Montserrat:wght@900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #F2F4F7;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #E8EBF0;
-  --text-primary: #0F172A;
-  --text-secondary: #334155;
-  --text-muted: #627288;
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(239, 68, 68, 0.12);
+  --bg-primary: #010C1E;
+  --bg-secondary: #04142B;
+  --bg-tertiary: #121F32;
+  --surface-hover: #1A2740;
+  --primary-blue: #1A6DFF;
+  --dark-blue: #0C48B8;
+  --primary-gold: #F1C317;
+  --bright-gold: #FFD43B;
+  --text-primary: #EEF1F5;
+  --text-secondary: #B2B6C2;
+  --text-muted: #787E90;
+  --glass-bg: rgba(18, 31, 50, 0.85);
+  --glass-border: rgba(26, 109, 255, 0.2);
 }
 
 .dark {
-  --bg-primary: #05101E;
-  --bg-secondary: #091A2E;
-  --bg-tertiary: #0D2642;
-  --text-primary: #F8FAFC;
-  --text-secondary: #CBD5E1;
-  --text-muted: #8E9BAE;
-  --glass-bg: rgba(9, 26, 46, 0.95);
-  --glass-border: rgba(239, 68, 68, 0.2);
+  --bg-primary: #010C1E;
+  --bg-secondary: #04142B;
+  --bg-tertiary: #121F32;
+  --surface-hover: #1A2740;
+  --primary-blue: #1A6DFF;
+  --dark-blue: #0C48B8;
+  --primary-gold: #F1C317;
+  --bright-gold: #FFD43B;
+  --text-primary: #EEF1F5;
+  --text-secondary: #B2B6C2;
+  --text-muted: #787E90;
+  --glass-bg: rgba(18, 31, 50, 0.85);
+  --glass-border: rgba(26, 109, 255, 0.2);
 }
 
 @theme {
   --font-sans: "Inter", sans-serif;
-  --font-display: "Bebas Neue", sans-serif;
-  --font-team: "Oswald", sans-serif;
-  --font-data: "Rajdhani", sans-serif;
+  --font-display: "Sora", sans-serif;
+  --font-team: "Sora", sans-serif;
+  --font-data: "Inter", sans-serif;
   
   --color-bg-primary: var(--bg-primary);
   --color-bg-secondary: var(--bg-secondary);
@@ -36,25 +46,136 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
 
-  /* Make primary rose/red colors darker for enhanced readability and premium feel in light & dark modes */
-  --color-rose-300: #f43f5e;
-  --color-rose-400: #e11d48;
-  --color-rose-500: #be123c;
-  --color-rose-600: #9f1239;
-  --color-rose-700: #881337;
+  /* Overriding Rose to Primary Blue colors to transition components smoothly */
+  --color-rose-300: #1A6DFF;
+  --color-rose-400: #1A6DFF;
+  --color-rose-500: #1A6DFF;
+  --color-rose-600: #0C48B8;
+  --color-rose-700: #0C48B8;
 
-  --color-red-300: #ef4444;
-  --color-red-400: #dc2626;
-  --color-red-500: #b91c1c;
-  --color-red-600: #991b1b;
-  --color-red-700: #7f1d1d;
+  /* Overriding Red for Errors */
+  --color-red-500: #EF4444;
+  --color-red-600: #DC2626;
+
+  /* Custom palette definitions */
+  --color-primary-blue: #1A6DFF;
+  --color-primary-hover: #4088FF;
+  --color-primary-pressed: #0C48B8;
+  --color-champ-gold: #F1C317;
+  --color-gold-hover: #FFD43B;
+  --color-gold-pressed: #D4A30B;
+  --color-success-green: #22C55E;
+  --color-warning-amber: #F1C317;
+  --color-error-red: #EF4444;
+  --color-info-cyan: #06B6D4;
 }
 
 html, body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
+  background-color: #010C1E;
+  color: #EEF1F5;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Typography Standards */
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: "Sora", sans-serif !important;
+  font-weight: 700;
+  color: #EEF1F5;
+}
+
+h1 {
+  font-size: 36px !important;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 28px !important;
+  line-height: 1.25;
+}
+
+h3 {
+  font-size: 22px !important;
+  line-height: 1.3;
+}
+
+h4 {
+  font-size: 18px !important;
+  line-height: 1.35;
+}
+
+body, p, span, div, input, button, select, textarea {
+  font-family: "Inter", sans-serif;
+}
+
+/* Attribute Selectors for Old Main Background Hexes to direct to theme colors */
+[class*="bg-[#05101E]"], .bg-\[\#05101E\] {
+  background-color: #010C1E !important;
+}
+[class*="bg-[#091A2E]"], .bg-\[\#091A2E\] {
+  background-color: #04142B !important;
+}
+[class*="bg-[#061224]"], .bg-\[\#061224\] {
+  background-color: #121F32 !important;
+}
+[class*="bg-[#12243D]"], .bg-\[\#12243D\] {
+  background-color: #121F32 !important;
+}
+[class*="bg-[#16304F]"], .bg-\[\#16304F\] {
+  background-color: #1A2740 !important;
+}
+
+/* Gold Theme Color Mapping Override */
+[class*="text-[#D4AF37]"], .text-\[\#D4AF37\] {
+  color: #F1C317 !important;
+}
+[class*="bg-[#D4AF37]"], .bg-\[\#D4AF37\] {
+  background-color: #F1C317 !important;
+}
+[class*="border-[#D4AF37]"], .border-\[\#D4AF37\] {
+  border-color: #F1C317 !important;
+}
+[class*="decoration-[#D4AF37]"], .decoration-\[\#D4AF37\] {
+  text-decoration-color: #F1C317 !important;
+}
+
+/* Opacities for Gold Override */
+[class*="bg-[#D4AF37]/10"] {
+  background-color: rgba(241, 195, 23, 0.1) !important;
+}
+[class*="bg-[#D4AF37]/20"] {
+  background-color: rgba(241, 195, 23, 0.2) !important;
+}
+[class*="bg-[#D4AF37]/25"] {
+  background-color: rgba(241, 195, 23, 0.25) !important;
+}
+[class*="border-[#D4AF37]/15"] {
+  border-color: rgba(241, 195, 23, 0.15) !important;
+}
+[class*="border-[#D4AF37]/20"] {
+  border-color: rgba(241, 195, 23, 0.2) !important;
+}
+[class*="border-[#D4AF37]/25"] {
+  border-color: rgba(241, 195, 23, 0.25) !important;
+}
+[class*="border-[#D4AF37]/30"] {
+  border-color: rgba(241, 195, 23, 0.3) !important;
+}
+[class*="border-[#D4AF37]/35"] {
+  border-color: rgba(241, 195, 23, 0.35) !important;
+}
+[class*="border-[#D4AF37]/45"] {
+  border-color: rgba(241, 195, 23, 0.45) !important;
+}
+[class*="from-[#D4AF37]/10"] {
+  --tw-gradient-from: rgba(241, 195, 23, 0.1) !important;
+}
+[class*="via-[#D4AF37]/20"] {
+  --tw-gradient-via: rgba(241, 195, 23, 0.2) !important;
+}
+[class*="to-[#D4AF37]/10"] {
+  --tw-gradient-to: rgba(241, 195, 23, 0.1) !important;
 }
 
 .glass-panel {
@@ -67,20 +188,20 @@ html, body {
 
 /* Custom Premium Stadium Theme Styles */
 .stadium-panel {
-  background-color: rgba(30, 30, 30, 0.8);
-  border: 1px solid rgba(57, 255, 20, 0.3);
+  background-color: rgba(11, 23, 42, 0.85);
+  border: 1px solid rgba(37, 99, 235, 0.3);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   border-radius: 16px;
 }
 
 .dark .stadium-panel {
-  background-color: rgba(30, 30, 30, 0.8);
-  border: 1px solid rgba(57, 255, 20, 0.3);
+  background-color: rgba(11, 23, 42, 0.85);
+  border: 1px solid rgba(37, 99, 235, 0.3);
 }
 
 .light .stadium-panel {
-  background-color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background-color: rgba(11, 23, 42, 0.85);
+  border: 1px solid rgba(37, 99, 235, 0.3);
 }
 
 /* Glowing Neon Elements */
@@ -90,13 +211,13 @@ html, body {
 }
 
 .glow-rose {
-  box-shadow: 0 0 15px rgba(244, 63, 94, 0.35);
-  border-color: rgba(244, 63, 94, 0.6);
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.35);
+  border-color: rgba(37, 99, 235, 0.6);
 }
 
 .glow-amber {
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.35);
-  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 15px rgba(250, 204, 21, 0.35);
+  border-color: rgba(250, 204, 21, 0.6);
 }
 
 .glow-red {
@@ -105,18 +226,18 @@ html, body {
 }
 
 .glow-gold {
-  box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
-  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.2);
+  border-color: rgba(250, 204, 21, 0.4);
 }
 
 .metallic-text {
-  background: linear-gradient(135deg, #ffffff 30%, #a1a1aa 70%);
+  background: linear-gradient(135deg, #ffffff 30%, #cbd5e1 70%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .metallic-red {
-  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

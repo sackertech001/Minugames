@@ -75,6 +75,7 @@ export default function App() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [bracketView, setBracketView] = useState<'full' | 'day1' | 'day2' | 'day3'>('full');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'bracket' | 'display' | 'registration' | 'info' | 'settings'>('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isTournamentStarted, setIsTournamentStarted] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
@@ -1376,6 +1377,42 @@ export default function App() {
               return { blob: new Blob([buffer], { type: contentType }), contentType };
             };
 
+            const uploadToBucketWithFallbacks = async (
+              preferredBucket: string,
+              fileName: string,
+              fileBlob: Blob,
+              contentType: string
+            ): Promise<string | null> => {
+              // Try the exact bucket name, kebab-case, and snake-case variations to match whatever was manually created
+              const bucketCandidates = [
+                preferredBucket,
+                preferredBucket.replace(/\s+/g, '-'),
+                preferredBucket.replace(/\s+/g, '_')
+              ];
+
+              for (const bucketId of bucketCandidates) {
+                try {
+                  console.log(`[Client Storage Upload] Trying bucket ID: "${bucketId}"`);
+                  const fileToUpload = new File([fileBlob], fileName, { type: contentType });
+                  
+                  const { data, error } = await supabase.storage
+                    .from(bucketId)
+                    .upload(fileName, fileToUpload, { contentType, upsert: true });
+
+                  if (!error && data) {
+                    const { data: { publicUrl } } = supabase.storage.from(bucketId).getPublicUrl(fileName);
+                    console.log(`[Client Storage Upload] Success for bucket "${bucketId}":`, publicUrl);
+                    return publicUrl;
+                  } else if (error) {
+                    console.warn(`[Client Storage Upload] Bucket "${bucketId}" error:`, error.message);
+                  }
+                } catch (err: any) {
+                  console.error(`[Client Storage Upload] Bucket "${bucketId}" exception:`, err?.message || err);
+                }
+              }
+              return null;
+            };
+
             // Upload photo to Supabase storage if it's base64 data
             if (app.photoUrl && app.photoUrl.startsWith('data:')) {
               try {
@@ -1383,15 +1420,14 @@ export default function App() {
                 if (fileRes) {
                   const ext = fileRes.contentType.split('/')[1] || 'png';
                   const fileName = `${targetUserId}_photo_${Date.now()}.${ext}`;
-                  const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('player photos')
-                    .upload(fileName, fileRes.blob, { contentType: fileRes.contentType, upsert: true });
-
-                  if (uploadError) {
-                    console.log('[Client Supabase] Photo upload notice:', uploadError.message);
-                  } else if (uploadData) {
-                    const { data: { publicUrl } } = supabase.storage.from('player photos').getPublicUrl(fileName);
-                    finalPhotoUrl = publicUrl;
+                  const uploadedUrl = await uploadToBucketWithFallbacks(
+                    'player photos',
+                    fileName,
+                    fileRes.blob,
+                    fileRes.contentType
+                  );
+                  if (uploadedUrl) {
+                    finalPhotoUrl = uploadedUrl;
                   }
                 }
               } catch (photoErr) {
@@ -1406,15 +1442,14 @@ export default function App() {
                 if (fileRes) {
                   const ext = app.documentName?.split('.').pop() || fileRes.contentType.split('/')[1] || 'pdf';
                   const fileName = `${targetUserId}_document_${Date.now()}.${ext}`;
-                  const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('player documents')
-                    .upload(fileName, fileRes.blob, { contentType: fileRes.contentType, upsert: true });
-
-                  if (uploadError) {
-                    console.log('[Client Supabase] Document upload notice:', uploadError.message);
-                  } else if (uploadData) {
-                    const { data: { publicUrl } } = supabase.storage.from('player documents').getPublicUrl(fileName);
-                    finalDocumentUrl = publicUrl;
+                  const uploadedUrl = await uploadToBucketWithFallbacks(
+                    'player documents',
+                    fileName,
+                    fileRes.blob,
+                    fileRes.contentType
+                  );
+                  if (uploadedUrl) {
+                    finalDocumentUrl = uploadedUrl;
                   }
                 }
               } catch (docErr) {
@@ -1512,11 +1547,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex bg-bg-primary text-text-primary">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isTabAllowed={isTabAllowed} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isTabAllowed={isTabAllowed} 
+        isCollapsed={isSidebarCollapsed} 
+        setIsCollapsed={setIsSidebarCollapsed} 
+      />
       
-      <div className="flex-1 ml-72">
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-24' : 'ml-72'}`}>
         {/* Premium Luxury Header Bar */}
-        <header className="bg-bg-secondary border-b border-rose-500/15 py-4 px-4 md:px-8 sticky top-0 z-30 shadow-[0_0_20px_rgba(239,68,68,0.05)] transition-colors duration-300">
+        <header className="bg-bg-secondary border-b border-[#1A2740] py-4 px-4 md:px-8 sticky top-0 z-30 shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-colors duration-300">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           
           {/* Logo & Headline */}
@@ -1605,17 +1646,17 @@ export default function App() {
               <button
                 onClick={handleAutoSimulateAllReady}
                 id="btn-auto-simulate-round"
-                className="flex items-center gap-1.5 text-xs font-bold text-rose-500 hover:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-md"
+                className="flex items-center gap-1.5 text-xs font-bold text-red-500 hover:text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-md"
                 title="Autofills and advances matches for the currently ready brackets"
               >
-                <Sparkles className="w-3.5 h-3.5 text-rose-500 animate-pulse" /> Fast Sim
+                <Sparkles className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Fast Sim
               </button>
             )}
 
             <button
               onClick={handleResetEntireTournament}
               id="btn-reset-tournament"
-              className="flex items-center gap-1.5 text-xs font-extrabold text-rose-500 hover:text-rose-400 bg-rose-500/5 border border-rose-500/20 px-3.5 py-2 rounded-xl transition-colors cursor-pointer uppercase tracking-wider shadow-[0_0_12px_rgba(225,29,72,0.05)]"
+              className="flex items-center gap-1.5 text-xs font-extrabold text-red-500 hover:text-red-400 bg-red-500/5 border border-red-500/20 px-3.5 py-2 rounded-xl transition-colors cursor-pointer uppercase tracking-wider shadow-[0_0_12px_rgba(239,68,68,0.05)]"
               title="Wipe all data and reset system to defaults (Requires Admin PIN)"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Wipe System

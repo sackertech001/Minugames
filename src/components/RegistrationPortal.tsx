@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Player, PlayerApplication, TournamentConfig } from '../types';
 import { 
   UserPlus, Trash2, Upload, Sparkles, AlertCircle, Edit, ShieldCheck, CheckCircle2, Trophy,
-  Check, XCircle, Users, FileText, Globe, Phone, MessageSquare, Calendar, ListFilter
+  Check, XCircle, Users, FileText, Globe, Phone, MessageSquare, Calendar, ListFilter, Search, ArrowUpDown, Filter
 } from 'lucide-react';
 import { getDemoPlayers } from '../utils/demoData';
 import { generateSnookerAvatar } from '../utils/avatar';
@@ -45,15 +45,21 @@ export default function RegistrationPortal({
 
   // Sub-tabs and Application states
   const [activeSubTab, setActiveSubTab] = useState<'roster' | 'applications'>('roster');
-
   const [tournamentType, setTournamentType] = useState(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
 
   React.useEffect(() => {
     setTournamentType(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
   }, [config.selectedTournamentType, config.tournamentTypes]);
+
+  // Search and Sort states for Roster list
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterSortBy, setRosterSortBy] = useState<'name' | 'seed'>('seed');
+  const [rosterSortOrder, setRosterSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Search and filter states for Applications list
+  const [appSearch, setAppSearch] = useState('');
   const [appFilter, setAppFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedSeeds, setSelectedSeeds] = useState<Record<string, number>>({});
-
 
   // Find next available seed
   const getNextAvailableSeed = (): number => {
@@ -121,7 +127,6 @@ export default function RegistrationPortal({
 
   const handleAutoFill = () => {
     const demo = getDemoPlayers().slice(0, playersCount);
-    // Adjust seeds from 1 to playersCount
     const adjustedDemo = demo.map((p, index) => ({
       ...p,
       seed: index + 1
@@ -150,29 +155,28 @@ export default function RegistrationPortal({
     setError('');
 
     if (!name.trim()) {
-      setError('Player name is required.');
+      setError('Player Name is required.');
       return;
     }
 
-    const seedNum = Number(seed);
-    if (isNaN(seedNum) || seedNum < 1) {
-      setError(`Seed must be a positive number starting from 1.`);
+    if (seed === '' || seed < 1) {
+      setError('A valid Seed Rank is required.');
       return;
     }
 
-    // Check duplicate seed
-    const duplicateSeedPlayer = players.find(
-      (p) => p.seed === seedNum && p.id !== editingPlayerId
+    // Check seed duplication
+    const duplicateSeed = players.find(
+      (p) => p.seed === Number(seed) && p.id !== editingPlayerId
     );
-    if (duplicateSeedPlayer) {
-      setError(`Seed #${seedNum} is already assigned to ${duplicateSeedPlayer.name}.`);
+    if (duplicateSeed) {
+      setError(`Seed #${seed} is already assigned to ${duplicateSeed.name}.`);
       return;
     }
 
-    const finalPhotoUrl = photoDataUrl || generateSnookerAvatar(name, seedNum);
+    const finalPhoto = photoDataUrl || generateSnookerAvatar(name, Number(seed) || 5);
 
     if (editingPlayerId) {
-      // Edit mode
+      // Edit Player
       const updated = players.map((p) => {
         if (p.id === editingPlayerId) {
           return {
@@ -180,27 +184,29 @@ export default function RegistrationPortal({
             name: name.trim(),
             nickname: nickname.trim() || undefined,
             club: club.trim() || undefined,
-            seed: seedNum,
-            photoUrl: finalPhotoUrl,
+            seed: Number(seed),
+            photoUrl: finalPhoto,
             tournamentType: tournamentType,
           };
         }
         return p;
       });
-      // Sort by seed
-      updated.sort((a, b) => a.seed - b.seed);
-      onPlayersChange(updated);
+      onPlayersChange(updated.sort((a, b) => a.seed - b.seed));
       setEditingPlayerId(null);
     } else {
-      // Add mode
+      // Create Player
+      if (players.length >= playersCount) {
+        setError(`Roster is already full (${playersCount}/${playersCount} players).`);
+        return;
+      }
 
       const newPlayer: Player = {
-        id: `p-${Date.now()}`,
+        id: `P-${Date.now()}`,
         name: name.trim(),
         nickname: nickname.trim() || undefined,
         club: club.trim() || undefined,
-        seed: seedNum,
-        photoUrl: finalPhotoUrl,
+        seed: Number(seed),
+        photoUrl: finalPhoto,
         matchesPlayed: 0,
         matchesWon: 0,
         totalPoints: 0,
@@ -209,17 +215,15 @@ export default function RegistrationPortal({
         tournamentType: tournamentType,
       };
 
-      const updated = [...players, newPlayer].sort((a, b) => a.seed - b.seed);
-      onPlayersChange(updated);
+      onPlayersChange([...players, newPlayer].sort((a, b) => a.seed - b.seed));
     }
 
-    // Reset inputs
+    // Reset Form
     setName('');
     setNickname('');
     setClub('');
     setPhotoDataUrl('');
     setSeed('');
-    setTournamentType(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
   };
 
   const handleEdit = (p: Player) => {
@@ -229,221 +233,231 @@ export default function RegistrationPortal({
     setClub(p.club || '');
     setSeed(p.seed);
     setPhotoDataUrl(p.photoUrl);
-    setTournamentType(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
-    setError('');
+    if (p.tournamentType) {
+      setTournamentType(p.tournamentType);
+    }
   };
 
-  const handleDelete = (playerId: string) => {
-    if (isTournamentStarted) {
-      setError('Cannot delete players once the tournament has started.');
-      return;
-    }
-    setPlayerToDelete(playerId);
+  const handleDelete = (id: string) => {
+    setPlayerToDelete(id);
   };
 
   const handleConfirmDelete = () => {
-    if (!playerToDelete) return;
-    const updated = players.filter((p) => p.id !== playerToDelete);
-    onPlayersChange(updated);
-    if (editingPlayerId === playerToDelete) {
-      setEditingPlayerId(null);
-      setName('');
-      setNickname('');
-      setClub('');
-      setPhotoDataUrl('');
-      setSeed(getNextAvailableSeed());
+    if (playerToDelete) {
+      onPlayersChange(players.filter((p) => p.id !== playerToDelete));
+      setPlayerToDelete(null);
+      if (editingPlayerId === playerToDelete) {
+        setEditingPlayerId(null);
+        setName('');
+        setNickname('');
+        setClub('');
+        setPhotoDataUrl('');
+        setSeed('');
+      }
     }
-    setPlayerToDelete(null);
   };
 
+  // Helper for available seeds calculation
+  const getAvailableSeeds = (): number[] => {
+    const registeredSeeds = players.map((p) => p.seed);
+    const available: number[] = [];
+    for (let s = 1; s <= playersCount; s++) {
+      if (!registeredSeeds.includes(s)) {
+        available.push(s);
+      }
+    }
+    return available;
+  };
+
+  const availableSeeds = getAvailableSeeds();
+  const isRosterFull = players.length >= playersCount;
+
+  // Filter & Sort registered players
+  const filteredPlayers = players
+    .filter((p) => {
+      const term = rosterSearch.toLowerCase();
+      return (
+        p.name.toLowerCase().includes(term) ||
+        (p.nickname && p.nickname.toLowerCase().includes(term)) ||
+        (p.club && p.club.toLowerCase().includes(term))
+      );
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      if (rosterSortBy === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else {
+        comparison = a.seed - b.seed;
+      }
+      return rosterSortOrder === 'asc' ? comparison : -comparison;
+    });
+
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-      {/* Registration Form (1 Column on XL) */}
-      <div className="bg-bg-secondary dark:bg-[#091A2E] border border-rose-500/15 dark:border-rose-500/20 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_0_20px_rgba(239,68,68,0.1)] h-fit transition-all duration-300">
-        <div className="flex items-center justify-between border-b border-rose-500/10 dark:border-rose-500/15 pb-4 mb-5">
-          <div className="flex items-center gap-3">
-            <div className="relative p-2 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/20 rounded-xl">
-              <UserPlus className="w-5 h-5 text-rose-500 animate-pulse" />
-            </div>
-            <div className="flex flex-col leading-none text-left">
-              <span className="text-[10px] font-sans font-black text-text-muted dark:text-slate-400 tracking-[0.2em] uppercase">REGISTER</span>
-              <span className="text-base font-sans font-black text-rose-500 tracking-wider uppercase">PLAYER</span>
-            </div>
+    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start animate-in fade-in duration-300">
+      
+      {/* Registration Form Column */}
+      <div className="bg-[#121F32] border border-[#1A2740] rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#1A6DFF]/5 rounded-full filter blur-2xl pointer-events-none" />
+        
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2.5 bg-[#1A6DFF]/15 border border-[#1A6DFF]/30 text-[#1A6DFF] rounded-xl">
+            <UserPlus className="w-5 h-5" />
           </div>
-          {!isTournamentStarted && players.length === 0 && (
-            <button
-              onClick={handleAutoFill}
-              id="btn-auto-fill-players"
-              className="bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 dark:border-rose-500/25 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-[0_0_12px_rgba(239,68,68,0.05)]"
-            >
-              <div className="flex items-center justify-center text-rose-500">
-                <Users className="w-3.5 h-3.5" />
-              </div>
-              <div className="flex flex-col leading-none text-left">
-                <span className="text-[8px] font-sans font-black text-rose-500 tracking-wider uppercase">QUICK FILL</span>
-                <span className="text-xs font-sans font-black text-text-primary dark:text-slate-200">{playersCount}</span>
-              </div>
-            </button>
-          )}
+          <div className="text-left">
+            <h3 className="font-display font-black text-white text-base uppercase leading-none">
+              {editingPlayerId ? 'Modify Contender' : 'Register Contender'}
+            </h3>
+            <p className="text-[11px] text-[#B2B6C2] font-sans uppercase mt-1 tracking-wider">
+              {editingPlayerId ? 'Update player properties' : 'Enlist new contender on system'}
+            </p>
+          </div>
         </div>
 
-        {isTournamentStarted && !editingPlayerId ? (
-          <div className="bg-bg-primary dark:bg-[#0E1116] border border-rose-500/15 dark:border-rose-500/20 text-rose-600 dark:text-rose-400/90 rounded-xl p-4 text-xs flex gap-3 animate-in fade-in duration-200">
-            <ShieldCheck className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+        {isTournamentStarted ? (
+          <div className="p-4 bg-[#EF4444]/10 border border-[#EF4444]/25 rounded-2xl flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
             <div className="text-left">
-              <p className="font-sans font-black uppercase tracking-wider mb-1">Tournament Active</p>
-              <p className="leading-relaxed text-text-secondary dark:text-slate-400">
-                The championship has commenced. Adding new players or deleting existing slots is disabled, but you can select any player from the active roster list on the right to edit their profile details.
+              <span className="text-xs font-black text-[#EF4444] uppercase tracking-wider block">Registration Locked</span>
+              <p className="text-xs text-[#B2B6C2] mt-1 leading-relaxed">
+                The tournament has already started. Roster modifications, seeds assignments, and registrations are disabled during live bracket feeds.
               </p>
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-500/5 dark:bg-red-500/10 border border-red-500/15 dark:border-red-500/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-xs flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-xl text-xs text-red-400 font-bold text-left flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
-            <div className="text-left">
-              <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
-                Player Full Name <span className="text-rose-500 font-bold">*</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                id="input-player-name"
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Ronnie O'Sullivan"
-                className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
-                maxLength={40}
-              />
-            </div>
-
-            {/* Tournament Type prefilled & uneditable field */}
-            <div className="text-left">
-              <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                <Trophy className="w-3 h-3 text-rose-500" /> Tournament Type
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  readOnly
-                  value={config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker'}
-                  className="w-full bg-bg-tertiary/60 dark:bg-[#030912] border border-rose-500/10 rounded-xl px-4 py-2.5 text-sm text-text-secondary dark:text-slate-300 font-bold cursor-not-allowed outline-none select-none"
-                />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-sans font-black bg-rose-500/10 text-rose-500 border border-rose-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                  Prefilled
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-left">
-              <div>
-                <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
-                  Nickname <span className="text-text-muted dark:text-slate-500 font-normal lowercase">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={nickname}
-                  id="input-player-nickname"
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="e.g. The Rocket"
-                  className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
-                  maxLength={30}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
-                  Seed Rank <span className="text-rose-500 font-bold">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={seed}
-                  id="input-player-seed"
-                  disabled={isTournamentStarted}
-                  onChange={(e) => setSeed(e.target.value === '' ? '' : Number(e.target.value))}
-                  min={1}
-                  className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            <div className="text-left">
-              <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
-                Representing Club / Region <span className="text-text-muted dark:text-slate-500 font-normal lowercase">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={club}
-                id="input-player-club"
-                onChange={(e) => setClub(e.target.value)}
-                placeholder="e.g. London Snooker Academy"
-                className="w-full bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 focus:border-rose-500/50 dark:focus:border-rose-500/60 rounded-xl px-4 py-2.5 text-sm text-text-primary dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] focus:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
-                maxLength={50}
-              />
-            </div>
-
-            {/* Drag and Drop File Upload */}
-            <div className="text-left">
-              <label className="block text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mb-1.5">
-                Player Photo / Profile Cover
-              </label>
-
-              {photoDataUrl ? (
-                <div className="relative border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-3 bg-bg-primary dark:bg-[#05101E] flex items-center gap-4">
-                  <img
-                    src={photoDataUrl || undefined}
-                    alt="Uploaded avatar preview"
-                    className="w-16 h-16 rounded-lg object-cover border border-rose-500/25 shadow-[0_0_10px_rgba(239,68,68,0.15)]"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-text-primary dark:text-slate-200 truncate">Custom photo loaded</p>
-                    <p className="text-[10px] text-rose-500/60 dark:text-rose-500/60">Will be stored locally in database</p>
+            {/* Avatar Uploader */}
+            <div className="space-y-1.5 text-left">
+              <label className="text-[10px] font-sans font-black text-[#787E90] uppercase tracking-wider block">Profile Portrait</label>
+              <div 
+                onClick={triggerFileInput}
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all duration-300 ${
+                  isDragActive
+                    ? 'border-[#1A6DFF] bg-[#1A6DFF]/5'
+                    : photoDataUrl 
+                    ? 'border-[#1A2740] bg-[#04142B]' 
+                    : 'border-[#1A2740] hover:border-[#1A6DFF]/50 bg-[#04142B]'
+                }`}
+              >
+                {photoDataUrl ? (
+                  <div className="relative inline-block">
+                    <img 
+                      src={photoDataUrl} 
+                      alt="Selected avatar" 
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-[#1A6DFF] mx-auto shadow-md"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPhotoDataUrl('');
+                      }}
+                      className="absolute -top-1.5 -right-1.5 bg-[#EF4444] hover:bg-red-600 text-white p-1 rounded-full shadow transition-all hover:scale-110"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPhotoDataUrl('')}
-                    className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                    title="Remove Image"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onDragEnter={handleDrag}
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={triggerFileInput}
-                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-                    isDragActive
-                      ? 'border-rose-500 bg-rose-500/5'
-                      : 'border-rose-500/15 hover:border-rose-500/40 bg-bg-primary dark:bg-[#05101E]'
-                  }`}
-                >
-                  <Upload className="w-6 h-6 text-rose-500/50 mx-auto mb-2" />
-                  <p className="text-xs font-medium text-text-primary dark:text-slate-200 mb-0.5">
-                    Drag & Drop Player photo or <span className="text-rose-500 font-black hover:underline">Browse</span>
-                  </p>
-                  <p className="text-[10px] text-text-muted dark:text-slate-500">Supports PNG, JPG, WEBP. Max 2MB.</p>
-                  <p className="text-[9px] text-rose-500/40 mt-1.5 font-medium">Leave empty to auto-generate a premium thematic avatar</p>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </div>
-              )}
+                ) : (
+                  <div className="space-y-1.5">
+                    <Upload className="w-6 h-6 text-[#787E90] mx-auto" />
+                    <p className="text-xs font-semibold text-[#EEF1F5]">
+                      Drag & Drop portrait or <span className="text-[#1A6DFF] hover:underline">Browse</span>
+                    </p>
+                    <p className="text-[10px] text-[#787E90]">JPG, PNG, Base64 (max 2MB)</p>
+                  </div>
+                )}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
+              </div>
             </div>
 
-            <div className="flex gap-3 pt-2">
+            {/* Tournament Type Selector */}
+            {config.tournamentTypes && config.tournamentTypes.length > 0 && (
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-sans font-black text-[#787E90] uppercase tracking-wider block">Game Category</label>
+                <div className="relative">
+                  <select
+                    value={tournamentType}
+                    onChange={(e) => setTournamentType(e.target.value)}
+                    className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[#1A6DFF] transition-colors appearance-none cursor-pointer"
+                  >
+                    {config.tournamentTypes.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#787E90]">
+                    ▼
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Form Inputs */}
+            <div className="space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-sans font-black text-[#787E90] uppercase tracking-wider block">Full Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Stephen Hendry"
+                  className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl px-4 py-3 text-sm text-[#EEF1F5] placeholder-[#787E90] outline-none focus:border-[#1A6DFF] transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-sans font-black text-[#787E90] uppercase tracking-wider block">Alias / Nickname</label>
+                  <input
+                    type="text"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    placeholder='e.g. "The Maverick"'
+                    className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl px-4 py-3 text-sm text-[#EEF1F5] placeholder-[#787E90] outline-none focus:border-[#1A6DFF] transition-colors"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-sans font-black text-[#787E90] uppercase tracking-wider block">Seed / Rank</label>
+                  <input
+                    type="number"
+                    value={seed}
+                    onChange={(e) => setSeed(e.target.value === '' ? '' : Number(e.target.value))}
+                    min="1"
+                    max={playersCount}
+                    placeholder="e.g. 1"
+                    className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl px-4 py-3 text-sm text-[#EEF1F5] placeholder-[#787E90] outline-none focus:border-[#1A6DFF] transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-sans font-black text-[#787E90] uppercase tracking-wider block">Club Affiliation</label>
+                <input
+                  type="text"
+                  value={club}
+                  onChange={(e) => setClub(e.target.value)}
+                  placeholder="e.g. Crucible Club"
+                  className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl px-4 py-3 text-sm text-[#EEF1F5] placeholder-[#787E90] outline-none focus:border-[#1A6DFF] transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3.5 pt-2">
               {editingPlayerId && (
                 <button
                   type="button"
@@ -456,53 +470,52 @@ export default function RegistrationPortal({
                     setSeed(getNextAvailableSeed());
                     setError('');
                   }}
-                  className="flex-1 bg-bg-primary hover:bg-bg-tertiary dark:bg-[#0E1116] dark:hover:bg-[#1A1D23] border border-rose-500/15 dark:border-rose-500/20 text-text-secondary dark:text-slate-300 font-extrabold text-xs py-2.5 rounded-xl transition-colors cursor-pointer uppercase tracking-wider"
+                  className="flex-1 bg-[#04142B] hover:bg-[#1A2740] border border-[#1A2740] text-[#B2B6C2] font-black text-xs py-3.5 rounded-xl transition-all cursor-pointer uppercase tracking-wider"
                 >
                   Cancel
                 </button>
               )}
               <button
                 type="submit"
-                id="btn-save-player"
-                className="flex-1 bg-gradient-to-r from-rose-950 via-rose-600 to-rose-950 border border-rose-500/40 hover:from-rose-900 hover:via-rose-500 hover:to-rose-900 text-white font-sans font-black text-xs tracking-[0.2em] py-3.5 rounded-xl transition-all shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer uppercase"
+                className="flex-1 bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] hover:from-[#4088FF] hover:to-[#1A6DFF] text-white font-black text-xs tracking-wider py-3.5 rounded-xl transition-all shadow-lg shadow-[#1A6DFF]/10 flex items-center justify-center gap-2 cursor-pointer uppercase hover:scale-[1.01]"
               >
                 {editingPlayerId ? <Edit className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                {editingPlayerId ? 'Update Player' : 'Register Player'}
+                {editingPlayerId ? 'Update Contender' : 'Register Contender'}
               </button>
             </div>
           </form>
         )}
       </div>
 
-      {/* Players Progress and Grid (2 Columns on XL) */}
+      {/* Roster & Applications Registers */}
       <div className="xl:col-span-2 space-y-6">
         
-        {/* Registration Sub-tab Toggle */}
-        <div className="flex border-b border-rose-500/10 dark:border-rose-500/15 gap-6 pb-px">
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-[#1A2740] gap-6 pb-px">
           <button
             type="button"
             onClick={() => setActiveSubTab('roster')}
-            className={`pb-3 text-xs uppercase tracking-wider font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+            className={`pb-3 text-xs uppercase tracking-widest font-black transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'roster'
-                ? 'border-rose-500 text-rose-500'
-                : 'border-transparent text-text-muted hover:text-text-primary dark:text-slate-500 dark:hover:text-slate-300'
+                ? 'border-[#F1C317] text-[#EEF1F5]'
+                : 'border-transparent text-[#787E90] hover:text-[#EEF1F5]'
             }`}
           >
-            <Users className="w-4 h-4" /> Active Roster ({players.length})
+            <Users className="w-4 h-4" /> Active Roster ({players.length}/{playersCount})
           </button>
           <button
             type="button"
             onClick={() => setActiveSubTab('applications')}
-            className={`pb-3 text-xs uppercase tracking-wider font-extrabold transition-all border-b-2 flex items-center gap-2 relative cursor-pointer ${
+            className={`pb-3 text-xs uppercase tracking-widest font-black transition-all border-b-2 flex items-center gap-2 relative cursor-pointer ${
               activeSubTab === 'applications'
-                ? 'border-rose-500 text-rose-500'
-                : 'border-transparent text-text-muted hover:text-text-primary dark:text-slate-500 dark:hover:text-slate-300'
+                ? 'border-[#F1C317] text-[#EEF1F5]'
+                : 'border-transparent text-[#787E90] hover:text-[#EEF1F5]'
             }`}
           >
-            <FileText className="w-4 h-4" /> Applications Register
+            <FileText className="w-4 h-4" /> Applications ({applications.length})
             {applications.filter(a => a.status === 'pending').length > 0 && (
-              <span className="bg-rose-500 text-white font-sans text-[9px] font-black px-1.5 py-0.5 rounded-full ml-1 border border-rose-600 animate-pulse">
-                {applications.filter(a => a.status === 'pending').length} New
+              <span className="bg-[#EF4444] text-white font-sans text-[9px] font-black px-1.5 py-0.5 rounded-full ml-1 animate-pulse">
+                {applications.filter(a => a.status === 'pending').length}
               </span>
             )}
           </button>
@@ -510,123 +523,176 @@ export default function RegistrationPortal({
 
         {activeSubTab === 'roster' ? (
           <>
-            {/* Progress & Quick Actions */}
-            <div className="bg-bg-secondary dark:bg-[#091A2E] border border-rose-500/15 dark:border-rose-500/20 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_0_20px_rgba(239,68,68,0.1)] transition-colors duration-300">
+            {/* Readiness Card */}
+            <div className="bg-[#121F32] border border-[#1A2740] rounded-3xl p-6 shadow-xl relative overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/20 flex items-center justify-center shrink-0">
-                    <Trophy className="w-5 h-5 text-rose-500" />
+                  <div className="w-11 h-11 rounded-2xl bg-[#F1C317]/10 border border-[#F1C317]/20 flex items-center justify-center shrink-0">
+                    <Trophy className="w-5 h-5 text-[#F1C317]" />
                   </div>
                   <div className="text-left">
-                    <h4 className="font-sans font-black text-text-primary dark:text-slate-100 text-sm uppercase tracking-wider mb-0.5">
+                    <h4 className="font-sans font-black text-white text-sm uppercase tracking-wider mb-0.5">
                       Championship Readiness
                     </h4>
-                    <p className="text-xs text-text-secondary dark:text-slate-400">
-                      A perfect {playersCount}-player registration is required to draw the knockout bracket.
+                    <p className="text-xs text-[#B2B6C2]">
+                      A total of {playersCount} contestants are required to compile brackets.
                     </p>
                   </div>
                 </div>
+
                 {!isTournamentStarted && players.length > 0 && (
                   <button
                     onClick={handleClearAll}
-                    id="btn-clear-all-players"
-                    className="self-start sm:self-center text-xs font-bold text-rose-500 hover:text-rose-400 bg-rose-500/5 border border-rose-500/15 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
+                    className="self-start sm:self-center text-xs font-black text-[#EF4444] hover:text-white hover:bg-[#EF4444] border border-[#EF4444]/20 hover:border-transparent px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
                   >
-                    <Trash2 className="w-3.5 h-3.5" /> Reset Board
+                    <Trash2 className="w-3.5 h-3.5" /> Wipe Board
                   </button>
                 )}
               </div>
 
-              {/* Progress bar */}
+              {/* Progress Indicator */}
               <div className="mt-5">
-                <div className="flex justify-between text-[11px] font-sans font-black text-rose-600 dark:text-rose-500/70 tracking-wider mb-2">
-                  <span>REGISTERED PLAYERS</span>
-                  <span className="text-rose-500">{players.length} Players Registered</span>
+                <div className="flex justify-between text-[10px] font-sans font-black text-[#787E90] tracking-widest uppercase mb-2">
+                  <span>Registered Contenders</span>
+                  <span className="text-[#F1C317]">{players.length} / {playersCount} REGISTERED</span>
                 </div>
-                <div className="w-full bg-bg-primary dark:bg-[#05101E] rounded-full h-3.5 overflow-hidden border border-rose-500/10 dark:border-rose-500/15 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)]">
+                <div className="w-full bg-[#04142B] rounded-full h-3.5 overflow-hidden border border-[#1A2740]">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r from-rose-950 via-rose-500 to-rose-400 shadow-[0_0_10px_rgba(239,68,68,0.3)] dark:shadow-[0_0_10px_rgba(239,68,68,0.5)]`}
+                    className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] shadow-[0_0_12px_rgba(26,109,255,0.4)]"
                     style={{ width: `${Math.min(100, (players.length / playersCount) * 100)}%` }}
-                  ></div>
+                  />
                 </div>
               </div>
 
-              {/* Unlock Tournament Action */}
-              {players.length >= playersCount && !isTournamentStarted && (
-                <div className="mt-5 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-6 h-6 text-rose-500 shrink-0" />
-                    <div className="text-left">
-                      <h5 className="text-sm font-black text-rose-500 uppercase tracking-wide">Ready to Draw Bracket</h5>
-                      <p className="text-xs text-text-secondary dark:text-slate-400">{players.length} players registered (bracket requires at least {playersCount}). Generate the schedule now.</p>
+              {/* Draw Lock State / CTA */}
+              {!isTournamentStarted && (
+                <div className="mt-6 pt-5 border-t border-[#1A2740]/60 flex flex-wrap items-center justify-between gap-4">
+                  {players.length < playersCount ? (
+                    <div className="flex items-center gap-2.5 text-[#B2B6C2]">
+                      <AlertCircle className="w-5 h-5 text-[#F1C317] shrink-0" />
+                      <span className="text-xs">
+                        Need <strong className="text-white">{playersCount - players.length}</strong> more players. Use manual entry or enrollees above.
+                      </span>
                     </div>
+                  ) : (
+                    <div className="flex items-center gap-2.5 text-emerald-400">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                      <span className="text-xs font-bold uppercase tracking-wider">ROSTER COMPLETELY LOADED</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    {players.length === 0 && !isTournamentStarted && (
+                      <button
+                        onClick={handleAutoFill}
+                        className="bg-[#04142B] border border-[#1A2740] hover:bg-[#1A2740] text-xs font-black px-4.5 py-3 rounded-xl text-[#B2B6C2] hover:text-white transition-all uppercase tracking-wider cursor-pointer"
+                      >
+                        ⚡ Autofill Demo Roster
+                      </button>
+                    )}
+
+                    {players.length === playersCount && !isTournamentStarted && (
+                      <button
+                        onClick={onStartTournament}
+                        className="bg-gradient-to-r from-[#F1C317] to-[#FFD43B] hover:from-[#FFD43B] hover:to-[#F1C317] text-[#010C1E] text-xs font-black px-5 py-3 rounded-xl transition-all shadow-lg shadow-[#F1C317]/10 flex items-center gap-1.5 cursor-pointer uppercase tracking-widest animate-pulse hover:scale-[1.01]"
+                      >
+                        <ShieldCheck className="w-4 h-4 fill-current" /> Initialize Tournament Brackets
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={onStartTournament}
-                    id="btn-draw-brackets"
-                    className="w-full sm:w-auto bg-gradient-to-r from-rose-950 via-rose-600 to-rose-950 border border-rose-500/40 hover:from-rose-900 hover:via-rose-500 hover:to-rose-900 text-white font-sans font-black text-xs tracking-[0.15em] px-6 py-3 rounded-xl shadow-[0_0_15px_rgba(239,68,68,0.25)] transition-all cursor-pointer uppercase"
-                  >
-                    Commence Championship
-                  </button>
                 </div>
               )}
             </div>
 
-            {/* Players List Grid */}
-            <div className="bg-bg-secondary dark:bg-[#091A2E] border border-rose-500/15 dark:border-rose-500/20 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_0_20px_rgba(239,68,68,0.1)] transition-colors duration-300">
-              <h4 className="font-sans font-black text-text-primary dark:text-slate-100 text-sm uppercase tracking-wider mb-4 text-left">
-                Registered Slots (Sorted by Seed)
-              </h4>
+            {/* Advanced Filters & Roster List */}
+            <div className="bg-[#121F32] border border-[#1A2740] rounded-3xl p-6 shadow-xl space-y-6">
+              
+              {/* Filter controls panel */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1A2740]/40 pb-5">
+                {/* Search bar */}
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787E90]" />
+                  <input
+                    type="text"
+                    value={rosterSearch}
+                    onChange={(e) => setRosterSearch(e.target.value)}
+                    placeholder="Search name, nickname, club..."
+                    className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl pl-10 pr-4 py-2.5 text-xs text-[#EEF1F5] placeholder-[#787E90] outline-none focus:border-[#1A6DFF] transition-colors"
+                  />
+                </div>
 
-              {players.length === 0 ? (
-                <div className="text-center py-16 border border-dashed border-rose-500/15 dark:border-rose-500/20 rounded-xl bg-bg-primary dark:bg-[#05101E] flex flex-col items-center justify-center">
-                  <div className="w-14 h-14 bg-rose-500/5 border border-rose-500/15 rounded-full flex items-center justify-center mb-4 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
-                    <UserPlus className="w-6 h-6 text-rose-500/50" />
-                  </div>
-                  <p className="text-text-primary dark:text-slate-100 text-sm font-black uppercase tracking-wider">No players registered yet</p>
-                  <p className="text-text-secondary dark:text-slate-400 text-xs mt-1.5 max-w-sm mx-auto leading-relaxed px-4">
-                    Use the form on the left to register players, or click the <span className="text-rose-500 font-black cursor-pointer hover:underline" onClick={handleAutoFill}>Quick Fill {playersCount}</span> button to auto-populate with the world's finest professionals!
-                  </p>
+                {/* Sort control */}
+                <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
+                  <span className="text-[#787E90] font-sans font-black uppercase tracking-wider text-[10px]">Sort by:</span>
+                  <select
+                    value={rosterSortBy}
+                    onChange={(e) => setRosterSortBy(e.target.value as 'name' | 'seed')}
+                    className="bg-[#04142B] border border-[#1A2740] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none cursor-pointer"
+                  >
+                    <option value="seed">Seed Rank</option>
+                    <option value="name">Full Name</option>
+                  </select>
+                  
+                  <button
+                    onClick={() => setRosterSortOrder(p => p === 'asc' ? 'desc' : 'asc')}
+                    className="p-1.5 rounded-lg bg-[#04142B] border border-[#1A2740] hover:bg-[#1A2740] text-[#B2B6C2] hover:text-white transition-colors"
+                    title="Toggle Sort Order"
+                  >
+                    <ArrowUpDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Roster Cards List */}
+              {filteredPlayers.length === 0 ? (
+                <div className="text-center py-10 border border-dashed border-[#1A2740] rounded-2xl">
+                  <Users className="w-8 h-8 text-[#787E90]/40 mx-auto mb-2" />
+                  <p className="text-xs text-[#B2B6C2]">No registered contenders found matching search filters.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[480px] overflow-y-auto pr-1">
-                  {players.map((p) => (
-                    <div
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredPlayers.map((p) => (
+                    <div 
                       key={p.id}
-                      className="bg-bg-primary dark:bg-[#05101E] border border-rose-500/10 dark:border-rose-500/15 rounded-xl p-3 hover:border-rose-500/50 transition-all flex items-center gap-3 relative group"
+                      className="group bg-[#04142B] border border-[#1A2740] hover:border-[#1A6DFF]/30 p-4 rounded-2xl flex items-center justify-between gap-4 transition-all duration-300 hover:shadow-lg relative overflow-hidden"
                     >
-                      <div className="relative shrink-0">
-                        <img
-                          src={p.photoUrl || undefined}
-                          alt={p.name}
-                          className="w-10 h-10 rounded-lg object-cover border border-rose-500/15 dark:border-rose-500/20 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.05)] dark:shadow-[0_0_8px_rgba(239,68,68,0.1)]"
-                          referrerPolicy="no-referrer"
-                        />
-                        <span className="absolute -top-1.5 -left-1.5 bg-bg-secondary dark:bg-[#091A2E] text-[9px] font-black text-rose-500 px-1.5 py-0.5 rounded border border-rose-500/15 dark:border-rose-500/20">
-                          #{p.seed}
-                        </span>
-                      </div>
+                      {/* Interactive decorative line */}
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1A6DFF] opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                      <div className="min-w-0 flex-1 text-left">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-xs font-black text-text-primary dark:text-slate-100 truncate group-hover:text-rose-500 transition-colors">
-                            {p.name}
-                          </p>
-                          {p.tournamentType && (
-                            <span className="text-[8px] font-sans font-black tracking-widest bg-rose-500/10 text-rose-500 px-1 py-0.5 rounded border border-rose-500/20 uppercase">
-                              {p.tournamentType}
-                            </span>
-                          )}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative shrink-0">
+                          <img
+                            src={p.photoUrl}
+                            alt={p.name}
+                            className="w-11 h-11 rounded-2xl object-cover border-2 border-[#1A2740] group-hover:border-[#1A6DFF]/50 transition-colors"
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="absolute -top-1.5 -left-1.5 bg-[#121F32] text-[9px] font-black text-[#F1C317] border border-[#1A2740] px-1.5 py-0.5 rounded-md shadow-sm font-mono">
+                            #{p.seed}
+                          </span>
                         </div>
-                        <p className="text-[10px] text-text-secondary dark:text-slate-400 italic truncate font-sans">
-                          {p.nickname ? `"${p.nickname}"` : p.club || 'Independent'}
-                        </p>
+                        <div className="min-w-0 text-left">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h5 className="text-xs font-black text-white truncate leading-none">
+                              {p.name}
+                            </h5>
+                            {p.tournamentType && (
+                              <span className="text-[8px] font-sans font-black bg-[#1A6DFF]/15 text-[#1A6DFF] px-1.5 py-0.5 rounded border border-[#1A6DFF]/20 uppercase">
+                                {p.tournamentType}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-[#B2B6C2] mt-1 font-sans truncate italic">
+                            {p.nickname ? `"${p.nickname}"` : p.club || 'Independent Contender'}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      {/* Hover action tray */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
                         <button
                           onClick={() => handleEdit(p)}
-                          className="p-1 hover:bg-rose-500/10 text-text-muted hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 rounded transition-colors cursor-pointer"
+                          className="p-1.5 hover:bg-[#1A6DFF]/15 text-[#787E90] hover:text-[#1A6DFF] rounded-lg transition-colors cursor-pointer"
                           title="Edit Player"
                         >
                           <Edit className="w-3.5 h-3.5" />
@@ -634,7 +700,7 @@ export default function RegistrationPortal({
                         {!isTournamentStarted && (
                           <button
                             onClick={() => handleDelete(p.id)}
-                            className="p-1 hover:bg-rose-500/10 text-text-muted hover:text-rose-500 rounded transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-[#EF4444]/15 text-[#787E90] hover:text-[#EF4444] rounded-lg transition-colors cursor-pointer"
                             title="Delete Player"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -644,24 +710,20 @@ export default function RegistrationPortal({
                     </div>
                   ))}
 
-                  {/* Empty Slots visualization if players count is less than playersCount */}
+                  {/* Empty Slots visualization */}
                   {players.length < playersCount &&
                     Array.from({ length: playersCount - players.length }).map((_, idx) => {
                       const emptySeed = getNextAvailableSeed() + idx;
-                      // Make sure we only show valid seed counts
                       if (emptySeed <= playersCount) {
                         return (
                           <div
                             key={`empty-${idx}`}
-                            className="border border-dashed border-rose-500/10 dark:border-rose-500/15 bg-bg-primary/40 dark:bg-[#05101E]/30 rounded-xl p-3 flex items-center gap-3 text-text-muted"
+                            className="border border-dashed border-[#1A2740] bg-[#04142B]/20 rounded-2xl p-4 flex items-center gap-3 text-[#787E90] italic text-xs text-left"
                           >
-                            <div className="w-10 h-10 rounded-lg bg-bg-secondary dark:bg-[#05101E] border border-dashed border-rose-500/15 dark:border-rose-500/20 flex items-center justify-center font-sans text-xs text-rose-500/50 font-black shrink-0">
+                            <div className="w-10 h-10 rounded-xl bg-[#04142B] border border-dashed border-[#1A2740] flex items-center justify-center font-black text-[10px] text-[#787E90] shrink-0">
                               #{emptySeed}
                             </div>
-                            <div className="min-w-0 flex-1 text-left">
-                              <p className="text-xs font-semibold text-text-muted dark:text-slate-500 italic">Empty Slot</p>
-                              <p className="text-[10px] text-rose-500/30">Awaiting...</p>
-                            </div>
+                            <span>Empty Bracket Rank Slot</span>
                           </div>
                         );
                       }
@@ -672,277 +734,155 @@ export default function RegistrationPortal({
             </div>
           </>
         ) : (
-          /* APPLICATIONS REGISTER DASHBOARD */
-          <div className="bg-gradient-to-b from-bg-secondary to-bg-primary dark:from-[#091A2E] dark:to-[#05101E] rounded-2xl p-6 border border-rose-500/15 shadow-xl dark:shadow-2xl dark:shadow-black/80 space-y-6 transition-all duration-300">
+          /* Application sub-tab screen */
+          <div className="bg-[#121F32] border border-[#1A2740] rounded-3xl p-6 shadow-xl space-y-6">
             
-            {/* Header row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rose-500/10 pb-4">
-              <div className="text-left">
-                <span className="text-[9px] font-sans font-black text-rose-600 dark:text-rose-500 tracking-[0.2em] uppercase block mb-1">
-                  Public Enrollment Portal
-                </span>
-                <h4 className="font-sans font-black text-text-primary dark:text-white text-base uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="w-5 h-5 text-rose-500" /> Player Application Register
-                </h4>
-                <p className="text-[11px] text-text-secondary dark:text-slate-400 mt-0.5">
-                  Review entries submitted via the public registration link and sync selected players into the tournament seeds.
-                </p>
+            {/* Filter controls panel */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1A2740]/40 pb-5">
+              {/* Search bar */}
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787E90]" />
+                <input
+                  type="text"
+                  value={appSearch}
+                  onChange={(e) => setAppSearch(e.target.value)}
+                  placeholder="Search applicant name, club, phone..."
+                  className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl pl-10 pr-4 py-2.5 text-xs text-[#EEF1F5] placeholder-[#787E90] outline-none focus:border-[#1A6DFF] transition-colors"
+                />
               </div>
 
-              {/* Demo Simulate entries button */}
-              <button
-                type="button"
-                onClick={() => {
-                  const types = config.tournamentTypes || ['Soccer', 'Snooker', 'Table Tennis'];
-                  const demoApps: PlayerApplication[] = [
-                    {
-                      id: `app-sim-1`,
-                      fullName: 'Judd Trump',
-                      nickname: 'The Ace in the Pack',
-                      photoUrl: generateSnookerAvatar('Judd Trump', 5),
-                      club: 'Bristol Snooker Centre',
-                      phoneNumber: '+44 7700 900077',
-                      whatsappNumber: '+44 7700 900077',
-                      socialMediaPage: 'https://instagram.com/juddtrump',
-                      status: 'pending',
-                      appliedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-                      documentUrl: 'data:application/pdf;base64,JVBERi0xLjUKMSAwIG9iagogIDw8IC9UeXBlIC9DYXRhbG9nCiAgICAgL1BhZ2VzIDIgMCBSCiAgPj4KZW5kb2JqCjIgMCBvYmoKICA8PCAvVHlwZSAvUGFnZXMKICAgICAvS2lkcyBbIDMgMCBSIF0KICAgICAvQ291bnQgMQogID4+CmVuZG9iagozIDAgb2JqCiAgPDwgL1R5cGUgL1BhZ2UKICAgICAvUGFyZW50IDIgMCBSCiAgICAgL01lZGlhQm94IFsgMCAwIDU5NSA4NDIgXQogICAgIC9Db250ZW50cyA0IDAgUgoKICA+PgplbmRvYmoKNCAwIG9iagogIDw8IC9MZW5ndGggNTYgPj4Kc3RyZWFtCkJUCi9GMSAxMiBUZgogNzAgNzAwIFRECiAoSlVERCBUUlVNUCBWRVJJRklDQVRJT04gRE9DVU1FTlQpIFRQCgVFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNyAwMDAwMCBuIAowMDAwMDAwMDgxIDAwMDAwIG4gCjAwMDAwMDAxNDkgAwMDAwIG4gCjAwMDAwMDAyNTUgAwMDAwIG4gCnRyYWlsZXIKICA8PCAvU2l6ZSA1CiAgICAgL1Jvb3QgMSAwIFIKICA+PgpzdGFydHhyZWYKMzYwCiUlRU9GCg==',
-                      documentName: 'judd_trump_license.pdf',
-                      tournamentType: types[1] || types[0] || 'Snooker'
-                    },
-                    {
-                      id: `app-sim-2`,
-                      fullName: 'Mark Selby',
-                      nickname: 'The Jester from Leicester',
-                      photoUrl: generateSnookerAvatar('Mark Selby', 12),
-                      club: 'Leicester Snooker Club',
-                      phoneNumber: '+44 7700 900088',
-                      socialMediaPage: 'https://twitter.com/markselby',
-                      status: 'pending',
-                      appliedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-                      documentUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-                      documentName: 'mark_selby_id.png',
-                      tournamentType: types[1] || types[0] || 'Snooker'
-                    },
-                    {
-                      id: `app-sim-3`,
-                      fullName: 'Kyren Wilson',
-                      nickname: 'The Warrior',
-                      photoUrl: generateSnookerAvatar('Kyren Wilson', 15),
-                      club: 'Kettering Snooker Centre',
-                      phoneNumber: '+44 7700 900099',
-                      whatsappNumber: '+44 7700 900099',
-                      status: 'pending',
-                      appliedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-                      tournamentType: types[1] || types[0] || 'Snooker'
-                    }
-                  ];
-                  onApplicationsChange([...demoApps, ...applications]);
-                }}
-                className="text-[10px] font-sans font-black text-rose-500 hover:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md uppercase tracking-wider self-start sm:self-auto"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Simulate 3 Applications
-              </button>
-            </div>
-
-            {/* Filter buttons bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-bg-primary dark:bg-[#05101E] p-3 rounded-xl border border-rose-500/10 dark:border-rose-500/15">
-              <div className="flex items-center gap-1.5">
-                <ListFilter className="w-3.5 h-3.5 text-rose-500/60" />
-                <span className="text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest mr-1">Filter status:</span>
-              </div>
-              <div className="flex gap-1.5 flex-wrap">
-                {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => {
-                  const count = status === 'all' 
-                    ? applications.length 
-                    : applications.filter(a => a.status === status).length;
-                  const isActive = appFilter === status;
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => setAppFilter(status)}
-                      className={`px-3.5 py-1.5 text-[10px] font-sans font-black rounded-lg transition-all uppercase tracking-wider cursor-pointer flex items-center gap-1.5 border ${
-                        isActive
-                          ? 'bg-rose-500 text-white border-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                          : 'bg-bg-primary dark:bg-[#05101E]/50 text-text-secondary dark:text-slate-400 border-rose-500/15 hover:border-rose-500/40 hover:text-rose-500 dark:hover:text-rose-400'
-                      }`}
-                    >
-                      {status}
-                      <span className={`text-[9px] font-mono font-black px-1.5 py-0.2 rounded-full ${
-                        isActive ? 'bg-bg-primary dark:bg-[#05101E] text-rose-600 dark:text-rose-400' : 'bg-bg-secondary dark:bg-[#091A2E]/50 text-text-muted dark:text-slate-500'
-                      }`}>
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
+              {/* Status Filter */}
+              <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
+                <span className="text-[#787E90] font-sans font-black uppercase tracking-wider text-[10px]">Filter by:</span>
+                <select
+                  value={appFilter}
+                  onChange={(e) => setAppFilter(e.target.value as any)}
+                  className="bg-[#04142B] border border-[#1A2740] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none cursor-pointer"
+                >
+                  <option value="all">All Applications</option>
+                  <option value="pending">Pending Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
               </div>
             </div>
 
-            {/* Applications List */}
+            {/* Applications List overflow block */}
             {applications.length === 0 ? (
-              <div className="text-center py-20 border border-dashed border-rose-500/15 dark:border-rose-500/10 rounded-2xl bg-bg-primary dark:bg-[#05101E]/40">
-                <FileText className="w-12 h-12 text-rose-500/35 mx-auto mb-3" />
-                <p className="text-sm font-sans font-black text-text-primary dark:text-slate-200 uppercase tracking-wider">No applications in register yet</p>
-                <p className="text-xs text-text-secondary dark:text-slate-400 max-w-sm mx-auto mt-1.5 leading-relaxed">
-                  Generate the public registration link in the Settings page and share it to players, or use the simulator button above to load demo entries!
+              <div className="text-center py-12 border border-dashed border-[#1A2740] rounded-2xl">
+                <FileText className="w-10 h-10 text-[#787E90]/30 mx-auto mb-3" />
+                <p className="text-xs text-[#B2B6C2] max-w-sm mx-auto leading-relaxed">
+                  No online applications registered. Players can apply publicly using the Registration Token.
                 </p>
-              </div>
-            ) : applications.filter(a => appFilter === 'all' ? true : a.status === appFilter).length === 0 ? (
-              <div className="text-center py-16 text-rose-500/40 text-xs italic font-sans uppercase tracking-wider">
-                No entries match the "{appFilter}" status filter.
               </div>
             ) : (
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+              <div className="space-y-4">
                 {applications
-                  .filter(a => appFilter === 'all' ? true : a.status === appFilter)
-                  .map((app) => {
-                    const assignedSeeds = players.map(p => p.seed);
-                    const availableSeeds = [];
-                    const maxSearch = Math.max(playersCount, players.length + 100);
-                    for (let i = 1; i <= maxSearch; i++) {
-                      if (!assignedSeeds.includes(i)) {
-                        availableSeeds.push(i);
-                      }
-                    }
+                  .filter((app) => {
+                    // Filter logic
+                    const matchSearch = 
+                      app.fullName.toLowerCase().includes(appSearch.toLowerCase()) ||
+                      (app.club && app.club.toLowerCase().includes(appSearch.toLowerCase())) ||
+                      app.phoneNumber.includes(appSearch);
                     
-                    const isRosterFull = false;
-                    const selectedSeed = selectedSeeds[app.id] || availableSeeds[0] || 1;
-
+                    const matchFilter = appFilter === 'all' ? true : app.status === appFilter;
+                    return matchSearch && matchFilter;
+                  })
+                  .map((app) => {
+                    const selectedSeed = selectedSeeds[app.id] || availableSeeds[0];
                     return (
                       <div 
-                        key={app.id}
-                        className={`border rounded-xl p-4 space-y-4 transition-all relative group bg-gradient-to-b from-bg-secondary to-bg-primary dark:from-[#091A2E] dark:to-[#05101E] ${
-                          app.status === 'approved' 
-                            ? 'bg-emerald-500/5 border-emerald-500/25' 
-                            : app.status === 'rejected'
-                            ? 'bg-red-500/5 border-rose-500/25'
-                            : 'border-rose-500/15 hover:border-rose-500/40'
-                        }`}
+                        key={app.id} 
+                        className="bg-[#04142B] border border-[#1A2740] rounded-2xl p-5 space-y-4 text-left transition-all hover:border-[#1A2740]/80 relative overflow-hidden"
                       >
-                        {/* Upper row: Avatar + details */}
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                          <div className="flex items-center gap-3.5">
-                            <img
-                              src={app.photoUrl || undefined}
-                              alt={app.fullName}
-                              className="w-12 h-12 rounded-xl object-cover border border-rose-500/20 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.1)]"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="min-w-0 text-left">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h5 className="font-sans font-black text-text-primary dark:text-slate-100 text-sm uppercase tracking-wide">
-                                  {app.fullName}
-                                </h5>
-                                {app.nickname && (
-                                  <span className="text-[10px] text-rose-500 font-sans font-black tracking-widest bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
-                                    "{app.nickname}"
-                                  </span>
-                                )}
-                                {app.tournamentType && (
-                                  <span className="text-[10px] text-amber-500 font-sans font-black tracking-widest bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 uppercase">
-                                    {app.tournamentType}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-text-secondary dark:text-slate-400 italic mt-0.5">
-                                Representing: {app.club || 'Independent'}
-                              </p>
-                              <div className="flex items-center gap-1 text-[9px] text-rose-600/80 dark:text-rose-500/60 font-sans mt-1 uppercase tracking-wide font-black">
-                                <Calendar className="w-3 h-3" /> Applied: {new Date(app.appliedAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </div>
+                        {/* Status tag */}
+                        <div className="absolute top-4 right-4">
+                          <span className={`text-[9px] font-sans font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                            app.status === 'pending'
+                              ? 'bg-[#F1C317]/10 text-[#F1C317] border-[#F1C317]/20 animate-pulse'
+                              : app.status === 'approved'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-red-500/10 text-red-400 border-red-500/20'
+                          }`}>
+                            {app.status}
+                          </span>
+                        </div>
 
-                          {/* Top right badges or actions */}
-                          <div className="flex items-center gap-2 self-start sm:self-auto">
-                            <span className={`px-2.5 py-1 rounded text-[9px] font-sans font-black uppercase tracking-widest border ${
-                              app.status === 'approved'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                : app.status === 'rejected'
-                                ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                                : 'bg-rose-500/10 text-rose-500 border-rose-500/20 animate-pulse'
-                            }`}>
-                              {app.status === 'approved' ? '✓ Approved & Synced' : app.status === 'rejected' ? '✗ Rejected' : '● Pending Review'}
-                            </span>
-                            
-                            {/* Delete button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = applications.filter(a => a.id !== app.id);
-                                onApplicationsChange(updated);
-                              }}
-                              className="p-1.5 text-text-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer"
-                              title="Delete application entry"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                        {/* Profile segment */}
+                        <div className="flex gap-4 items-start pr-16">
+                          <img
+                            src={app.photoUrl}
+                            alt={app.fullName}
+                            className="w-12 h-12 rounded-2xl object-cover border border-[#1A2740] shrink-0"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-black text-white">{app.fullName}</h4>
+                              {app.tournamentType && (
+                                <span className="text-[8px] font-sans font-black bg-[#1A6DFF]/10 text-[#1A6DFF] px-1.5 py-0.5 rounded border border-[#1A6DFF]/20 uppercase">
+                                  {app.tournamentType}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#B2B6C2] mt-0.5">
+                              {app.nickname ? `"${app.nickname}"` : 'No nickname'} • {app.club || 'Independent'}
+                            </p>
+                            <p className="text-[10px] text-[#787E90] mt-1.5">
+                              Applied on {new Date(app.appliedAt).toLocaleDateString()} at {new Date(app.appliedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Middle row: contacts metadata */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-bg-primary dark:bg-[#05101E] p-2.5 rounded-xl border border-rose-500/10 text-[11px] font-medium text-text-secondary dark:text-slate-300">
-                          <a href={`tel:${app.phoneNumber}`} className="flex items-center gap-1.5 hover:text-rose-400 transition-all truncate">
-                            <Phone className="w-3.5 h-3.5 text-rose-500/50 shrink-0" />
+                        {/* Contact segment info */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs pt-1">
+                          <div className="flex items-center gap-2 text-[#B2B6C2] bg-[#121F32]/40 px-3 py-2 rounded-xl border border-[#1A2740]/40">
+                            <Phone className="w-3.5 h-3.5 text-[#1A6DFF]" />
                             <span className="truncate">{app.phoneNumber}</span>
-                          </a>
+                          </div>
                           
-                          {app.whatsappNumber ? (
-                            <a href={`https://wa.me/${app.whatsappNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-emerald-400 transition-all truncate">
-                              <MessageSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                              <span className="truncate">{app.whatsappNumber}</span>
-                            </a>
-                          ) : (
-                            <div className="flex items-center gap-1.5 text-text-muted dark:text-slate-500 italic text-left">
-                              <MessageSquare className="w-3.5 h-3.5 text-rose-500/20 shrink-0" /> No WhatsApp
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 text-[#B2B6C2] bg-[#121F32]/40 px-3 py-2 rounded-xl border border-[#1A2740]/40">
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="truncate">{app.whatsappNumber || 'No WhatsApp'}</span>
+                          </div>
 
-                          {app.socialMediaPage ? (
-                            <a href={app.socialMediaPage.startsWith('http') ? app.socialMediaPage : `https://${app.socialMediaPage}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-rose-400 transition-all truncate">
-                              <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                              <span className="truncate hover:underline">{app.socialMediaPage.replace('https://', '').replace('http://', '')}</span>
-                            </a>
-                          ) : (
-                            <div className="flex items-center gap-1.5 text-text-muted dark:text-slate-500 italic text-left">
-                              <Globe className="w-3.5 h-3.5 text-rose-500/20 shrink-0" /> No Social Page
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 text-[#B2B6C2] bg-[#121F32]/40 px-3 py-2 rounded-xl border border-[#1A2740]/40">
+                            <Globe className="w-3.5 h-3.5 text-[#F1C317]" />
+                            <span className="truncate">{app.socialMediaPage || 'No Social Handle'}</span>
+                          </div>
                         </div>
 
-                        {/* Document verification block */}
+                        {/* Verification Docs */}
                         {app.documentUrl && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-rose-500/5 border border-rose-500/15 p-2.5 rounded-xl text-[11px]">
-                            <div className="flex items-center gap-2 truncate text-text-secondary dark:text-slate-300 font-medium">
-                              <FileText className="w-4 h-4 text-rose-500 shrink-0" />
-                              <span className="truncate">Verification Doc: <strong className="text-text-primary dark:text-slate-100">{app.documentName || 'document.pdf'}</strong></span>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#121F32] border border-[#1A2740] p-3 rounded-2xl text-[11px]">
+                            <div className="flex items-center gap-2.5 truncate text-[#B2B6C2]">
+                              <FileText className="w-4 h-4 text-[#1A6DFF]" />
+                              <span className="truncate">Payment Proof: <strong className="text-white font-black">{app.documentName || 'receipt.pdf'}</strong></span>
                             </div>
                             <a
                               href={app.documentUrl}
-                              download={app.documentName || 'verification_document'}
+                              download={app.documentName || 'verification'}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-sans font-black text-[10px] uppercase tracking-wider rounded-lg border border-rose-500/20 transition-all cursor-pointer shrink-0 text-center"
+                              className="px-3 py-1.5 bg-[#1A6DFF]/10 hover:bg-[#1A6DFF]/20 text-[#1A6DFF] font-sans font-black text-[10px] uppercase tracking-wider rounded-lg border border-[#1A6DFF]/20 transition-all cursor-pointer text-center"
                             >
-                              View / Download Document
+                              Verify Proof Document
                             </a>
                           </div>
                         )}
 
-                        {/* Bottom row: Sync/Selection actions if pending */}
+                        {/* Pending Review Actions */}
                         {app.status === 'pending' && (
-                          <div className="pt-2 border-t border-rose-500/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="pt-3 border-t border-[#1A2740]/60 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div className="flex items-center gap-2 w-full sm:w-auto">
-                              <span className="text-[10px] font-sans font-black text-rose-600 dark:text-rose-500/80 uppercase tracking-widest">Assign Seed Rank:</span>
+                              <span className="text-[10px] font-sans font-black text-[#787E90] uppercase tracking-widest">Assign Seed:</span>
                               <select
-                                value={selectedSeed}
+                                value={selectedSeed || ''}
                                 disabled={isRosterFull}
                                 onChange={(e) => {
                                   setSelectedSeeds(prev => ({ ...prev, [app.id]: Number(e.target.value) }));
                                 }}
-                                className="bg-bg-primary dark:bg-[#05101E] border border-rose-500/15 dark:border-rose-500/20 focus:border-rose-500/50 text-xs font-mono font-black text-text-primary dark:text-slate-100 px-2.5 py-1.5 rounded-lg focus:shadow-[0_0_10px_rgba(239,68,68,0.15)] outline-none cursor-pointer"
+                                className="bg-[#121F32] border border-[#1A2740] text-xs font-mono font-black text-white px-3 py-1.5 rounded-xl focus:border-[#1A6DFF] outline-none cursor-pointer"
                               >
                                 {availableSeeds.map((s) => (
                                   <option key={s} value={s}>Seed #{s}</option>
@@ -952,7 +892,6 @@ export default function RegistrationPortal({
                             </div>
 
                             <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                              {/* Reject button */}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -962,28 +901,26 @@ export default function RegistrationPortal({
                                   });
                                   onApplicationsChange(updated);
                                 }}
-                                className="flex-1 sm:flex-none text-xs font-sans font-black text-red-500 hover:bg-red-500/10 px-3.5 py-2 rounded-xl border border-red-500/20 transition-all flex items-center justify-center gap-1 cursor-pointer uppercase tracking-wider"
+                                className="flex-1 sm:flex-none text-xs font-black text-[#EF4444] hover:bg-[#EF4444]/10 px-4 py-2.5 rounded-xl border border-[#EF4444]/20 transition-all flex items-center justify-center gap-1 cursor-pointer uppercase tracking-wider"
                               >
                                 <XCircle className="w-3.5 h-3.5" /> Reject
                               </button>
 
-                              {/* Sync/Approve button */}
                               <button
                                 type="button"
                                 disabled={isRosterFull || isTournamentStarted || availableSeeds.length === 0}
                                 onClick={() => {
                                   if (isTournamentStarted) {
-                                    setError('Cannot register new players. Tournament bracket is already locked.');
+                                    setError('Cannot register. Tournament has already locked brackets.');
                                     return;
                                   }
                                   
                                   const finalSeed = selectedSeeds[app.id] || availableSeeds[0];
                                   if (!finalSeed) {
-                                    setError('No available seed ranks left to assign.');
+                                    setError('No available seeds left.');
                                     return;
                                   }
 
-                                  // Create player
                                   const newPlayer: Player = {
                                     id: app.id,
                                     name: app.fullName,
@@ -999,32 +936,29 @@ export default function RegistrationPortal({
                                     tournamentType: app.tournamentType,
                                   };
 
-                                  // Add player
                                   onPlayersChange([...players, newPlayer].sort((a, b) => a.seed - b.seed));
 
-                                  // Approve application
                                   const updated = applications.map(a => {
                                     if (a.id === app.id) return { ...a, status: 'approved' as const };
                                     return a;
                                   });
                                   onApplicationsChange(updated);
                                 }}
-                                className={`flex-1 sm:flex-none text-xs font-sans font-black px-4.5 py-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
+                                className={`flex-1 sm:flex-none text-xs font-black px-4.5 py-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
                                   isRosterFull || isTournamentStarted || availableSeeds.length === 0
-                                    ? 'bg-bg-primary dark:bg-[#05101E] border-rose-500/10 dark:border-rose-500/15 text-text-muted dark:text-slate-500 cursor-not-allowed'
-                                    : 'bg-gradient-to-r from-rose-950 via-rose-600 to-rose-950 border border-rose-500/40 hover:from-rose-900 hover:via-rose-500 hover:to-rose-900 text-white shadow-[0_0_15px_rgba(239,68,68,0.25)] hover:scale-[1.01]'
+                                    ? 'bg-[#04142B] border-[#1A2740]/40 text-[#787E90] cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] border-transparent text-white shadow-md'
                                 }`}
                               >
-                                <Check className="w-4 h-4 text-inherit" /> Sync to Tournament
+                                <Check className="w-4 h-4" /> Approve & Sync
                               </button>
                             </div>
                           </div>
                         )}
                         
-                        {/* Status notification if roster is full */}
                         {app.status === 'pending' && isRosterFull && (
-                          <p className="text-[10px] text-rose-600 dark:text-rose-500 font-sans font-black text-right italic uppercase tracking-wider">
-                            * Roster is full ({playersCount}/{playersCount}). Free up a seed slot in Active Roster to sync.
+                          <p className="text-[10px] text-[#EF4444] font-sans font-black text-right italic uppercase tracking-wider">
+                            * Roster is full ({playersCount}/{playersCount}). Free up a seed slot to sync player.
                           </p>
                         )}
                       </div>
@@ -1035,7 +969,6 @@ export default function RegistrationPortal({
           </div>
         )}
       </div>
-
 
       {/* Clear All Confirmation */}
       <ConfirmModal

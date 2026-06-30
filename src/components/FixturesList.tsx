@@ -1,6 +1,6 @@
 import React from 'react';
 import { Match, Player } from '../types';
-import { Play, Eye, Calendar, Clock, Trophy } from 'lucide-react';
+import { Play, Eye, Calendar, Clock, Trophy, Star } from 'lucide-react';
 
 interface FixturesListProps {
   matches: Match[];
@@ -14,20 +14,20 @@ export default function FixturesList({ matches, players, onStartMatch, onViewMat
   const groupStageMatches = matches.filter(m => m.round === 'GroupStage');
 
   return (
-    <div className="bg-bg-secondary border border-rose-500/10 dark:border-rose-500/15 p-6 rounded-2xl shadow-[0_0_15px_rgba(239,68,68,0.03)] space-y-4">
-      <div className="flex items-center justify-between pb-2 border-b border-rose-500/10">
-        <h3 className="text-xs font-sans font-black text-text-primary uppercase tracking-[0.15em] flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-rose-500" /> Tournament Fixtures
+    <div className="bg-[#121F32] border border-[#1A2740] p-6 rounded-3xl shadow-xl space-y-5 text-left">
+      <div className="flex items-center justify-between pb-3 border-b border-[#1A2740]">
+        <h3 className="text-xs font-display font-black text-white uppercase tracking-[0.15em] flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-[#F1C317]" /> Tournament Fixtures
         </h3>
-        <span className="text-[10px] font-sans font-black text-rose-500 dark:text-rose-400 uppercase tracking-widest">Group Stage Matchups</span>
+        <span className="text-[10px] font-sans font-black text-[#1A6DFF] uppercase tracking-widest">Group Stage Matchups</span>
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {groupStageMatches.length === 0 && (
-          <p className="text-text-muted font-sans font-medium text-xs py-4 text-center">No fixtures generated.</p>
+          <p className="text-[#787E90] font-sans font-medium text-xs py-6 text-center">No fixtures generated.</p>
         )}
         {groupStageMatches.length > 0 && (
-          <div className="grid grid-cols-6 gap-3 text-[10px] text-text-muted font-sans font-black uppercase tracking-widest px-3.5 mb-1">
+          <div className="hidden lg:grid grid-cols-6 gap-3 text-[10px] text-[#787E90] font-sans font-black uppercase tracking-widest px-4 mb-2">
             <span>Match</span>
             <span>Fixture</span>
             <span>Date</span>
@@ -40,62 +40,75 @@ export default function FixturesList({ matches, players, onStartMatch, onViewMat
           const player1 = players.find(p => p.id === match.player1Id);
           const player2 = players.find(p => p.id === match.player2Id);
           return (
-            <div key={match.id} className="grid grid-cols-6 gap-3 items-center bg-bg-tertiary border border-rose-500/10 p-3.5 rounded-xl text-xs hover:border-rose-500/25 hover:bg-rose-500/5 transition-all">
-              <span className="text-rose-500 dark:text-rose-400 font-sans font-black uppercase tracking-wider">{match.label}</span>
-              <span className="text-text-primary font-sans font-bold truncate">
-                {player1?.name || 'TBD'} <span className="text-text-muted font-medium">vs</span> {player2?.name || 'TBD'}
+            <div 
+              key={match.id} 
+              className="grid grid-cols-1 lg:grid-cols-6 gap-3 lg:gap-4 items-center bg-[#04142B] border border-[#1A2740] p-4 rounded-2xl text-xs hover:border-[#1A6DFF]/30 transition-all duration-300"
+            >
+              {/* Match ID label */}
+              <span className="text-[#1A6DFF] font-sans font-black uppercase tracking-wider">{match.label}</span>
+              
+              {/* Contenders name */}
+              <span className="text-[#EEF1F5] font-sans font-bold truncate">
+                {player1?.name || 'TBD'} <span className="text-[#787E90] font-medium font-sans">vs</span> {player2?.name || 'TBD'}
               </span>
+              
+              {/* Date Input */}
               <div className="relative">
                 <input 
                   type="date" 
                   value={match.matchDate || ''} 
                   onChange={(e) => {
-                    console.log('DEBUG: Date changed to', e.target.value);
                     onUpdateMatch(match.id, { matchDate: e.target.value });
                   }} 
-                  className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 text-text-primary font-sans font-bold text-xs rounded-lg p-1.5 outline-none transition-all w-full cursor-pointer [&::-webkit-calendar-picker-indicator]:invert-0 dark:[&::-webkit-calendar-picker-indicator]:invert" 
+                  className="bg-[#121F32] border border-[#1A2740] focus:border-[#1A6DFF] text-white font-sans font-bold text-xs rounded-xl px-3 py-2 outline-none transition-all w-full cursor-pointer" 
                 />
               </div>
+              
+              {/* Time Input */}
               <div className="relative">
                 <input 
                   type="text" 
                   value={match.scheduledTime || ''} 
                   onChange={(e) => onUpdateMatch(match.id, { scheduledTime: e.target.value })} 
-                  className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 text-text-primary font-sans font-bold text-xs rounded-lg p-1.5 outline-none transition-all w-full" 
+                  className="bg-[#121F32] border border-[#1A2740] focus:border-[#1A6DFF] text-white font-sans font-bold text-xs rounded-xl px-3 py-2 outline-none transition-all w-full" 
                   placeholder="10:00 AM" 
                 />
               </div>
+              
+              {/* Match Status Badge */}
               <div className="flex">
                 {match.status === 'scheduled' && (
-                  <span className="bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20 font-sans font-black text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md">
+                  <span className="bg-[#121F32] text-[#B2B6C2] border border-[#1A2740] font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md">
                     Scheduled
                   </span>
                 )}
                 {match.status === 'playing' && (
-                  <span className="bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 font-sans font-black text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md animate-pulse">
-                    Live
+                  <span className="bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/25 font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md animate-pulse flex items-center gap-1">
+                    <span className="w-1 h-1 bg-[#EF4444] rounded-full animate-ping"></span> Live
                   </span>
                 )}
                 {match.status === 'completed' && (
-                  <span className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 font-sans font-black text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md">
-                    Ended
+                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md">
+                    Completed
                   </span>
                 )}
               </div>
-              <div className="flex gap-1.5 justify-end">
+              
+              {/* Action buttons */}
+              <div className="flex gap-2 justify-start lg:justify-end">
                 {match.status === 'scheduled' && (
                   <button
                     onClick={() => onStartMatch(match.id)}
-                    className="bg-rose-500 hover:bg-rose-600 text-white border border-rose-500/30 font-sans font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all cursor-pointer shadow-[0_0_8px_rgba(239,68,68,0.15)] flex items-center gap-1"
+                    className="bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] hover:from-[#4088FF] hover:to-[#1A6DFF] text-white font-sans font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1 hover:scale-[1.01]"
                   >
-                    <Play className="w-3 h-3" /> Start
+                    <Play className="w-3.5 h-3.5" /> Start
                   </button>
                 )}
                 <button
                   onClick={() => onViewMatch(match.id)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/30 font-sans font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                  className="bg-[#121F32] hover:bg-[#1A2740] text-[#B2B6C2] hover:text-white border border-[#1A2740] font-sans font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1"
                 >
-                  <Eye className="w-3 h-3 text-slate-400" /> View
+                  <Eye className="w-3.5 h-3.5 text-[#787E90]" /> View
                 </button>
               </div>
             </div>
