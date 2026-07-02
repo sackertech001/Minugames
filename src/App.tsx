@@ -41,6 +41,11 @@ import PlayerApplicationForm from './components/PlayerApplicationForm';
 import { getSupabase } from './utils/supabaseClient';
 import Sidebar from './components/Sidebar';
 
+const isUUID = (id: any): boolean => {
+  if (typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 // Memory fallback storage for sandboxed environments where localStorage is blocked
 const memoryStorage: Record<string, string> = {};
 
@@ -192,6 +197,8 @@ export default function App() {
       if (patch.playerApplications && Array.isArray(patch.playerApplications)) {
         try {
           for (const app of patch.playerApplications) {
+            if (!isUUID(app.id)) continue; // Only process valid UUIDs
+
             const { error: updateError } = await supabase
               .from('profiles')
               .update({ status: app.status })
@@ -275,6 +282,8 @@ export default function App() {
         if (patch.players && Array.isArray(patch.players)) {
           try {
             for (const player of patch.players) {
+              if (!isUUID(player.id)) continue; // Only process valid UUIDs
+
               const { error: updateError } = await supabase
                 .from('profiles')
                 .update({
@@ -814,8 +823,10 @@ export default function App() {
                   dbPlayers.sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
                   setPlayers((prev) => {
-                    if (JSON.stringify(prev) !== JSON.stringify(dbPlayers)) {
-                      return dbPlayers;
+                    const demoPlayers = prev.filter((p) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
+                    const mergedPlayers = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
+                    if (JSON.stringify(prev) !== JSON.stringify(mergedPlayers)) {
+                      return mergedPlayers;
                     }
                     return prev;
                   });

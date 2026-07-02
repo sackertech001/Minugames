@@ -7,6 +7,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const isUUID = (id: any): boolean => {
+  if (typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 const PORT = 3000;
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
@@ -512,7 +517,9 @@ async function startServer() {
           lastSupabaseFetchTime = Date.now();
 
           const state = readState();
-          state.players = dbPlayers;
+          // Retain local/demo players who do not have a valid UUID or have a demo prefix
+          const demoPlayers = (state.players || []).filter((p: any) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
+          state.players = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
           state.playerApplications = mappedApps;
 
           const { data: dbTypes, error: typesError } = await supabase
@@ -623,8 +630,9 @@ async function startServer() {
             }
           });
           
-          // Update statuses in parallel using Promise.all
-          const updatePromises = req.body.playerApplications.map((app: any) =>
+          // Update statuses in parallel using Promise.all (only for valid UUIDs)
+          const validApps = req.body.playerApplications.filter((app: any) => isUUID(app.id));
+          const updatePromises = validApps.map((app: any) =>
             supabase
               .from('profiles')
               .update({ status: app.status })
@@ -634,13 +642,13 @@ async function startServer() {
           const results = await Promise.all(updatePromises);
           results.forEach((res, index) => {
             if (res.error) {
-              const app = req.body.playerApplications[index];
+              const app = validApps[index];
               console.log(`[Supabase Status Sync] Update status details for user ${app?.id}:`, res.error.message);
             }
           });
 
-          // Create rows in players table for newly approved applications
-          const approvedApps = req.body.playerApplications.filter((app: any) => app.status === 'approved');
+          // Create rows in players table for newly approved applications (only for valid UUIDs)
+          const approvedApps = req.body.playerApplications.filter((app: any) => app.status === 'approved' && isUUID(app.id));
           if (approvedApps.length > 0) {
             for (const app of approvedApps) {
               try {
@@ -695,8 +703,9 @@ async function startServer() {
             }
           });
 
-          // Update stats in parallel using Promise.all on both profiles and players tables
-          const updatePromises = req.body.players.map(async (player: any) => {
+          // Update stats in parallel using Promise.all on both profiles and players tables (only for valid UUIDs)
+          const validPlayers = req.body.players.filter((player: any) => isUUID(player.id));
+          const updatePromises = validPlayers.map(async (player: any) => {
             // Update profiles
             const { error: profileErr } = await supabase
               .from('profiles')
