@@ -318,7 +318,7 @@ export default function MatchScorerModal({
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {[1, 3, 5, 7].map((num) => (
+                  {[3].map((num) => (
                     <button
                       key={num}
                       type="button"
@@ -326,8 +326,8 @@ export default function MatchScorerModal({
                       onClick={() => handleGamesCountChange(num)}
                       className={`px-3 py-1.5 text-[10px] font-sans font-black uppercase tracking-wider rounded-lg transition-all border ${
                         gamesCount === num
-                          ? 'bg-[#D4AF37] border-[#D4AF37] text-slate-950 font-black shadow-[0_0_12px_rgba(212,175,55,0.25)]'
-                          : 'bg-[#091A2E] border-rose-500/10 text-slate-400 hover:border-rose-500/25 hover:text-slate-200'
+                           ? 'bg-[#D4AF37] border-[#D4AF37] text-slate-950 font-black shadow-[0_0_12px_rgba(212,175,55,0.25)]'
+                           : 'bg-[#091A2E] border-rose-500/10 text-slate-400 hover:border-rose-500/25 hover:text-slate-200'
                       }`}
                     >
                       {num} Sets

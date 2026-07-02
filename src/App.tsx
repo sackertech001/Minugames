@@ -46,6 +46,30 @@ const isUUID = (id: any): boolean => {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 };
 
+const safeIsoString = (timeStr: any, dayNum?: number): string => {
+  if (!timeStr) return new Date().toISOString();
+  const parsed = new Date(timeStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+  try {
+    const day = dayNum || 1;
+    let hour = 12;
+    let minute = 0;
+    const timeMatch = String(timeStr).match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      hour = parseInt(timeMatch[1], 10);
+      minute = parseInt(timeMatch[2], 10);
+    }
+    const date = new Date();
+    date.setDate(date.getDate() + (day - 1));
+    date.setHours(hour, minute, 0, 0);
+    return date.toISOString();
+  } catch (e) {
+    return new Date().toISOString();
+  }
+};
+
 // Memory fallback storage for sandboxed environments where localStorage is blocked
 const memoryStorage: Record<string, string> = {};
 
@@ -371,6 +395,71 @@ export default function App() {
             }
           } catch (err: any) {
             console.log('[Client Supabase] Tournament types sync notice:', err?.message || err);
+          }
+        }
+
+        // 4. Update round_of_32 table on bracket start or match update
+        if (patch.isTournamentStarted === false || (patch.matches && patch.matches.length === 0)) {
+          try {
+            await supabase
+              .from('round_of_32')
+              .delete()
+              .neq('match_number', 0);
+          } catch (e) {
+            console.log('[Client Supabase round_of_32 Reset] Error:', e);
+          }
+        }
+
+        if (patch.matches && Array.isArray(patch.matches)) {
+          try {
+            const r32Matches = patch.matches.filter((m: any) => m.round === 'R32' || m.id.startsWith('M'));
+            if (r32Matches.length > 0) {
+              const rowsToUpsert = r32Matches.map((m: any) => {
+                const matchNumStr = m.id.replace(/\D/g, ''); // Extract digits
+                const matchNumber = parseInt(matchNumStr, 10);
+                if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 16) {
+                  return null;
+                }
+
+                const p1 = players.find(p => p.id === m.player1Id);
+                const p2 = players.find(p => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: matchNumber,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (players.find(p => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 1),
+                  table_number: m.table_number || matchNumber,
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsert.length > 0) {
+                const { error: upsertErr } = await supabase
+                  .from('round_of_32')
+                  .upsert(rowsToUpsert, { onConflict: 'match_number' });
+
+                if (upsertErr) {
+                  console.log('[Client Supabase round_of_32 Sync] Upsert notice:', upsertErr.message);
+                } else {
+                  console.log('[Client Supabase round_of_32 Sync] Successfully synced matches to round_of_32');
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase round_of_32 Sync] General error:', err?.message || err);
           }
         }
       }
@@ -950,14 +1039,59 @@ export default function App() {
   };
 
   // 2. Start Championship Action
-  const handleStartTournament = () => {
-    if (players.length < tournamentConfig.playersCount) {
-      showToast(`Please register at least ${tournamentConfig.playersCount} players to commence! (Currently: ${players.length})`, 'error');
+  const handleStartTournament = async () => {
+    let activePlayers = [...players];
+    const supabase = getSupabase();
+
+    if (supabase) {
+      try {
+        // Fetch players directly from Supabase players table
+        const { data: dbPlayers, error: playersErr } = await supabase
+          .from('players')
+          .select('*');
+
+        // Fetch profiles table to get matching profile information for name, nickname, club, seed, photo, etc.
+        const { data: dbProfiles } = await supabase
+          .from('profiles')
+          .select('*');
+
+        if (!playersErr && dbPlayers && dbPlayers.length > 0) {
+          const mappedDbPlayers = dbPlayers.map((pt: any) => {
+            const matchingProfile = dbProfiles?.find((profile: any) => profile.id === pt.profile_id);
+            return {
+              id: pt.profile_id || pt.id,
+              name: pt.player_name || pt.name || (matchingProfile ? matchingProfile.full_name : 'Tournament Player'),
+              nickname: pt.nickname || (matchingProfile ? matchingProfile.nickname : '') || '',
+              club: pt.club || (matchingProfile ? matchingProfile.club : '') || '',
+              seed: pt.seed !== undefined && pt.seed !== null ? Number(pt.seed) : (matchingProfile && matchingProfile.seed !== undefined && matchingProfile.seed !== null ? Number(matchingProfile.seed) : 1),
+              photoUrl: pt.photo_url || pt.photoUrl || (matchingProfile ? matchingProfile.photo_url : '') || '',
+              matchesPlayed: pt.matches_played !== undefined && pt.matches_played !== null ? Number(pt.matches_played) : 0,
+              matchesWon: pt.matches_won !== undefined && pt.matches_won !== null ? Number(pt.matches_won) : 0,
+              totalPoints: pt.total_points !== undefined && pt.total_points !== null ? Number(pt.total_points) : 0,
+              highestBreak: pt.highest_break !== undefined && pt.highest_break !== null ? Number(pt.highest_break) : 0,
+              status: pt.status || 'active',
+              tournamentType: pt.tournament_type || ''
+            };
+          });
+
+          if (mappedDbPlayers.length > 0) {
+            activePlayers = mappedDbPlayers;
+            // Also update React state so the UI stays synced with the database
+            setPlayers(mappedDbPlayers);
+          }
+        }
+      } catch (err: any) {
+        console.warn('Could not load live players on bracket initialization:', err);
+      }
+    }
+
+    if (activePlayers.length < tournamentConfig.playersCount) {
+      showToast(`Please register at least ${tournamentConfig.playersCount} players to commence! (Currently: ${activePlayers.length})`, 'error');
       return;
     }
 
     // Slice players to configured bracket size based on seed order
-    const activePlayers = [...players]
+    const sortedActivePlayers = [...activePlayers]
       .sort((a, b) => a.seed - b.seed)
       .slice(0, tournamentConfig.playersCount);
 
@@ -966,14 +1100,76 @@ export default function App() {
     if (tournamentConfig.formatType === 'group' && tournamentConfig.groups) {
       matchesToSet = generateGroupFixtures(tournamentConfig.groups);
     } else {
-      matchesToSet = createInitialMatches(activePlayers, tournamentConfig.playersCount);
+      matchesToSet = createInitialMatches(sortedActivePlayers, tournamentConfig.playersCount);
     }
     
     setMatches(matchesToSet);
     setIsTournamentStarted(true);
     setActiveTab('bracket');
 
-    saveStateToStorage(players, matchesToSet, true);
+    // Save state to local storage & server (which also triggers the saveStateToServer Supabase sync)
+    saveStateToStorage(activePlayers, matchesToSet, true);
+
+    // Direct database write to round_of_32 for the initialized bracket matches to ensure complete instant population
+    if (supabase) {
+      try {
+        const r32Matches = matchesToSet.filter((m: any) => m.round === 'R32' || m.id.startsWith('M'));
+        if (r32Matches.length > 0) {
+          // Clear table first to start fresh
+          await supabase
+            .from('round_of_32')
+            .delete()
+            .neq('match_number', 0);
+
+          const rowsToInsert = r32Matches.map((m: any) => {
+            const matchNumStr = m.id.replace(/\D/g, ''); // Extract digits
+            const matchNumber = parseInt(matchNumStr, 10);
+            if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 16) {
+              return null;
+            }
+
+            const p1 = activePlayers.find(p => p.id === m.player1Id);
+            const p2 = activePlayers.find(p => p.id === m.player2Id);
+            const p1Name = p1 ? p1.name : 'TBD';
+            const p2Name = p2 ? p2.name : 'TBD';
+
+            return {
+              match_number: matchNumber,
+              player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+              player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+              player1_name: p1Name,
+              player2_name: p2Name,
+              player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+              player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+              player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+              player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+              winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+              winner_name: m.winnerId ? (activePlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+              status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+              scheduled_time: safeIsoString(m.scheduledTime, m.day || 1),
+              table_number: m.table_number || matchNumber,
+              referee_name: m.referee_name || null,
+              tournament_type: m.tournament_type || 'Snooker'
+            };
+          }).filter(Boolean);
+
+          if (rowsToInsert.length > 0) {
+            const { error: insertErr } = await supabase
+              .from('round_of_32')
+              .insert(rowsToInsert);
+
+            if (insertErr) {
+              console.error('[Supabase round_of_32 Initial Sync] Insert error:', insertErr.message);
+            } else {
+              console.log('[Supabase round_of_32 Initial Sync] Successfully populated round_of_32 with initial bracket matches');
+              showToast('Populated Round of 32 database table with matches!', 'success');
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error('Error during round_of_32 initial population:', err);
+      }
+    }
   };
 
   // 3. Score Saving & Result Propagation

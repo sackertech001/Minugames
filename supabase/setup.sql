@@ -138,11 +138,20 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   EXECUTE FUNCTION public.handle_new_user();
 
 -- ====================================================================
--- 6. DISABLE ROW LEVEL SECURITY (RLS) FOR PROFILES
+-- 6. CONFIGURE ROW LEVEL SECURITY & POLICIES FOR PROFILES
 -- ====================================================================
--- Disabling RLS ensures that player registration, profiles updates, and select queries
--- function flawlessly and without permissions errors on all environments.
-ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
+-- Enable RLS and define fully permissive policies to guarantee unrestricted access on all environments.
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access for profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow public insert access for profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow public update access for profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow public delete access for profiles" ON public.profiles;
+
+CREATE POLICY "Allow public read access for profiles" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for profiles" ON public.profiles FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for profiles" ON public.profiles FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for profiles" ON public.profiles FOR DELETE USING (true);
 
 -- ====================================================================
 -- 7. DEFINE TOURNAMENT TYPES TABLE
@@ -154,8 +163,18 @@ CREATE TABLE IF NOT EXISTS public.tournament_types (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Disable row level security on tournament_types as well for full unrestricted access
-ALTER TABLE public.tournament_types DISABLE ROW LEVEL SECURITY;
+-- Enable RLS and define fully permissive policies for tournament_types
+ALTER TABLE public.tournament_types ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access for tournament_types" ON public.tournament_types;
+DROP POLICY IF EXISTS "Allow public insert access for tournament_types" ON public.tournament_types;
+DROP POLICY IF EXISTS "Allow public update access for tournament_types" ON public.tournament_types;
+DROP POLICY IF EXISTS "Allow public delete access for tournament_types" ON public.tournament_types;
+
+CREATE POLICY "Allow public read access for tournament_types" ON public.tournament_types FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for tournament_types" ON public.tournament_types FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for tournament_types" ON public.tournament_types FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for tournament_types" ON public.tournament_types FOR DELETE USING (true);
 
 -- Seed initial tournament types
 INSERT INTO public.tournament_types (name, is_active)
@@ -164,6 +183,116 @@ VALUES
   ('Snooker', true),
   ('Table Tennis', false)
 ON CONFLICT (name) DO NOTHING;
+
+-- ====================================================================
+-- 8. DEFINE PLAYERS TABLE
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.players (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE UNIQUE,
+  name TEXT,
+  player_name TEXT,
+  nickname TEXT,
+  club TEXT,
+  seed INT DEFAULT 1,
+  photo_url TEXT,
+  matches_played INT DEFAULT 0,
+  matches_won INT DEFAULT 0,
+  total_points INT DEFAULT 0,
+  highest_break INT DEFAULT 0,
+  status TEXT DEFAULT 'active',
+  tournament_type TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and define fully permissive policies for players
+ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access for players" ON public.players;
+DROP POLICY IF EXISTS "Allow public insert access for players" ON public.players;
+DROP POLICY IF EXISTS "Allow public update access for players" ON public.players;
+DROP POLICY IF EXISTS "Allow public delete access for players" ON public.players;
+
+CREATE POLICY "Allow public read access for players" ON public.players FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for players" ON public.players FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for players" ON public.players FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for players" ON public.players FOR DELETE USING (true);
+
+-- ====================================================================
+-- 9. DEFINE ROUND OF 32 TABLE
+-- ====================================================================
+-- Re-create round_of_32 table to ensure player columns are flexible TEXT fields, allowing both UUID profiles and string demo player IDs without foreign-key blocks.
+DROP TABLE IF EXISTS public.round_of_32 CASCADE;
+
+CREATE TABLE public.round_of_32 (
+  id TEXT PRIMARY KEY, -- e.g. 'M1', 'M2', etc.
+  label TEXT,
+  player1_id TEXT,
+  player2_id TEXT,
+  score1 INT DEFAULT NULL,
+  score2 INT DEFAULT NULL,
+  points1 INT DEFAULT NULL,
+  points2 INT DEFAULT NULL,
+  break1 INT DEFAULT NULL,
+  break2 INT DEFAULT NULL,
+  winner_id TEXT,
+  loser_id TEXT,
+  status TEXT DEFAULT 'scheduled',
+  scheduled_time TEXT,
+  day INT DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and define fully permissive policies for round_of_32
+ALTER TABLE public.round_of_32 ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access for round_of_32" ON public.round_of_32;
+DROP POLICY IF EXISTS "Allow public insert access for round_of_32" ON public.round_of_32;
+DROP POLICY IF EXISTS "Allow public update access for round_of_32" ON public.round_of_32;
+DROP POLICY IF EXISTS "Allow public delete access for round_of_32" ON public.round_of_32;
+
+CREATE POLICY "Allow public read access for round_of_32" ON public.round_of_32 FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for round_of_32" ON public.round_of_32 FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for round_of_32" ON public.round_of_32 FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for round_of_32" ON public.round_of_32 FOR DELETE USING (true);
+
+-- ====================================================================
+-- 10. DEFINE TOURNAMENT ROUNDS STATUS TABLE
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.rounds (
+  stage TEXT PRIMARY KEY, -- e.g. 'Round of 32', 'Round of 16', 'Quarter finals', etc.
+  status TEXT NOT NULL CHECK (status IN ('active', 'upcoming', 'ended')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and define fully permissive policies for rounds to ensure complete unrestricted access
+ALTER TABLE public.rounds ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access for rounds" ON public.rounds;
+DROP POLICY IF EXISTS "Allow public insert access for rounds" ON public.rounds;
+DROP POLICY IF EXISTS "Allow public update access for rounds" ON public.rounds;
+DROP POLICY IF EXISTS "Allow public delete access for rounds" ON public.rounds;
+
+CREATE POLICY "Allow public read access for rounds" ON public.rounds FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for rounds" ON public.rounds FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for rounds" ON public.rounds FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for rounds" ON public.rounds FOR DELETE USING (true);
+
+-- Seed initial rounds
+INSERT INTO public.rounds (stage, status) VALUES
+  ('Round of 32', 'active'),
+  ('Round of 16', 'upcoming'),
+  ('Quarter finals', 'upcoming'),
+  ('Semi finals', 'upcoming'),
+  ('Final', 'upcoming')
+ON CONFLICT (stage) DO NOTHING;
+
+-- Auto-update updated_at timestamp trigger
+CREATE OR REPLACE TRIGGER update_rounds_updated_at
+  BEFORE UPDATE ON public.rounds
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_updated_at();
 
 -- ====================================================================
 -- SUCCESS: All tables, triggers, and sync systems are fully initialized!
