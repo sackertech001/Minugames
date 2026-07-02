@@ -385,25 +385,128 @@ async function startServer() {
           }));
           cachedProfiles = mappedApps;
 
-          // Pick players that have approved/active status from profiles to populate state.players
-          const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
-          const dbPlayers = dbProfiles
-            .filter((p: any) => approvedStatuses.includes(p.status))
-            .map((p: any) => ({
-              id: p.id,
-              name: p.full_name || 'Tournament Player',
-              nickname: p.nickname || '',
-              club: p.club || '',
-              seed: p.seed || 1,
-              photoUrl: p.photo_url || '',
-              matchesPlayed: p.matches_played || 0,
-              matchesWon: p.matches_won || 0,
-              totalPoints: p.total_points || 0,
-              highestBreak: p.highest_break || 0,
-              status: p.status === 'approved' ? 'active' : p.status,
-              tournamentType: p.tournament_type || ''
-            }))
-            .sort((a, b) => (a.seed || 0) - (b.seed || 0));
+          // Get players from players table in Supabase
+          let dbPlayers: any[] = [];
+          try {
+            console.log("[Supabase Background Sync] Fetching players table...");
+            const { data: dbPlayersTable, error: playersFetchError } = await supabase
+              .from('players')
+              .select('*');
+
+            if (playersFetchError) {
+              console.log('[Supabase DB Sync] Fetch players table error, falling back to profiles:', playersFetchError.message);
+              // Fallback to approved profiles
+              const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+              dbPlayers = dbProfiles
+                .filter((p: any) => approvedStatuses.includes(p.status))
+                .map((p: any) => ({
+                  id: p.id,
+                  name: p.full_name || 'Tournament Player',
+                  nickname: p.nickname || '',
+                  club: p.club || '',
+                  seed: p.seed || 1,
+                  photoUrl: p.photo_url || '',
+                  matchesPlayed: p.matches_played || 0,
+                  matchesWon: p.matches_won || 0,
+                  totalPoints: p.total_points || 0,
+                  highestBreak: p.highest_break || 0,
+                  status: p.status === 'approved' ? 'active' : p.status,
+                  tournamentType: p.tournament_type || ''
+                }));
+            } else {
+              // Auto-heal: insert any approved profile that is missing from players table
+              const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+              const approvedProfiles = dbProfiles.filter((p: any) => approvedStatuses.includes(p.status));
+              
+              for (const profile of approvedProfiles) {
+                const exists = dbPlayersTable && dbPlayersTable.some((pt: any) => pt.profile_id === profile.id || pt.id === profile.id);
+                if (!exists) {
+                  console.log(`[Supabase DB Sync] Auto-inserting missing player for profile ${profile.id} into players table`);
+                  try {
+                    const { error: insertErr } = await supabase
+                      .from('players')
+                      .insert({
+                        profile_id: profile.id,
+                        player_name: profile.full_name,
+                        nickname: profile.nickname,
+                        club: profile.club,
+                        seed: profile.seed || 1,
+                        status: profile.status === 'approved' ? 'active' : profile.status,
+                        matches_played: profile.matches_played || 0,
+                        matches_won: profile.matches_won || 0,
+                        total_points: profile.total_points || 0,
+                        highest_break: profile.highest_break || 0
+                      });
+                    if (insertErr) {
+                      await supabase
+                        .from('players')
+                        .insert({
+                          profile_id: profile.id,
+                          name: profile.full_name,
+                          nickname: profile.nickname,
+                          club: profile.club,
+                          seed: profile.seed || 1,
+                          status: profile.status === 'approved' ? 'active' : profile.status,
+                          matches_played: profile.matches_played || 0,
+                          matches_won: profile.matches_won || 0,
+                          total_points: profile.total_points || 0,
+                          highest_break: profile.highest_break || 0
+                        });
+                    }
+                  } catch (e) {
+                    console.log(`[Supabase DB Sync] Auto-healing insert error:`, e);
+                  }
+                }
+              }
+
+              // Re-fetch players table to get a complete list
+              const { data: dbPlayersTableUpdated } = await supabase
+                .from('players')
+                .select('*');
+
+              const finalPlayersTable = dbPlayersTableUpdated || dbPlayersTable || [];
+
+              dbPlayers = finalPlayersTable.map((pt: any) => {
+                const matchingProfile = dbProfiles.find((profile: any) => profile.id === pt.profile_id || profile.id === pt.id);
+                return {
+                  id: pt.profile_id || pt.id || (matchingProfile ? matchingProfile.id : ''),
+                  name: pt.player_name || pt.name || (matchingProfile ? matchingProfile.full_name : 'Tournament Player'),
+                  nickname: pt.nickname || (matchingProfile ? matchingProfile.nickname : '') || '',
+                  club: pt.club || (matchingProfile ? matchingProfile.club : '') || '',
+                  seed: pt.seed !== undefined && pt.seed !== null ? Number(pt.seed) : (matchingProfile && matchingProfile.seed !== undefined && matchingProfile.seed !== null ? Number(matchingProfile.seed) : 1),
+                  photoUrl: pt.photo_url || pt.photoUrl || (matchingProfile ? matchingProfile.photo_url : '') || '',
+                  matchesPlayed: pt.matches_played !== undefined && pt.matches_played !== null ? Number(pt.matches_played) : (pt.matchesPlayed !== undefined ? Number(pt.matchesPlayed) : (matchingProfile && matchingProfile.matches_played !== undefined ? Number(matchingProfile.matches_played) : 0)),
+                  matchesWon: pt.matches_won !== undefined && pt.matches_won !== null ? Number(pt.matches_won) : (pt.matchesWon !== undefined ? Number(pt.matchesWon) : (matchingProfile && matchingProfile.matches_won !== undefined ? Number(matchingProfile.matches_won) : 0)),
+                  totalPoints: pt.total_points !== undefined && pt.total_points !== null ? Number(pt.total_points) : (pt.totalPoints !== undefined ? Number(pt.totalPoints) : (matchingProfile && matchingProfile.total_points !== undefined ? Number(matchingProfile.total_points) : 0)),
+                  highestBreak: pt.highest_break !== undefined && pt.highest_break !== null ? Number(pt.highest_break) : (pt.highestBreak !== undefined ? Number(pt.highestBreak) : (matchingProfile && matchingProfile.highest_break !== undefined ? Number(matchingProfile.highest_break) : 0)),
+                  status: pt.status || (matchingProfile && matchingProfile.status === 'approved' ? 'active' : matchingProfile?.status) || 'active',
+                  tournamentType: pt.tournament_type || pt.tournamentType || (matchingProfile ? matchingProfile.tournament_type : '') || ''
+                };
+              });
+            }
+          } catch (playerErr: any) {
+            console.log('[Supabase DB Sync] Players table fetch error, falling back to profiles:', playerErr?.message || playerErr);
+            // Fallback to approved profiles
+            const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+            dbPlayers = dbProfiles
+              .filter((p: any) => approvedStatuses.includes(p.status))
+              .map((p: any) => ({
+                id: p.id,
+                name: p.full_name || 'Tournament Player',
+                nickname: p.nickname || '',
+                club: p.club || '',
+                seed: p.seed || 1,
+                photoUrl: p.photo_url || '',
+                matchesPlayed: p.matches_played || 0,
+                matchesWon: p.matches_won || 0,
+                totalPoints: p.total_points || 0,
+                highestBreak: p.highest_break || 0,
+                status: p.status === 'approved' ? 'active' : p.status,
+                tournamentType: p.tournament_type || ''
+              }));
+          }
+
+          dbPlayers.sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
           cachedPlayers = dbPlayers;
           lastSupabaseFetchTime = Date.now();
@@ -536,6 +639,37 @@ async function startServer() {
             }
           });
 
+          // Create rows in players table for newly approved applications
+          const approvedApps = req.body.playerApplications.filter((app: any) => app.status === 'approved');
+          if (approvedApps.length > 0) {
+            for (const app of approvedApps) {
+              try {
+                const { data: existingPlayer } = await supabase
+                  .from('players')
+                  .select('id')
+                  .eq('profile_id', app.id)
+                  .maybeSingle();
+
+                if (!existingPlayer) {
+                  const { error: insertErr } = await supabase
+                    .from('players')
+                    .insert({
+                      profile_id: app.id,
+                      name: app.fullName,
+                      player_name: app.fullName
+                    });
+                  if (insertErr) {
+                    console.log(`[Supabase Player Table Sync] Insert details for user ${app.id}:`, insertErr.message);
+                  } else {
+                    console.log(`[Supabase Player Table Sync] Successfully created player row for ${app.fullName}`);
+                  }
+                }
+              } catch (err: any) {
+                console.log(`[Supabase Player Table Sync] Error checking/inserting user ${app.id}:`, err?.message || err);
+              }
+            }
+          }
+
           // Invalidate cache so next GET is direct
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
@@ -561,9 +695,10 @@ async function startServer() {
             }
           });
 
-          // Update stats in parallel using Promise.all
-          const updatePromises = req.body.players.map((player: any) =>
-            supabase
+          // Update stats in parallel using Promise.all on both profiles and players tables
+          const updatePromises = req.body.players.map(async (player: any) => {
+            // Update profiles
+            const { error: profileErr } = await supabase
               .from('profiles')
               .update({
                 status: player.status,
@@ -573,16 +708,54 @@ async function startServer() {
                 total_points: player.totalPoints,
                 highest_break: player.highestBreak,
               })
-              .eq('id', player.id)
-          );
+              .eq('id', player.id);
 
-          const results = await Promise.all(updatePromises);
-          results.forEach((res, index) => {
-            if (res.error) {
-              const player = req.body.players[index];
-              console.log(`[Supabase Player Stats Sync] Update details for user ${player?.id}:`, res.error.message);
+            if (profileErr) {
+              console.log(`[Supabase Player Stats Sync] Profile table update failed for ${player.id}:`, profileErr.message);
+            }
+
+            // Update players table
+            const { error: playerErr1 } = await supabase
+              .from('players')
+              .update({
+                status: player.status,
+                seed: player.seed,
+                matches_played: player.matchesPlayed,
+                matches_won: player.matchesWon,
+                total_points: player.totalPoints,
+                highest_break: player.highestBreak,
+                player_name: player.name,
+                name: player.name,
+                nickname: player.nickname,
+                club: player.club,
+                photo_url: player.photoUrl,
+                tournament_type: player.tournamentType
+              })
+              .eq('profile_id', player.id);
+
+            if (playerErr1) {
+              // Try updating by 'id' just in case
+              await supabase
+                .from('players')
+                .update({
+                  status: player.status,
+                  seed: player.seed,
+                  matches_played: player.matchesPlayed,
+                  matches_won: player.matchesWon,
+                  total_points: player.totalPoints,
+                  highest_break: player.highestBreak,
+                  player_name: player.name,
+                  name: player.name,
+                  nickname: player.nickname,
+                  club: player.club,
+                  photo_url: player.photoUrl,
+                  tournament_type: player.tournamentType
+                })
+                .eq('id', player.id);
             }
           });
+
+          await Promise.all(updatePromises);
 
           lastSupabaseFetchTime = 0;
         } catch (err: any) {

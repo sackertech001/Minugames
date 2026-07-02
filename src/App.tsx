@@ -23,6 +23,7 @@ import {
   CheckCircle,
   Settings,
   LogOut,
+  StopCircle,
 } from 'lucide-react';
 import InvalidRegistrationPage from './components/InvalidRegistrationPage';
 import TournamentLandingPage from './components/TournamentLandingPage';
@@ -185,25 +186,91 @@ export default function App() {
       console.warn('Could not sync state to server:', e);
     }
 
-    // Direct Client-side Supabase updates if server API is unavailable/404 and Supabase is configured
-    if (!succeeded) {
-      const supabase = getSupabase();
-      if (supabase) {
-        if (patch.playerApplications && Array.isArray(patch.playerApplications)) {
-          try {
-            for (const app of patch.playerApplications) {
-              const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ status: app.status })
-                .eq('id', app.id);
-              if (updateError) {
-                console.log(`[Client Supabase] Update profile status notice for ${app.id}:`, updateError.message);
+    // Direct Client-side Supabase updates - Unconditional if Supabase is configured
+    const supabase = getSupabase();
+    if (supabase) {
+      if (patch.playerApplications && Array.isArray(patch.playerApplications)) {
+        try {
+          for (const app of patch.playerApplications) {
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ status: app.status })
+              .eq('id', app.id);
+            if (updateError) {
+              console.log(`[Client Supabase] Update profile status notice for ${app.id}:`, updateError.message);
+            }
+
+            if (app.status === 'approved') {
+              try {
+                const { data: existingPlayer } = await supabase
+                  .from('players')
+                  .select('id')
+                  .eq('profile_id', app.id)
+                  .maybeSingle();
+
+                if (!existingPlayer) {
+                  let inserted = false;
+                  
+                  // Try 1: insert with player_name
+                  try {
+                    const { error: err1 } = await supabase
+                      .from('players')
+                      .insert({
+                        profile_id: app.id,
+                        player_name: app.fullName
+                      });
+                    if (!err1) {
+                      inserted = true;
+                      console.log(`[Client Supabase Player Sync] Created player row with player_name for ${app.fullName}`);
+                    } else {
+                      console.log(`[Client Supabase Player Sync] player_name insert failed: ${err1.message}. Trying name...`);
+                    }
+                  } catch (e) {}
+
+                  // Try 2: insert with name
+                  if (!inserted) {
+                    try {
+                      const { error: err2 } = await supabase
+                        .from('players')
+                        .insert({
+                          profile_id: app.id,
+                          name: app.fullName
+                        });
+                      if (!err2) {
+                        inserted = true;
+                        console.log(`[Client Supabase Player Sync] Created player row with name for ${app.fullName}`);
+                      } else {
+                        console.log(`[Client Supabase Player Sync] name insert failed: ${err2.message}. Trying profile_id only...`);
+                      }
+                    } catch (e) {}
+                  }
+
+                  // Try 3: insert with profile_id only
+                  if (!inserted) {
+                    try {
+                      const { error: err3 } = await supabase
+                        .from('players')
+                        .insert({
+                          profile_id: app.id
+                        });
+                      if (!err3) {
+                        inserted = true;
+                        console.log(`[Client Supabase Player Sync] Created player row with profile_id only for ${app.fullName}`);
+                      } else {
+                        console.log(`[Client Supabase Player Sync] profile_id only insert failed: ${err3.message}`);
+                      }
+                    } catch (e) {}
+                  }
+                }
+              } catch (pErr: any) {
+                console.log(`[Client Supabase Player Sync] Check error for ${app.id}:`, pErr?.message || pErr);
               }
             }
-          } catch (err: any) {
-            console.log('[Client Supabase] Status sync notice:', err?.message || err);
           }
+        } catch (err: any) {
+          console.log('[Client Supabase] Status sync notice:', err?.message || err);
         }
+      }
 
         if (patch.players && Array.isArray(patch.players)) {
           try {
@@ -298,8 +365,7 @@ export default function App() {
           }
         }
       }
-    }
-  };
+    };
 
   // Parse URL for Public Registration Form Mode
   useEffect(() => {
@@ -625,25 +691,127 @@ export default function App() {
                     return prev;
                   });
 
-                  // Pick players that have approved/active status from profiles to populate players state
-                  const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
-                  const dbPlayers = dbProfiles
-                    .filter((p: any) => approvedStatuses.includes(p.status))
-                    .map((p: any) => ({
-                      id: p.id,
-                      name: p.full_name || 'Tournament Player',
-                      nickname: p.nickname || '',
-                      club: p.club || '',
-                      seed: p.seed || 1,
-                      photoUrl: p.photo_url || '',
-                      matchesPlayed: p.matches_played || 0,
-                      matchesWon: p.matches_won || 0,
-                      totalPoints: p.total_points || 0,
-                      highestBreak: p.highest_break || 0,
-                      status: p.status === 'approved' ? 'active' : p.status,
-                      tournamentType: p.tournament_type || ''
-                    }))
-                    .sort((a, b) => (a.seed || 0) - (b.seed || 0));
+                  // Get players from players table in Supabase
+                  let dbPlayers: any[] = [];
+                  try {
+                    const { data: dbPlayersTable, error: playersFetchError } = await supabase
+                      .from('players')
+                      .select('*');
+
+                    if (playersFetchError) {
+                      console.log('[Client Supabase Sync] Fetch players table error, falling back to profiles:', playersFetchError.message);
+                      // Fallback to approved profiles
+                      const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+                      dbPlayers = dbProfiles
+                        .filter((p: any) => approvedStatuses.includes(p.status))
+                        .map((p: any) => ({
+                          id: p.id,
+                          name: p.full_name || 'Tournament Player',
+                          nickname: p.nickname || '',
+                          club: p.club || '',
+                          seed: p.seed || 1,
+                          photoUrl: p.photo_url || '',
+                          matchesPlayed: p.matches_played || 0,
+                          matchesWon: p.matches_won || 0,
+                          totalPoints: p.total_points || 0,
+                          highestBreak: p.highest_break || 0,
+                          status: p.status === 'approved' ? 'active' : p.status,
+                          tournamentType: p.tournament_type || ''
+                        }));
+                    } else {
+                      // Auto-heal: insert any approved profile that is missing from players table
+                      const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+                      const approvedProfiles = dbProfiles.filter((p: any) => approvedStatuses.includes(p.status));
+                      
+                      for (const profile of approvedProfiles) {
+                        const exists = dbPlayersTable && dbPlayersTable.some((pt: any) => pt.profile_id === profile.id || pt.id === profile.id);
+                        if (!exists) {
+                          console.log(`[Client Supabase Sync] Auto-inserting missing player for profile ${profile.id} into players table`);
+                          try {
+                            const { error: insertErr } = await supabase
+                              .from('players')
+                              .insert({
+                                profile_id: profile.id,
+                                player_name: profile.full_name,
+                                nickname: profile.nickname,
+                                club: profile.club,
+                                seed: profile.seed || 1,
+                                status: profile.status === 'approved' ? 'active' : profile.status,
+                                matches_played: profile.matches_played || 0,
+                                matches_won: profile.matches_won || 0,
+                                total_points: profile.total_points || 0,
+                                highest_break: profile.highest_break || 0
+                              });
+                            if (insertErr) {
+                              await supabase
+                                .from('players')
+                                .insert({
+                                  profile_id: profile.id,
+                                  name: profile.full_name,
+                                  nickname: profile.nickname,
+                                  club: profile.club,
+                                  seed: profile.seed || 1,
+                                  status: profile.status === 'approved' ? 'active' : profile.status,
+                                  matches_played: profile.matches_played || 0,
+                                  matches_won: profile.matches_won || 0,
+                                  total_points: profile.total_points || 0,
+                                  highest_break: profile.highest_break || 0
+                                });
+                            }
+                          } catch (e) {
+                            console.log(`[Client Supabase Sync] Auto-healing insert error:`, e);
+                          }
+                        }
+                      }
+
+                      // Re-fetch players table to get a complete list
+                      const { data: dbPlayersTableUpdated } = await supabase
+                        .from('players')
+                        .select('*');
+
+                      const finalPlayersTable = dbPlayersTableUpdated || dbPlayersTable || [];
+
+                      dbPlayers = finalPlayersTable.map((pt: any) => {
+                        const matchingProfile = dbProfiles.find((profile: any) => profile.id === pt.profile_id || profile.id === pt.id);
+                        return {
+                          id: pt.profile_id || pt.id || (matchingProfile ? matchingProfile.id : ''),
+                          name: pt.player_name || pt.name || (matchingProfile ? matchingProfile.full_name : 'Tournament Player'),
+                          nickname: pt.nickname || (matchingProfile ? matchingProfile.nickname : '') || '',
+                          club: pt.club || (matchingProfile ? matchingProfile.club : '') || '',
+                          seed: pt.seed !== undefined && pt.seed !== null ? Number(pt.seed) : (matchingProfile && matchingProfile.seed !== undefined && matchingProfile.seed !== null ? Number(matchingProfile.seed) : 1),
+                          photoUrl: pt.photo_url || pt.photoUrl || (matchingProfile ? matchingProfile.photo_url : '') || '',
+                          matchesPlayed: pt.matches_played !== undefined && pt.matches_played !== null ? Number(pt.matches_played) : (pt.matchesPlayed !== undefined ? Number(pt.matchesPlayed) : (matchingProfile && matchingProfile.matches_played !== undefined ? Number(matchingProfile.matches_played) : 0)),
+                          matchesWon: pt.matches_won !== undefined && pt.matches_won !== null ? Number(pt.matches_won) : (pt.matchesWon !== undefined ? Number(pt.matchesWon) : (matchingProfile && matchingProfile.matches_won !== undefined ? Number(matchingProfile.matches_won) : 0)),
+                          totalPoints: pt.total_points !== undefined && pt.total_points !== null ? Number(pt.total_points) : (pt.totalPoints !== undefined ? Number(pt.totalPoints) : (matchingProfile && matchingProfile.total_points !== undefined ? Number(matchingProfile.total_points) : 0)),
+                          highestBreak: pt.highest_break !== undefined && pt.highest_break !== null ? Number(pt.highest_break) : (pt.highestBreak !== undefined ? Number(pt.highestBreak) : (matchingProfile && matchingProfile.highest_break !== undefined ? Number(matchingProfile.highest_break) : 0)),
+                          status: pt.status || (matchingProfile && matchingProfile.status === 'approved' ? 'active' : matchingProfile?.status) || 'active',
+                          tournamentType: pt.tournament_type || pt.tournamentType || (matchingProfile ? matchingProfile.tournament_type : '') || ''
+                        };
+                      });
+                    }
+                  } catch (playerErr: any) {
+                    console.log('[Client Supabase Sync] Players table fetch error, falling back to profiles:', playerErr?.message || playerErr);
+                    // Fallback to approved profiles
+                    const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+                    dbPlayers = dbProfiles
+                      .filter((p: any) => approvedStatuses.includes(p.status))
+                      .map((p: any) => ({
+                        id: p.id,
+                        name: p.full_name || 'Tournament Player',
+                        nickname: p.nickname || '',
+                        club: p.club || '',
+                        seed: p.seed || 1,
+                        photoUrl: p.photo_url || '',
+                        matchesPlayed: p.matches_played || 0,
+                        matchesWon: p.matches_won || 0,
+                        totalPoints: p.total_points || 0,
+                        highestBreak: p.highest_break || 0,
+                        status: p.status === 'approved' ? 'active' : p.status,
+                        tournamentType: p.tournament_type || ''
+                      }));
+                  }
+
+                  dbPlayers.sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
                   setPlayers((prev) => {
                     if (JSON.stringify(prev) !== JSON.stringify(dbPlayers)) {
@@ -1120,6 +1288,31 @@ export default function App() {
   };
 
   // 5. Complete Reset Option
+  const handleEndTournament = () => {
+    if (!hasPermission('editSettings') && !hasPermission('scoreMatches')) {
+      showToast('Your current role does not have authorization to end the tournament.', 'error');
+      return;
+    }
+
+    // Reset players tournament stats
+    const resetPlayers = players.map(p => ({
+      ...p,
+      matchesPlayed: 0,
+      matchesWon: 0,
+      totalPoints: 0,
+      highestBreak: 0,
+      status: 'approved' as const
+    }));
+
+    setPlayers(resetPlayers);
+    setMatches([]);
+    setIsTournamentStarted(false);
+    setActiveTab('info');
+
+    saveStateToStorage(resetPlayers, [], false);
+    showToast('The tournament has been ended. All active games are ended, and fixtures have been reverted to empty.', 'success');
+  };
+
   const handleResetEntireTournament = () => {
     if (!hasPermission('wipeSystem')) {
       showToast('Your current role does not have authorization to wipe the tournament system data.', 'error');
@@ -1675,10 +1868,24 @@ export default function App() {
             )}
 
             <button
-              onClick={handleResetEntireTournament}
+              onClick={handleEndTournament}
+              disabled={!isTournamentStarted}
+              id="btn-end-tournament"
+              className={`flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 rounded-xl transition-colors uppercase tracking-wider ${
+                isTournamentStarted
+                  ? "text-amber-500 hover:text-amber-400 bg-amber-500/10 border border-amber-500/20 cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.05)]"
+                  : "text-amber-500/40 bg-amber-500/5 border border-amber-500/10 cursor-not-allowed opacity-50"
+              }`}
+              title={isTournamentStarted ? "End all active games and revert fixtures to empty" : "No active tournament to end"}
+            >
+              <StopCircle className="w-3.5 h-3.5" /> End Tournament
+            </button>
+
+            <button
+              disabled={true}
               id="btn-reset-tournament"
-              className="flex items-center gap-1.5 text-xs font-extrabold text-red-500 hover:text-red-400 bg-red-500/5 border border-red-500/20 px-3.5 py-2 rounded-xl transition-colors cursor-pointer uppercase tracking-wider shadow-[0_0_12px_rgba(239,68,68,0.05)]"
-              title="Wipe all data and reset system to defaults (Requires Admin PIN)"
+              className="flex items-center gap-1.5 text-xs font-extrabold text-red-500/40 bg-red-500/5 border border-red-500/10 px-3.5 py-2 rounded-xl transition-colors cursor-not-allowed opacity-50 uppercase tracking-wider"
+              title="Wipe system is currently disabled"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Wipe System
             </button>
