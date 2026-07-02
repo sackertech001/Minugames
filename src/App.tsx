@@ -99,9 +99,8 @@ export default function App() {
     dateRange: '17 July to 19 July 2026',
     setsToPlay: 3,
     prizes: {
-      first: '₦350,000 + Certificate',
-      second: '₦150,000 + Certificate',
-      third: 'Meal of Choice',
+      first: '₦500,000',
+      second: '₦150,000',
     },
     tournamentTypes: ['Soccer', 'Snooker', 'Table Tennis'],
     selectedTournamentType: 'Snooker'
@@ -383,7 +382,32 @@ export default function App() {
         if (!parsed.selectedTournamentType) {
           parsed.selectedTournamentType = parsed.tournamentTypes[0] || 'Snooker';
         }
+        let changed = false;
+        if (parsed.prizes) {
+          if (parsed.prizes.first === '₦350,000 + Certificate' || parsed.prizes.first === '₦500,000 + Certificate') {
+            parsed.prizes.first = '₦500,000';
+            changed = true;
+          } else if (parsed.prizes.first === '₦350,000') {
+            parsed.prizes.first = '₦500,000';
+            changed = true;
+          }
+          if (parsed.prizes.second === '₦150,000 + Certificate') {
+            parsed.prizes.second = '₦150,000';
+            changed = true;
+          }
+          if ('highestBreak' in parsed.prizes) {
+            delete parsed.prizes.highestBreak;
+            changed = true;
+          }
+          if ('third' in parsed.prizes) {
+            delete parsed.prizes.third;
+            changed = true;
+          }
+        }
         setTournamentConfig(parsed);
+        if (changed) {
+          safeStorage.setItem('snooker_config', JSON.stringify(parsed));
+        }
       }
       if (savedUsers) {
         setSystemUsers(JSON.parse(savedUsers));
@@ -1125,9 +1149,8 @@ export default function App() {
       dateRange: '17 July to 19 July 2026',
       setsToPlay: 3,
       prizes: {
-        first: '₦350,000 + Certificate',
-        second: '₦150,000 + Certificate',
-        third: 'Meal of Choice',
+        first: '₦500,000',
+        second: '₦150,000',
       },
       tournamentTypes: ['Soccer', 'Snooker', 'Table Tennis'],
       selectedTournamentType: 'Snooker'

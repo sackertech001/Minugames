@@ -73,7 +73,7 @@ export default function TournamentInfo({ config }: TournamentInfoProps) {
             </div>
             <div>
               <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">1st Place Champion</p>
-              <p className="text-base font-black text-slate-100">{config.prizes.first || "₦350,000 + Certificate"}</p>
+              <p className="text-base font-black text-slate-100">{config.prizes.first || "₦500,000"}</p>
             </div>
           </div>
 
@@ -84,18 +84,7 @@ export default function TournamentInfo({ config }: TournamentInfoProps) {
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">2nd Place Runner-Up</p>
-              <p className="text-base font-black text-slate-100">{config.prizes.second || "₦150,000 + Certificate"}</p>
-            </div>
-          </div>
-
-          {/* 3rd Place */}
-          <div className="flex items-center gap-4 bg-amber-700/5 border border-amber-700/10 p-3 rounded-xl hover:bg-amber-700/10 transition-all duration-200">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-600 via-amber-700 to-amber-800 flex items-center justify-center font-sans font-black text-black text-lg shadow-[0_0_10px_rgba(180,83,9,0.1)] shrink-0">
-              3
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">3rd Place Finish</p>
-              <p className="text-base font-black text-slate-100">{config.prizes.third || "Meal of Choice"}</p>
+              <p className="text-base font-black text-slate-100">{config.prizes.second || "₦150,000"}</p>
             </div>
           </div>
         </div>

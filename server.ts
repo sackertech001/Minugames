@@ -28,8 +28,8 @@ interface TournamentState {
     prizes: {
       first: string;
       second: string;
-      third: string;
-      highestBreak: string;
+      third?: string;
+      highestBreak?: string;
     };
     tournamentTypes?: string[];
     selectedTournamentType?: string;
@@ -55,10 +55,8 @@ const DEFAULT_STATE: TournamentState = {
     dateRange: "17 July to 19 July 2026",
     setsToPlay: 3,
     prizes: {
-      first: "₦350,000 + Certificate",
-      second: "₦150,000 + Certificate",
-      third: "Meal of Choice",
-      highestBreak: "₦50,000"
+      first: "₦500,000",
+      second: "₦150,000"
     }
   },
   systemUsers: [
@@ -110,7 +108,33 @@ function readState(): TournamentState {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const content = fs.readFileSync(DATA_FILE, "utf-8");
-      return JSON.parse(content);
+      const state = JSON.parse(content);
+      let changed = false;
+      if (state.tournamentConfig && state.tournamentConfig.prizes) {
+        if (state.tournamentConfig.prizes.first === "₦350,000 + Certificate" || state.tournamentConfig.prizes.first === "₦500,000 + Certificate") {
+          state.tournamentConfig.prizes.first = "₦500,000";
+          changed = true;
+        } else if (state.tournamentConfig.prizes.first === "₦350,000") {
+          state.tournamentConfig.prizes.first = "₦500,000";
+          changed = true;
+        }
+        if (state.tournamentConfig.prizes.second === "₦150,000 + Certificate") {
+          state.tournamentConfig.prizes.second = "₦150,000";
+          changed = true;
+        }
+        if ("highestBreak" in state.tournamentConfig.prizes) {
+          delete state.tournamentConfig.prizes.highestBreak;
+          changed = true;
+        }
+        if ("third" in state.tournamentConfig.prizes) {
+          delete state.tournamentConfig.prizes.third;
+          changed = true;
+        }
+      }
+      if (changed) {
+        writeState(state);
+      }
+      return state;
     }
   } catch (e) {
     console.error("Error reading data file, using defaults:", e);

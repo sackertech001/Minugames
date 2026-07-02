@@ -90,7 +90,6 @@ export default function SettingsTab({
   const [tourneyDuration, setTourneyDuration] = useState(config.durationDays);
   const [prize1, setPrize1] = useState(config.prizes.first);
   const [prize2, setPrize2] = useState(config.prizes.second);
-  const [prize3, setPrize3] = useState(config.prizes.third);
 
   // Dynamic configuration states
   const [playersCount, setPlayersCount] = useState(config.playersCount);
@@ -247,7 +246,6 @@ export default function SettingsTab({
       prizes: {
         first: prize1,
         second: prize2,
-        third: prize3,
       }
     };
 
@@ -973,19 +971,7 @@ export default function SettingsTab({
                     />
                   </div>
                 </div>
-                <div>
-                  <div className="space-y-1.5">
-                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
-                      3rd Place Finish
-                    </label>
-                    <input
-                      type="text"
-                      value={prize3}
-                      onChange={(e) => setPrize3(e.target.value)}
-                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
-                    />
-                  </div>
-                </div>
+
               </div>
 
               <div className="pt-3.5 flex justify-end">

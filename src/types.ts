@@ -90,7 +90,7 @@ export interface TournamentConfig {
   prizes: {
     first: string;
     second: string;
-    third: string;
+    third?: string;
   };
   tournamentTypes?: string[];
   selectedTournamentType?: string;
