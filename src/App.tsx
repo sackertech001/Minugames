@@ -111,7 +111,7 @@ export default function App() {
     { stage: 'Semi finals', status: 'not started' },
     { stage: 'Final', status: 'not started' }
   ]);
-  const [bracketView, setBracketView] = useState<'full' | 'day1' | 'day2' | 'day3'>('full');
+  const [bracketView, setBracketView] = useState<'full' | 'day1' | 'day2' | 'day3' | 'minimized'>('full');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'bracket' | 'display' | 'registration' | 'info' | 'settings'>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isTournamentStarted, setIsTournamentStarted] = useState(false);
@@ -202,7 +202,7 @@ export default function App() {
   const [isPortalLinkInvalid, setIsPortalLinkInvalid] = useState(false);
   const [showMainLogin, setShowMainLogin] = useState(false);
 
-  const [systemLogo, setSystemLogo] = useState<string>('');
+  const [systemLogo, setSystemLogo] = useState<string>('https://fmbwnbvhvcuihzifiajk.supabase.co/storage/v1/object/public/website_logo/46.png');
 
   const handleUpdateSystemLogo = (newLogo: string) => {
     setSystemLogo(newLogo);
@@ -2141,42 +2141,36 @@ export default function App() {
 
   const isEndActive = rounds.some(r => r.status !== 'not started');
   const effectiveTournamentStarted = isTournamentStarted || isEndActive;
+  const isMaximizedFullBracket = activeTab === 'bracket' && bracketView === 'full' && effectiveTournamentStarted && tournamentConfig.formatType !== 'group';
 
   return (
     <div className="min-h-screen flex bg-bg-primary text-text-primary">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        isTabAllowed={isTabAllowed} 
-        isCollapsed={isSidebarCollapsed} 
-        setIsCollapsed={setIsSidebarCollapsed} 
-      />
+      {!isMaximizedFullBracket && (
+        <Sidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          isTabAllowed={isTabAllowed} 
+          isCollapsed={isSidebarCollapsed} 
+          setIsCollapsed={setIsSidebarCollapsed} 
+          systemLogo={systemLogo}
+        />
+      )}
       
-      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-24' : 'ml-72'}`}>
+      <div className={`flex-1 transition-all duration-300 ${isMaximizedFullBracket ? 'ml-0' : isSidebarCollapsed ? 'ml-24' : 'ml-72'}`}>
         {/* Premium Luxury Header Bar */}
-        <header className="bg-bg-secondary border-b border-[#1A2740] py-4 px-4 md:px-8 sticky top-0 z-30 shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-colors duration-300">
+        {!isMaximizedFullBracket && (
+          <header className="bg-bg-secondary border-b border-[#1A2740] py-4 px-4 md:px-8 sticky top-0 z-30 shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-colors duration-300">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           
           {/* Logo & Headline */}
           <div className="flex items-center gap-4">
-            <div className="relative w-12 h-14 shrink-0">
-              <svg viewBox="0 0 100 115" className="w-full h-full drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]">
-                {/* Shield Outer border */}
-                <path d="M 50,5 L 85,20 C 85,60 70,95 50,110 C 30,95 15,60 15,20 Z" fill="var(--bg-secondary)" stroke="#EF4444" strokeWidth="3" />
-                <path d="M 50,10 L 80,24 C 80,58 67,90 50,103 C 33,90 20,58 20,24 Z" fill="none" stroke="#EF4444" strokeWidth="1.5" opacity="0.4" />
-                
-                {/* Crown on top */}
-                <path d="M 35,32 L 40,24 L 50,30 L 60,24 L 65,32 Z" fill="#F59E0B" />
-                <circle cx="35" cy="32" r="1.5" fill="#F59E0B" />
-                <circle cx="40" cy="24" r="1.5" fill="#F59E0B" />
-                <circle cx="50" cy="30" r="1.5" fill="#F59E0B" />
-                <circle cx="60" cy="24" r="1.5" fill="#F59E0B" />
-                <circle cx="65" cy="32" r="1.5" fill="#F59E0B" />
-
-                {/* Central Red Glowing Circle */}
-                <circle cx="50" cy="55" r="16" fill="var(--bg-primary)" stroke="#EF4444" strokeWidth="2" />
-                <text x="50" y="60" textAnchor="middle" fill="#EF4444" fontSize="15" fontWeight="900" fontFamily="sans-serif">46</text>
-              </svg>
+            <div className="relative w-14 h-14 shrink-0">
+              <img 
+                src={systemLogo || "https://fmbwnbvhvcuihzifiajk.supabase.co/storage/v1/object/public/website_logo/46.png"} 
+                alt="Logo" 
+                className="w-full h-full object-contain rounded-2xl border border-rose-500/20 p-1 bg-bg-primary shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <div className="flex items-center gap-3">
@@ -2275,6 +2269,7 @@ export default function App() {
           </div>
         </div>
       </header>
+      )}
 
       {/* Hero Banner when Champion is crowned */}
       {champion && (
@@ -2296,7 +2291,7 @@ export default function App() {
       )}
 
       {/* Main Content Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8">
+      <main className={`flex-1 w-full mx-auto space-y-8 ${isMaximizedFullBracket ? 'max-w-none p-2 md:p-4' : 'max-w-7xl p-4 md:p-8'}`}>
         
         {/* Navigation Tabs bar removed in favor of Sidebar */}
 

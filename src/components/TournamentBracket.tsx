@@ -293,37 +293,39 @@ export default function TournamentBracket({
   return (
     <div className="space-y-6">
       {/* Schedule Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[1, 2, 3].map((day) => {
-          const isActive = bracketView === `day${day}`;
-          return (
-            <button
-              key={day}
-              onClick={() => setBracketView(`day${day}` as any)}
-              className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 border cursor-pointer ${
-                isActive
-                  ? 'bg-[#121F32] border-[#1A6DFF] shadow-[0_8px_24px_rgba(26,109,255,0.15)]'
-                  : 'bg-[#121F32]/50 border-[#1A2740] hover:border-[#1A2740]/80 hover:bg-[#121F32]'
-              }`}
-            >
-              <div className="flex justify-between items-center mb-3">
-                <span className={`text-[10px] font-sans font-black tracking-[0.2em] uppercase ${isActive ? 'text-[#F1C317]' : 'text-[#787E90]'}`}>
-                  DAY {day}
-                </span>
-                <span className="text-[10px] text-[#787E90] font-sans tracking-wider font-semibold">
-                  {getDayDate(day as 1 | 2 | 3)}
-                </span>
-              </div>
-              <p className="text-sm font-sans font-black text-[#EEF1F5] uppercase tracking-wider mb-1.5 leading-snug">
-                {getRoundTitles(day as 1 | 2 | 3)}
-              </p>
-              <p className="text-[11px] text-[#B2B6C2] font-sans font-bold tracking-wide uppercase">
-                {getMatchesCountForDay(day as 1 | 2 | 3)} Matches
-              </p>
-            </button>
-          );
-        })}
-      </div>
+      {bracketView !== 'full' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((day) => {
+            const isActive = bracketView === `day${day}`;
+            return (
+              <button
+                key={day}
+                onClick={() => setBracketView(`day${day}` as any)}
+                className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 border cursor-pointer ${
+                  isActive
+                    ? 'bg-[#121F32] border-[#1A6DFF] shadow-[0_8px_24px_rgba(26,109,255,0.15)]'
+                    : 'bg-[#121F32]/50 border-[#1A2740] hover:border-[#1A2740]/80 hover:bg-[#121F32]'
+                }`}
+              >
+                <div className="flex justify-between items-center mb-3">
+                  <span className={`text-[10px] font-sans font-black tracking-[0.2em] uppercase ${isActive ? 'text-[#F1C317]' : 'text-[#787E90]'}`}>
+                    DAY {day}
+                  </span>
+                  <span className="text-[10px] text-[#787E90] font-sans tracking-wider font-semibold">
+                    {getDayDate(day as 1 | 2 | 3)}
+                  </span>
+                </div>
+                <p className="text-sm font-sans font-black text-[#EEF1F5] uppercase tracking-wider mb-1.5 leading-snug">
+                  {getRoundTitles(day as 1 | 2 | 3)}
+                </p>
+                <p className="text-[11px] text-[#B2B6C2] font-sans font-bold tracking-wide uppercase">
+                  {getMatchesCountForDay(day as 1 | 2 | 3)} Matches
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Top filter dashboard */}
       <div className="bg-[#121F32] border border-[#1A2740] rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
@@ -347,20 +349,24 @@ export default function TournamentBracket({
           >
             Full Bracket Tree
           </button>
-          {bracketView !== 'minimized' && (
-            <button
-              onClick={() => setBracketView('minimized')}
-              className="text-xs font-black px-4 py-2.5 rounded-lg transition-all cursor-pointer text-[#B2B6C2] hover:text-[#EEF1F5] hover:bg-white/5 uppercase tracking-wider"
-            >
-              Minimize
-            </button>
-          )}
+          <button
+            onClick={() => setBracketView('minimized')}
+            className={`text-xs font-black px-4 py-2.5 rounded-lg transition-all cursor-pointer uppercase tracking-wider ${
+              bracketView === 'minimized'
+                ? 'bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] text-white border border-[#1A6DFF]/20 shadow-md'
+                : 'text-[#B2B6C2] hover:text-[#EEF1F5] hover:bg-white/5'
+            }`}
+          >
+            Minimize
+          </button>
         </div>
       </div>
 
       {/* Bracket Tree Container */}
-      {bracketView === 'minimized' ? null : bracketView === 'full' ? (
-        <div className="overflow-x-auto pb-4 max-h-[750px] overflow-y-auto">
+      {(bracketView === 'full' || bracketView === 'minimized') ? (
+        <div className={`overflow-x-auto pb-4 overflow-y-auto ${
+          bracketView === 'full' ? 'max-h-[calc(100vh-180px)]' : 'max-h-[600px]'
+        }`}>
           <div className="flex gap-8 px-2 min-w-[1280px]">
             {showRound('R32') && (
               <div className="flex-1 space-y-4">

@@ -8,9 +8,10 @@ interface SidebarProps {
   isTabAllowed: (tab: string) => boolean;
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
+  systemLogo?: string;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, isTabAllowed, isCollapsed, setIsCollapsed }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, isTabAllowed, isCollapsed, setIsCollapsed, systemLogo }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'info', label: 'Tournament Info', icon: Info },
@@ -26,16 +27,17 @@ export default function Sidebar({ activeTab, setActiveTab, isTabAllowed, isColla
       className="fixed left-0 top-0 h-full p-4 bg-[#04142B] border-r border-[#1A2740]/80 flex flex-col z-50 transition-all duration-300 shadow-[4px_0_24px_rgba(0,0,0,0.3)]"
     >
       {/* Brand Logo area */}
-      <div className={`mb-8 px-2 py-3 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} border-b border-[#1A2740]/40 pb-5`}>
+      <div className={`mb-8 px-2 py-3 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} border-b border-[#1A2740]/40 pb-5`}>
+        <img 
+          src={systemLogo || "https://fmbwnbvhvcuihzifiajk.supabase.co/storage/v1/object/public/website_logo/46.png"} 
+          alt="Brand Logo" 
+          className="w-10 h-10 object-contain rounded-xl"
+          referrerPolicy="no-referrer"
+        />
         {!isCollapsed && (
-          <div className="text-xl font-display tracking-wider font-extrabold uppercase flex items-center gap-2">
+          <div className="text-sm font-display tracking-wider font-extrabold uppercase flex flex-col leading-none">
             <span className="text-white">MINU</span>
             <span className="text-[#1A6DFF]">GAMES</span>
-          </div>
-        )}
-        {isCollapsed && (
-          <div className="w-10 h-10 rounded-xl bg-[#1A6DFF] flex items-center justify-center font-display font-black text-white text-lg shadow-[0_0_15px_rgba(26,109,255,0.4)]">
-            M
           </div>
         )}
       </div>
