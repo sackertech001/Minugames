@@ -718,6 +718,15 @@ export default function App() {
               return prev;
             });
 
+            if (data.rounds) {
+              setRounds((prev) => {
+                if (JSON.stringify(prev) !== JSON.stringify(data.rounds)) {
+                  return data.rounds;
+                }
+                return prev;
+              });
+            }
+
             return;
           } else if (res.status === 404) {
             apiPermanentlyUnavailable = true;
@@ -969,6 +978,81 @@ export default function App() {
                     }
                     return prev;
                   });
+                }
+
+                // Fetch round_of_32 from Supabase to sync Round of 32 matches
+                try {
+                  const { data: dbR32Matches, error: r32Error } = await supabase
+                    .from('round_of_32')
+                    .select('*');
+
+                  if (!r32Error && dbR32Matches && dbR32Matches.length > 0) {
+                    const mappedMatches = dbR32Matches.map((m: any) => {
+                      const matchNumber = m.match_number;
+                      const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                      
+                      const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                        if (!scheduledTimeIso) return "Day 1 - 09:00";
+                        if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                        try {
+                          const d = new Date(scheduledTimeIso);
+                          if (isNaN(d.getTime())) return "Day 1 - 09:00";
+                          
+                          const hh = String(d.getHours()).padStart(2, '0');
+                          const mm = String(d.getMinutes()).padStart(2, '0');
+                          const timeStr = `${hh}:${mm}`;
+
+                          const startStr = config?.dateRange?.split(' to ')[0];
+                          if (startStr) {
+                            const start = new Date(startStr);
+                            if (!isNaN(start.getTime())) {
+                              const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                              const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                              const diffTime = dDay.getTime() - startDay.getTime();
+                              const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                              const dayNum = Math.max(1, diffDays + 1);
+                              return `Day ${dayNum} - ${timeStr}`;
+                            }
+                          }
+                          return `Day 1 - ${timeStr}`;
+                        } catch (e) {
+                          return "Day 1 - 09:00";
+                        }
+                      };
+
+                      return {
+                        id: `M${matchNumber}`,
+                        label: `Match ${matchNumber}`,
+                        round: 'R32' as const,
+                        day: 1,
+                        player1Id: m.player1_id || null,
+                        player2Id: m.player2_id || null,
+                        score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                        score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                        points1: null,
+                        points2: null,
+                        break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                        break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                        frames: [],
+                        winnerId: m.winner_id || null,
+                        loserId: m.winner_id ? (m.winner_id === m.player1_id ? m.player2_id : m.player1_id) : null,
+                        status: statusStr as 'scheduled' | 'playing' | 'completed',
+                        scheduledTime: fmtScheduledTime(m.scheduled_time, tournamentConfig)
+                      };
+                    });
+
+                    setMatches((prev) => {
+                      const nonR32Matches = prev.filter((m: any) => m.round !== 'R32' && !m.id.startsWith('M'));
+                      const mergedMatches = [...mappedMatches, ...nonR32Matches];
+                      if (JSON.stringify(prev) !== JSON.stringify(mergedMatches)) {
+                        safeStorage.setItem('snooker_matches', JSON.stringify(mergedMatches));
+                        return mergedMatches;
+                      }
+                      return prev;
+                    });
+                  }
+                } catch (r32Err) {
+                  console.log('[Client Supabase] round_of_32 fallback sync notice:', r32Err);
                 }
               } catch (dbErr) {
                 console.log('[Client Supabase] DB sync notice:', dbErr);

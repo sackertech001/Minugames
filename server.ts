@@ -19,6 +19,7 @@ interface TournamentState {
   players: any[];
   matches: any[];
   isTournamentStarted: boolean;
+  rounds?: any[];
   tournamentConfig: {
     tournamentName: string;
     format: string;
@@ -50,6 +51,13 @@ const DEFAULT_STATE: TournamentState = {
   players: [],
   matches: [],
   isTournamentStarted: false,
+  rounds: [
+    { stage: 'Round of 32', status: 'not started' },
+    { stage: 'Round of 16', status: 'not started' },
+    { stage: 'Quarter finals', status: 'not started' },
+    { stage: 'Semi finals', status: 'not started' },
+    { stage: 'Final', status: 'not started' }
+  ],
   tournamentConfig: {
     tournamentName: "CLASS 46 SNOOKER CHAMPIONSHIP",
     format: "Knockout",
@@ -533,6 +541,101 @@ async function startServer() {
             state.tournamentConfig.selectedTournamentType = activeType;
           }
 
+          // Fetch rounds from Supabase to sync tournament status and rounds state
+          try {
+            const { data: dbRounds, error: roundsError } = await supabase
+              .from('rounds')
+              .select('*');
+
+            if (!roundsError && dbRounds && dbRounds.length > 0) {
+              const mappedRounds = dbRounds.map((r: any) => ({
+                stage: r.stage,
+                status: r.status as 'active' | 'not started' | 'ended'
+              }));
+              const order = ['Round of 32', 'Round of 16', 'Quarter finals', 'Semi finals', 'Final'];
+              mappedRounds.sort((a, b) => order.indexOf(a.stage) - order.indexOf(b.stage));
+              state.rounds = mappedRounds;
+
+              const anyActiveOrEnded = mappedRounds.some((r: any) => r.status !== 'not started');
+              state.isTournamentStarted = anyActiveOrEnded;
+              console.log(`[Supabase DB Sync] Rounds synced. Any active/ended: ${anyActiveOrEnded}. Synced isTournamentStarted to ${anyActiveOrEnded}`);
+            }
+          } catch (rErr) {
+            console.log('[Supabase DB Sync] Error syncing rounds:', rErr);
+          }
+
+          // Fetch round_of_32 from Supabase to sync Round of 32 matches
+          try {
+            const { data: dbR32Matches, error: r32Error } = await supabase
+              .from('round_of_32')
+              .select('*');
+
+            if (!r32Error && dbR32Matches && dbR32Matches.length > 0) {
+              const mappedMatches = dbR32Matches.map((m: any) => {
+                const matchNumber = m.match_number;
+                const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                
+                // Helper to format ISO scheduled_time back to "Day 1 - HH:MM"
+                const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                  if (!scheduledTimeIso) return "Day 1 - 09:00";
+                  if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                  try {
+                    const d = new Date(scheduledTimeIso);
+                    if (isNaN(d.getTime())) return "Day 1 - 09:00";
+                    
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mm = String(d.getMinutes()).padStart(2, '0');
+                    const timeStr = `${hh}:${mm}`;
+
+                    const startStr = config?.dateRange?.split(' to ')[0];
+                    if (startStr) {
+                      const start = new Date(startStr);
+                      if (!isNaN(start.getTime())) {
+                        const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                        const diffTime = dDay.getTime() - startDay.getTime();
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        const dayNum = Math.max(1, diffDays + 1);
+                        return `Day ${dayNum} - ${timeStr}`;
+                      }
+                    }
+                    return `Day 1 - ${timeStr}`;
+                  } catch (e) {
+                    return "Day 1 - 09:00";
+                  }
+                };
+
+                return {
+                  id: `M${matchNumber}`,
+                  label: `Match ${matchNumber}`,
+                  round: 'R32' as const,
+                  day: 1,
+                  player1Id: m.player1_id || null,
+                  player2Id: m.player2_id || null,
+                  score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                  score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                  points1: null,
+                  points2: null,
+                  break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                  break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                  frames: [],
+                  winnerId: m.winner_id || null,
+                  loserId: m.winner_id ? (m.winner_id === m.player1_id ? m.player2_id : m.player1_id) : null,
+                  status: statusStr as 'scheduled' | 'playing' | 'completed',
+                  scheduledTime: fmtScheduledTime(m.scheduled_time, state.tournamentConfig)
+                };
+              });
+
+              // Merge mapped R32 matches into existing matches
+              const existingMatches = state.matches || [];
+              const nonR32Matches = existingMatches.filter((m: any) => m.round !== 'R32' && !m.id.startsWith('M'));
+              state.matches = [...mappedMatches, ...nonR32Matches];
+              console.log(`[Supabase DB Sync] Round of 32 synced. Total R32 matches merged: ${mappedMatches.length}`);
+            }
+          } catch (r32Err) {
+            console.log('[Supabase DB Sync] Error syncing round_of_32:', r32Err);
+          }
+
           writeState(state);
         }
       })(), 12000, "Supabase connection timed out");
@@ -545,15 +648,20 @@ async function startServer() {
 
   // API Endpoints
   app.get("/api/state", async (req, res) => {
-    const state = readState();
-
     const now = Date.now();
-    if (now - lastSupabaseFetchTime > 30000) {
+    if (lastSupabaseFetchTime === 0) {
+      try {
+        await syncWithSupabase();
+      } catch (err: any) {
+        console.log("[Supabase First Sync] Error during boot sync:", err?.message || err);
+      }
+    } else if (now - lastSupabaseFetchTime > 30000) {
       syncWithSupabase().catch(err => {
         console.log("[Supabase Background Sync] Sync notice:", err?.message || err);
       });
     }
 
+    const state = readState();
     res.json(state);
   });
 
