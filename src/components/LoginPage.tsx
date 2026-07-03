@@ -9,6 +9,7 @@ interface LoginPageProps {
   theme: string;
   setTheme: (theme: string) => void;
   systemLogo?: string;
+  onBackToHome?: () => void;
 }
 
 export default function LoginPage({
@@ -18,6 +19,7 @@ export default function LoginPage({
   theme,
   setTheme,
   systemLogo = '',
+  onBackToHome,
 }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
@@ -76,13 +78,24 @@ export default function LoginPage({
           </div>
         </div>
 
-        <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="flex items-center justify-center p-2.5 rounded-xl bg-[#121F32] border border-[#1A2740] hover:bg-[#1A2740] text-[#B2B6C2] hover:text-[#F1C317] transition-all cursor-pointer"
-          title={theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
-        >
-          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
+        <div className="flex items-center gap-3">
+          {onBackToHome && (
+            <button
+              onClick={onBackToHome}
+              className="text-xs font-black uppercase tracking-wider text-[#B2B6C2] hover:text-[#F1C317] transition-all bg-[#121F32] hover:bg-[#1A2740] border border-[#1A2740] px-3.5 py-2.5 rounded-xl cursor-pointer"
+            >
+              Back to Home
+            </button>
+          )}
+
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="flex items-center justify-center p-2.5 rounded-xl bg-[#121F32] border border-[#1A2740] hover:bg-[#1A2740] text-[#B2B6C2] hover:text-[#F1C317] transition-all cursor-pointer"
+            title={theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+        </div>
       </header>
 
       {/* Main Login Card Section */}

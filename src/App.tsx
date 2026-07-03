@@ -37,6 +37,7 @@ import MatchScorerModal from './components/MatchScorerModal';
 import ConfirmModal from './components/ConfirmModal';
 import SettingsTab from './components/SettingsTab';
 import LoginPage from './components/LoginPage';
+import MainLandingPage from './components/MainLandingPage';
 import PlayerApplicationForm from './components/PlayerApplicationForm';
 import { getSupabase } from './utils/supabaseClient';
 import Sidebar from './components/Sidebar';
@@ -199,6 +200,7 @@ export default function App() {
   const [isPublicViewMode, setIsPublicViewMode] = useState(false);
   const [isInvalidLinkMode, setIsInvalidLinkMode] = useState(false);
   const [isPortalLinkInvalid, setIsPortalLinkInvalid] = useState(false);
+  const [showMainLogin, setShowMainLogin] = useState(false);
 
   const [systemLogo, setSystemLogo] = useState<string>('');
 
@@ -2014,6 +2016,16 @@ export default function App() {
   }
 
   if (!currentUser) {
+    if (!showMainLogin) {
+      return (
+        <MainLandingPage
+          onNavigateToLogin={() => setShowMainLogin(true)}
+          systemLogo={systemLogo}
+          tournamentName={tournamentConfig.tournamentName}
+        />
+      );
+    }
+
     return (
       <LoginPage
         users={systemUsers}
@@ -2022,11 +2034,13 @@ export default function App() {
         theme={theme}
         setTheme={setTheme}
         systemLogo={systemLogo}
+        onBackToHome={() => setShowMainLogin(false)}
       />
     );
   }
 
   const isEndActive = rounds.some(r => r.status !== 'not started');
+  const effectiveTournamentStarted = isTournamentStarted || isEndActive;
 
   return (
     <div className="min-h-screen flex bg-bg-primary text-text-primary">
@@ -2125,7 +2139,7 @@ export default function App() {
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {isTournamentStarted && (
+            {effectiveTournamentStarted && (
               <button
                 onClick={handleAutoSimulateAllReady}
                 id="btn-auto-simulate-round"
@@ -2210,7 +2224,7 @@ export default function App() {
               players={players}
               onPlayersChange={handlePlayersChange}
               onStartTournament={handleStartTournament}
-              isTournamentStarted={isTournamentStarted}
+              isTournamentStarted={effectiveTournamentStarted}
               playersCount={tournamentConfig.playersCount}
               applications={playerApplications}
               onApplicationsChange={handleApplicationsChange}
@@ -2219,7 +2233,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'bracket' && isTournamentStarted && (
+          {activeTab === 'bracket' && effectiveTournamentStarted && (
             tournamentConfig.formatType === 'group' ? (
               <GroupStageView 
                 tournamentConfig={tournamentConfig} 
@@ -2260,7 +2274,7 @@ export default function App() {
             )
           )}
 
-          {activeTab === 'display' && isTournamentStarted && (
+          {activeTab === 'display' && effectiveTournamentStarted && (
             <LiveDisplayScreen players={players} matches={matches} />
           )}
 
@@ -2273,7 +2287,7 @@ export default function App() {
               onUpdateUsers={handleUpdateUsers}
               currentUser={currentUser}
               onLogin={handleLogin}
-              isTournamentStarted={isTournamentStarted}
+              isTournamentStarted={effectiveTournamentStarted}
               rolePermissions={rolePermissions}
               onUpdateRolePermissions={handleUpdateRolePermissions}
               publicRegistrationEnabled={publicRegistrationEnabled}

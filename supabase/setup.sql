@@ -298,5 +298,28 @@ CREATE TRIGGER update_rounds_updated_at
 COMMENT ON TABLE public.rounds IS 'Stores stages of the tournament and their corresponding active, upcoming, or ended status.';
 
 -- ====================================================================
+-- 11. APPOINTMENT BOOKINGS TABLE
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.appointments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  interest_type TEXT,
+  message TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and define permissive policies for public insertion and admin reads
+ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public insert for appointments" ON public.appointments;
+DROP POLICY IF EXISTS "Allow admin read for appointments" ON public.appointments;
+
+CREATE POLICY "Allow public insert for appointments" ON public.appointments FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow admin read for appointments" ON public.appointments FOR SELECT USING (true);
+
+-- ====================================================================
 -- SUCCESS: All tables, triggers, and sync systems are fully initialized!
 -- ====================================================================

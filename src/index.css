@@ -2,35 +2,35 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #010C1E;
-  --bg-secondary: #04142B;
-  --bg-tertiary: #121F32;
-  --surface-hover: #1A2740;
-  --primary-blue: #1A6DFF;
-  --dark-blue: #0C48B8;
-  --primary-gold: #F1C317;
-  --bright-gold: #FFD43B;
-  --text-primary: #EEF1F5;
-  --text-secondary: #B2B6C2;
-  --text-muted: #787E90;
-  --glass-bg: rgba(18, 31, 50, 0.85);
-  --glass-border: rgba(26, 109, 255, 0.2);
+  --bg-primary: #01112D;
+  --bg-secondary: #031C44;
+  --bg-tertiary: #052456;
+  --surface-hover: #083272;
+  --primary-blue: #ffcc01;
+  --dark-blue: #e6b800;
+  --primary-gold: #ffcc01;
+  --bright-gold: #ffe066;
+  --text-primary: #ffffff;
+  --text-secondary: #e0e6f0;
+  --text-muted: #8c9cb5;
+  --glass-bg: rgba(1, 17, 45, 0.85);
+  --glass-border: rgba(255, 204, 1, 0.2);
 }
 
 .dark {
-  --bg-primary: #010C1E;
-  --bg-secondary: #04142B;
-  --bg-tertiary: #121F32;
-  --surface-hover: #1A2740;
-  --primary-blue: #1A6DFF;
-  --dark-blue: #0C48B8;
-  --primary-gold: #F1C317;
-  --bright-gold: #FFD43B;
-  --text-primary: #EEF1F5;
-  --text-secondary: #B2B6C2;
-  --text-muted: #787E90;
-  --glass-bg: rgba(18, 31, 50, 0.85);
-  --glass-border: rgba(26, 109, 255, 0.2);
+  --bg-primary: #01112D;
+  --bg-secondary: #031C44;
+  --bg-tertiary: #052456;
+  --surface-hover: #083272;
+  --primary-blue: #ffcc01;
+  --dark-blue: #e6b800;
+  --primary-gold: #ffcc01;
+  --bright-gold: #ffe066;
+  --text-primary: #ffffff;
+  --text-secondary: #e0e6f0;
+  --text-muted: #8c9cb5;
+  --glass-bg: rgba(1, 17, 45, 0.85);
+  --glass-border: rgba(255, 204, 1, 0.2);
 }
 
 @theme {
@@ -47,32 +47,32 @@
   --color-text-muted: var(--text-muted);
 
   /* Overriding Rose to Primary Blue colors to transition components smoothly */
-  --color-rose-300: #1A6DFF;
-  --color-rose-400: #1A6DFF;
-  --color-rose-500: #1A6DFF;
-  --color-rose-600: #0C48B8;
-  --color-rose-700: #0C48B8;
+  --color-rose-300: #ffcc01;
+  --color-rose-400: #ffcc01;
+  --color-rose-500: #ffcc01;
+  --color-rose-600: #e6b800;
+  --color-rose-700: #e6b800;
 
   /* Overriding Red for Errors */
   --color-red-500: #EF4444;
   --color-red-600: #DC2626;
 
   /* Custom palette definitions */
-  --color-primary-blue: #1A6DFF;
-  --color-primary-hover: #4088FF;
-  --color-primary-pressed: #0C48B8;
-  --color-champ-gold: #F1C317;
-  --color-gold-hover: #FFD43B;
-  --color-gold-pressed: #D4A30B;
+  --color-primary-blue: #ffcc01;
+  --color-primary-hover: #ffe066;
+  --color-primary-pressed: #e6b800;
+  --color-champ-gold: #ffcc01;
+  --color-gold-hover: #ffe066;
+  --color-gold-pressed: #e6b800;
   --color-success-green: #22C55E;
-  --color-warning-amber: #F1C317;
+  --color-warning-amber: #ffcc01;
   --color-error-red: #EF4444;
   --color-info-cyan: #06B6D4;
 }
 
 html, body {
-  background-color: #010C1E;
-  color: #EEF1F5;
+  background-color: #01112D;
+  color: #ffffff;
   font-family: "Inter", sans-serif;
   font-size: 14px;
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -83,6 +83,53 @@ h1, h2, h3, h4, h5, h6, .font-heading {
   font-family: "Sora", sans-serif !important;
   font-weight: 700;
   color: #EEF1F5;
+}
+
+/* Custom Premium Typography System for Minu Games Landing Page only */
+
+/* Heading 1 (Hero/Main titles) */
+.main-landing-page h1:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]),
+.main-landing-page .text-slate-950:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]),
+.main-landing-page .text-slate-900:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]) {
+  color: #01112D !important;
+}
+
+/* Heading 2 (Section titles) */
+.main-landing-page h2:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]),
+.main-landing-page .text-slate-800:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]) {
+  color: #0A234A !important;
+}
+
+/* Heading 3 (Subsection titles) */
+.main-landing-page h3:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]):not([class*="text-slate-900"]):not([class*="text-slate-950"]),
+.main-landing-page .text-slate-700:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]) {
+  color: #1E3A63 !important;
+}
+
+/* Heading 4 (Small titles) */
+.main-landing-page h4:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]):not([class*="text-slate-900"]):not([class*="text-slate-950"]):not([class*="text-slate-800"]),
+.main-landing-page h5:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]):not([class*="text-slate-900"]):not([class*="text-slate-950"]):not([class*="text-slate-800"]),
+.main-landing-page h6:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]):not([class*="text-slate-900"]):not([class*="text-slate-950"]):not([class*="text-slate-800"]),
+.main-landing-page .font-heading:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]):not([class*="text-slate-900"]):not([class*="text-slate-950"]):not([class*="text-slate-800"]) {
+  color: #4A5D78 !important;
+}
+
+/* Body 1 (Primary paragraph text) */
+.main-landing-page p:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]):not([class*="text-slate-950"]):not([class*="text-slate-900"]):not([class*="text-slate-800"]):not([class*="text-slate-700"]):not([class*="text-slate-500"]):not([class*="text-slate-400"]):not([class*="text-slate-300"]),
+.main-landing-page .text-slate-600:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]) {
+  color: #4B5563 !important;
+}
+
+/* Body 2 (Secondary text) */
+.main-landing-page .text-slate-500:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]) {
+  color: #6B7280 !important;
+}
+
+/* Body 3 (Small text) */
+.main-landing-page .text-slate-400:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]),
+.main-landing-page .text-slate-300:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]),
+.main-landing-page .text-slate-200:not(.text-transparent):not(.text-white):not([class*="text-amber"]):not([class*="text-yellow"]) {
+  color: #9CA3AF !important;
 }
 
 h1 {
@@ -111,71 +158,71 @@ body, p, span, div, input, button, select, textarea {
 
 /* Attribute Selectors for Old Main Background Hexes to direct to theme colors */
 [class*="bg-[#05101E]"], .bg-\[\#05101E\] {
-  background-color: #010C1E !important;
+  background-color: #01112D !important;
 }
 [class*="bg-[#091A2E]"], .bg-\[\#091A2E\] {
-  background-color: #04142B !important;
+  background-color: #031C44 !important;
 }
 [class*="bg-[#061224]"], .bg-\[\#061224\] {
-  background-color: #121F32 !important;
+  background-color: #052456 !important;
 }
 [class*="bg-[#12243D]"], .bg-\[\#12243D\] {
-  background-color: #121F32 !important;
+  background-color: #052456 !important;
 }
 [class*="bg-[#16304F]"], .bg-\[\#16304F\] {
-  background-color: #1A2740 !important;
+  background-color: #083272 !important;
 }
 
 /* Gold Theme Color Mapping Override */
 [class*="text-[#D4AF37]"], .text-\[\#D4AF37\] {
-  color: #F1C317 !important;
+  color: #ffcc01 !important;
 }
 [class*="bg-[#D4AF37]"], .bg-\[\#D4AF37\] {
-  background-color: #F1C317 !important;
+  background-color: #ffcc01 !important;
 }
 [class*="border-[#D4AF37]"], .border-\[\#D4AF37\] {
-  border-color: #F1C317 !important;
+  border-color: #ffcc01 !important;
 }
 [class*="decoration-[#D4AF37]"], .decoration-\[\#D4AF37\] {
-  text-decoration-color: #F1C317 !important;
+  text-decoration-color: #ffcc01 !important;
 }
 
 /* Opacities for Gold Override */
 [class*="bg-[#D4AF37]/10"] {
-  background-color: rgba(241, 195, 23, 0.1) !important;
+  background-color: rgba(255, 204, 1, 0.1) !important;
 }
 [class*="bg-[#D4AF37]/20"] {
-  background-color: rgba(241, 195, 23, 0.2) !important;
+  background-color: rgba(255, 204, 1, 0.2) !important;
 }
 [class*="bg-[#D4AF37]/25"] {
-  background-color: rgba(241, 195, 23, 0.25) !important;
+  background-color: rgba(255, 204, 1, 0.25) !important;
 }
 [class*="border-[#D4AF37]/15"] {
-  border-color: rgba(241, 195, 23, 0.15) !important;
+  border-color: rgba(255, 204, 1, 0.15) !important;
 }
 [class*="border-[#D4AF37]/20"] {
-  border-color: rgba(241, 195, 23, 0.2) !important;
+  border-color: rgba(255, 204, 1, 0.2) !important;
 }
 [class*="border-[#D4AF37]/25"] {
-  border-color: rgba(241, 195, 23, 0.25) !important;
+  border-color: rgba(255, 204, 1, 0.25) !important;
 }
 [class*="border-[#D4AF37]/30"] {
-  border-color: rgba(241, 195, 23, 0.3) !important;
+  border-color: rgba(255, 204, 1, 0.3) !important;
 }
 [class*="border-[#D4AF37]/35"] {
-  border-color: rgba(241, 195, 23, 0.35) !important;
+  border-color: rgba(255, 204, 1, 0.35) !important;
 }
 [class*="border-[#D4AF37]/45"] {
-  border-color: rgba(241, 195, 23, 0.45) !important;
+  border-color: rgba(255, 204, 1, 0.45) !important;
 }
 [class*="from-[#D4AF37]/10"] {
-  --tw-gradient-from: rgba(241, 195, 23, 0.1) !important;
+  --tw-gradient-from: rgba(255, 204, 1, 0.1) !important;
 }
 [class*="via-[#D4AF37]/20"] {
-  --tw-gradient-via: rgba(241, 195, 23, 0.2) !important;
+  --tw-gradient-via: rgba(255, 204, 1, 0.2) !important;
 }
 [class*="to-[#D4AF37]/10"] {
-  --tw-gradient-to: rgba(241, 195, 23, 0.1) !important;
+  --tw-gradient-to: rgba(255, 204, 1, 0.1) !important;
 }
 
 .glass-panel {
