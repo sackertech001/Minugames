@@ -261,7 +261,7 @@ CREATE POLICY "Allow public delete access for round_of_32" ON public.round_of_32
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS public.rounds (
   stage TEXT PRIMARY KEY, -- e.g. 'Round of 32', 'Round of 16', 'Quarter finals', etc.
-  status TEXT NOT NULL CHECK (status IN ('active', 'upcoming', 'ended')),
+  status TEXT NOT NULL CHECK (status IN ('active', 'not started', 'ended')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -279,20 +279,23 @@ CREATE POLICY "Allow public insert access for rounds" ON public.rounds FOR INSER
 CREATE POLICY "Allow public update access for rounds" ON public.rounds FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public delete access for rounds" ON public.rounds FOR DELETE USING (true);
 
--- Seed initial rounds
+-- Seed initial stages
 INSERT INTO public.rounds (stage, status) VALUES
-  ('Round of 32', 'active'),
-  ('Round of 16', 'upcoming'),
-  ('Quarter finals', 'upcoming'),
-  ('Semi finals', 'upcoming'),
-  ('Final', 'upcoming')
-ON CONFLICT (stage) DO NOTHING;
+  ('Round of 32', 'not started'),
+  ('Round of 16', 'not started'),
+  ('Quarter finals', 'not started'),
+  ('Semi finals', 'not started'),
+  ('Final', 'not started')
+ON CONFLICT (stage) DO UPDATE SET status = EXCLUDED.status;
 
 -- Auto-update updated_at timestamp trigger
-CREATE OR REPLACE TRIGGER update_rounds_updated_at
+DROP TRIGGER IF EXISTS update_rounds_updated_at ON public.rounds;
+CREATE TRIGGER update_rounds_updated_at
   BEFORE UPDATE ON public.rounds
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_updated_at();
+
+COMMENT ON TABLE public.rounds IS 'Stores stages of the tournament and their corresponding active, upcoming, or ended status.';
 
 -- ====================================================================
 -- SUCCESS: All tables, triggers, and sync systems are fully initialized!

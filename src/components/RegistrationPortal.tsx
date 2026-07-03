@@ -17,6 +17,7 @@ interface RegistrationPortalProps {
   applications: PlayerApplication[];
   onApplicationsChange: (apps: PlayerApplication[]) => void;
   config: TournamentConfig;
+  rounds?: Array<{ stage: string; status: 'active' | 'not started' | 'ended' }>;
 }
 
 export default function RegistrationPortal({
@@ -28,6 +29,7 @@ export default function RegistrationPortal({
   applications,
   onApplicationsChange,
   config,
+  rounds = [],
 }: RegistrationPortalProps) {
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
@@ -591,14 +593,23 @@ export default function RegistrationPortal({
                       </button>
                     )}
 
-                    {players.length === playersCount && !isTournamentStarted && (
-                      <button
-                        onClick={onStartTournament}
-                        className="bg-gradient-to-r from-[#F1C317] to-[#FFD43B] hover:from-[#FFD43B] hover:to-[#F1C317] text-[#010C1E] text-xs font-black px-5 py-3 rounded-xl transition-all shadow-lg shadow-[#F1C317]/10 flex items-center gap-1.5 cursor-pointer uppercase tracking-widest animate-pulse hover:scale-[1.01]"
-                      >
-                        <ShieldCheck className="w-4 h-4 fill-current" /> Initialize Tournament Brackets
-                      </button>
-                    )}
+                    {players.length === playersCount && !isTournamentStarted && (() => {
+                      const isInitializeActive = rounds.every(r => r.status !== 'active');
+                      return (
+                        <button
+                          onClick={onStartTournament}
+                          disabled={!isInitializeActive}
+                          className={`text-xs font-black px-5 py-3 rounded-xl transition-all shadow-lg flex items-center gap-1.5 uppercase tracking-widest ${
+                            isInitializeActive
+                              ? "bg-gradient-to-r from-[#F1C317] to-[#FFD43B] hover:from-[#FFD43B] hover:to-[#F1C317] text-[#010C1E] shadow-[#F1C317]/10 animate-pulse hover:scale-[1.01] cursor-pointer"
+                              : "bg-gray-700 text-gray-500 border border-gray-600 cursor-not-allowed opacity-50 font-semibold"
+                          }`}
+                          title={isInitializeActive ? "Initialize tournament brackets" : "Cannot initialize: some rounds are already active"}
+                        >
+                          <ShieldCheck className="w-4 h-4 fill-current" /> Initialize Tournament Brackets
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

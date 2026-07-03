@@ -103,12 +103,20 @@ const safeStorage = {
 export default function App() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [rounds, setRounds] = useState<Array<{ stage: string; status: 'active' | 'not started' | 'ended' }>>([
+    { stage: 'Round of 32', status: 'not started' },
+    { stage: 'Round of 16', status: 'not started' },
+    { stage: 'Quarter finals', status: 'not started' },
+    { stage: 'Semi finals', status: 'not started' },
+    { stage: 'Final', status: 'not started' }
+  ]);
   const [bracketView, setBracketView] = useState<'full' | 'day1' | 'day2' | 'day3'>('full');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'bracket' | 'display' | 'registration' | 'info' | 'settings'>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isTournamentStarted, setIsTournamentStarted] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = safeStorage.getItem('cue_theme');
     return (saved === 'light' || saved === 'dark') ? saved : 'dark';
@@ -941,6 +949,25 @@ export default function App() {
                     return prev;
                   });
                 }
+
+                const { data: dbRounds, error: roundsError } = await supabase
+                  .from('rounds')
+                  .select('*');
+
+                if (!roundsError && dbRounds && dbRounds.length > 0) {
+                  const mappedRounds = dbRounds.map((r: any) => ({
+                    stage: r.stage,
+                    status: r.status as 'active' | 'not started' | 'ended'
+                  }));
+                  const order = ['Round of 32', 'Round of 16', 'Quarter finals', 'Semi finals', 'Final'];
+                  mappedRounds.sort((a, b) => order.indexOf(a.stage) - order.indexOf(b.stage));
+                  setRounds((prev) => {
+                    if (JSON.stringify(prev) !== JSON.stringify(mappedRounds)) {
+                      return mappedRounds;
+                    }
+                    return prev;
+                  });
+                }
               } catch (dbErr) {
                 console.log('[Client Supabase] DB sync notice:', dbErr);
               }
@@ -1113,6 +1140,18 @@ export default function App() {
     // Direct database write to round_of_32 for the initialized bracket matches to ensure complete instant population
     if (supabase) {
       try {
+        // Also update 'Round of 32' to 'active' status in the 'rounds' table
+        const { error: roundUpdateErr } = await supabase
+          .from('rounds')
+          .update({ status: 'active' })
+          .eq('stage', 'Round of 32');
+        if (roundUpdateErr) {
+          console.error('[Supabase rounds initialization] Update error:', roundUpdateErr.message);
+        } else {
+          console.log('[Supabase rounds initialization] Set Round of 32 to active');
+          setRounds(prev => prev.map(r => r.stage === 'Round of 32' ? { ...r, status: 'active' } : r));
+        }
+
         const r32Matches = matchesToSet.filter((m: any) => m.round === 'R32' || m.id.startsWith('M'));
         if (r32Matches.length > 0) {
           // Clear table first to start fresh
@@ -1500,6 +1539,27 @@ export default function App() {
       showToast('Your current role does not have authorization to end the tournament.', 'error');
       return;
     }
+    setShowEndConfirm(true);
+  };
+
+  const handleConfirmEndTournament = () => {
+    setShowEndConfirm(false);
+    const supabase = getSupabase();
+    if (supabase) {
+      supabase
+        .from('rounds')
+        .update({ status: 'not started' })
+        .neq('status', 'not started')
+        .then(({ error }) => {
+          if (error) {
+            console.error('[Supabase rounds termination] Update error:', error.message);
+          } else {
+            console.log('[Supabase rounds termination] Reverted rounds to not started');
+            setRounds(prev => prev.map(r => ({ ...r, status: 'not started' })));
+          }
+        });
+    }
+    setRounds(prev => prev.map(r => ({ ...r, status: 'not started' })));
 
     // Reset players tournament stats
     const resetPlayers = players.map(p => ({
@@ -1966,6 +2026,8 @@ export default function App() {
     );
   }
 
+  const isEndActive = rounds.some(r => r.status !== 'not started');
+
   return (
     <div className="min-h-screen flex bg-bg-primary text-text-primary">
       <Sidebar 
@@ -2076,14 +2138,14 @@ export default function App() {
 
             <button
               onClick={handleEndTournament}
-              disabled={!isTournamentStarted}
+              disabled={!isEndActive}
               id="btn-end-tournament"
               className={`flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 rounded-xl transition-colors uppercase tracking-wider ${
-                isTournamentStarted
+                isEndActive
                   ? "text-amber-500 hover:text-amber-400 bg-amber-500/10 border border-amber-500/20 cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.05)]"
                   : "text-amber-500/40 bg-amber-500/5 border border-amber-500/10 cursor-not-allowed opacity-50"
               }`}
-              title={isTournamentStarted ? "End all active games and revert fixtures to empty" : "No active tournament to end"}
+              title={isEndActive ? "End all active games and revert fixtures to empty" : "No active tournament to end"}
             >
               <StopCircle className="w-3.5 h-3.5" /> End Tournament
             </button>
@@ -2153,6 +2215,7 @@ export default function App() {
               applications={playerApplications}
               onApplicationsChange={handleApplicationsChange}
               config={tournamentConfig}
+              rounds={rounds}
             />
           )}
 
@@ -2248,6 +2311,18 @@ export default function App() {
         variant="danger"
         onConfirm={handleConfirmWipe}
         onCancel={() => setShowWipeConfirm(false)}
+      />
+
+      {/* End Tournament Confirmation Modal Overlay */}
+      <ConfirmModal
+        isOpen={showEndConfirm}
+        title="End Tournament"
+        message="Are you sure you want to end the current tournament? This will reset all active matches, clear live results, and revert players back to an approved but unbracketed state. This action cannot be undone."
+        confirmText="End Tournament"
+        cancelText="Cancel"
+        variant="warning"
+        onConfirm={handleConfirmEndTournament}
+        onCancel={() => setShowEndConfirm(false)}
       />
 
       {/* Toast Notification */}
