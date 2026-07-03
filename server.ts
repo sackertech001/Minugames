@@ -618,7 +618,11 @@ async function startServer() {
                   points2: null,
                   break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
                   break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
-                  frames: [],
+                  frames: [
+                    { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                    { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                    { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                  ],
                   winnerId: m.winner_id || null,
                   loserId: m.winner_id ? (m.winner_id === m.player1_id ? m.player2_id : m.player1_id) : null,
                   status: statusStr as 'scheduled' | 'playing' | 'completed',

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Player, Match, FrameScore, SoccerScore } from '../types';
 import { X, AlertTriangle, Sparkles, Trophy, ArrowRight, Settings, Play } from 'lucide-react';
+import { getSupabase } from '../utils/supabaseClient';
 
 interface MatchScorerModalProps {
   match: Match | null;
@@ -48,6 +49,8 @@ export default function MatchScorerModal({
     secondHalf: { player1Points: 0, player2Points: 0 },
   });
   const [error, setError] = useState('');
+  const [loadingUpdate, setLoadingUpdate] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Find player details
   const p1 = match ? players.find((p) => p.id === match.player1Id) : null;
@@ -57,24 +60,60 @@ export default function MatchScorerModal({
   useEffect(() => {
     if (match) {
       setError('');
+      setSuccessMessage('');
       if (formatType === 'group' && match.soccerScore) {
         setSoccerScores(match.soccerScore);
       } else {
-        // Default to existing frames if present, otherwise default to 3 games
-        const existingFrames = match.frames || [];
-        const count = existingFrames.length > 0 ? existingFrames.length : 3;
-        setGamesCount(count);
+        const fetchLatestScores = async () => {
+          const isR32 = match.round === 'R32' || match.id.startsWith('M');
+          if (isR32) {
+            const supabase = getSupabase();
+            if (supabase) {
+              const matchNum = parseInt(match.id.replace(/\D/g, ''), 10);
+              if (!isNaN(matchNum)) {
+                try {
+                  const { data, error: fetchError } = await supabase
+                    .from('round_of_32')
+                    .select('*')
+                    .eq('match_number', matchNum)
+                    .maybeSingle();
 
-        if (existingFrames.length > 0) {
-          setSetScores([...existingFrames]);
-        } else {
-          // Initialize with default empty scores
-          const initialScores: FrameScore[] = Array.from({ length: count }, () => ({
-            player1Points: 0,
-            player2Points: 0,
-          }));
-          setSetScores(initialScores);
-        }
+                  if (!fetchError && data) {
+                    const fetchedFrames: FrameScore[] = [
+                      { player1Points: Number(data.player1_set1 || 0), player2Points: Number(data.player2_set1 || 0) },
+                      { player1Points: Number(data.player1_set2 || 0), player2Points: Number(data.player2_set2 || 0) },
+                      { player1Points: Number(data.player1_set3 || 0), player2Points: Number(data.player2_set3 || 0) }
+                    ];
+                    setSetScores(fetchedFrames);
+                    setGamesCount(3);
+                    console.log('[MatchScorerModal] Successfully loaded scores from Supabase:', fetchedFrames);
+                    return;
+                  }
+                } catch (err) {
+                  console.error('[MatchScorerModal] Error fetching match scores from Supabase:', err);
+                }
+              }
+            }
+          }
+
+          // Default fallback to existing local frames if present, otherwise default to 3 games
+          const existingFrames = match.frames || [];
+          const count = existingFrames.length > 0 ? existingFrames.length : 3;
+          setGamesCount(count);
+
+          if (existingFrames.length > 0) {
+            setSetScores([...existingFrames]);
+          } else {
+            // Initialize with default empty scores
+            const initialScores: FrameScore[] = Array.from({ length: count }, () => ({
+              player1Points: 0,
+              player2Points: 0,
+            }));
+            setSetScores(initialScores);
+          }
+        };
+
+        fetchLatestScores();
       }
     }
   }, [match?.id, formatType]);
@@ -193,6 +232,86 @@ export default function MatchScorerModal({
     onClose();
   };
 
+  const handleUpdateScore = async () => {
+    if (!match || !isReady) return;
+    setLoadingUpdate(true);
+    setError('');
+    setSuccessMessage('');
+
+    // Compute player scores as "cumulatrion of the players score each set"
+    const player1_score = setScores.reduce((sum, score) => sum + score.player1Points, 0);
+    const player2_score = setScores.reduce((sum, score) => sum + score.player2Points, 0);
+
+    const isR32 = match.round === 'R32' || match.id.startsWith('M');
+
+    if (isR32) {
+      const supabase = getSupabase();
+      if (supabase) {
+        const matchNum = parseInt(match.id.replace(/\D/g, ''), 10);
+        if (!isNaN(matchNum)) {
+          try {
+            const player1_set1 = setScores[0]?.player1Points || 0;
+            const player1_set2 = setScores[1]?.player1Points || 0;
+            const player1_set3 = setScores[2]?.player1Points || 0;
+            const player2_set1 = setScores[0]?.player2Points || 0;
+            const player2_set2 = setScores[1]?.player2Points || 0;
+            const player2_set3 = setScores[2]?.player2Points || 0;
+
+            const { error: dbErr } = await supabase
+              .from('round_of_32')
+              .update({
+                player1_set1,
+                player1_set2,
+                player1_set3,
+                player2_set1,
+                player2_set2,
+                player2_set3,
+                player1_score,
+                player2_score,
+              })
+              .eq('match_number', matchNum);
+
+            if (dbErr) {
+              console.error('[MatchScorerModal] Supabase update error:', dbErr.message);
+              setError(`Database Update Error: ${dbErr.message}`);
+              setLoadingUpdate(false);
+              return;
+            } else {
+              console.log('[MatchScorerModal] Successfully updated scores in Supabase for Match', matchNum);
+            }
+          } catch (err: any) {
+            console.error('[MatchScorerModal] Exception updating scores in Supabase:', err);
+            setError(`Failed to update database: ${err?.message || err}`);
+            setLoadingUpdate(false);
+            return;
+          }
+        }
+      } else {
+        console.warn('[MatchScorerModal] Supabase not configured. Performing local-only update.');
+      }
+    }
+
+    // Call onUpdateLiveScore to sync parent application state in React
+    if (onUpdateLiveScore) {
+      onUpdateLiveScore(
+        match.id,
+        setScores,
+        player1_score,
+        player2_score,
+        player1_score, // points1
+        player2_score  // points2
+      );
+    }
+
+    setSuccessMessage('Scores updated successfully in Database!');
+    setLoadingUpdate(false);
+
+    // Auto clear success message after 3 seconds
+    setTimeout(() => {
+      setSuccessMessage('');
+    }, 3000);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#05101E]/85 backdrop-blur-md">
       <div className="bg-[#091A2E] border border-rose-500/15 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl shadow-black/80 animate-in fade-in zoom-in-95 duration-200 transition-colors">
@@ -283,6 +402,17 @@ export default function MatchScorerModal({
                   <h4 className="text-xs font-sans font-black text-slate-100 mt-3 truncate w-full uppercase tracking-wider">{p2.name}</h4>
                 </div>
               </div>
+
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-2.5 rounded-xl font-sans uppercase tracking-wider text-center">
+                  {error}
+                </div>
+              )}
+              {successMessage && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs px-4 py-2.5 rounded-xl font-sans uppercase tracking-wider text-center">
+                  {successMessage}
+                </div>
+              )}
 
               {/* Start Match Prompt Banner if scheduled */}
               {match.status === 'scheduled' && (
@@ -479,13 +609,24 @@ export default function MatchScorerModal({
                 <Sparkles className="w-4 h-4" /> Auto-Fill Sets
               </button>
 
-              <button
-                type="button"
-                onClick={onClose}
-                className="bg-[#091A2E] hover:bg-[#0D2642] border border-rose-500/15 text-slate-300 hover:text-white font-sans font-black uppercase tracking-wider text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleUpdateScore}
+                  disabled={loadingUpdate || match.status === 'completed'}
+                  className="bg-rose-500 hover:bg-rose-600 disabled:bg-rose-500/50 border border-transparent text-white font-sans font-black uppercase tracking-wider text-xs px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-rose-500/10"
+                >
+                  {loadingUpdate ? 'Updating...' : 'Update Score'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="bg-[#091A2E] hover:bg-[#0D2642] border border-rose-500/15 text-slate-300 hover:text-white font-sans font-black uppercase tracking-wider text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}
