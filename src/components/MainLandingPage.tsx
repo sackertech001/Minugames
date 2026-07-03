@@ -266,7 +266,7 @@ export default function MainLandingPage({ onNavigateToLogin, systemLogo = '', to
               onClick={onNavigateToLogin}
               className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white bg-[#01112D] hover:bg-[#01112D]/90 px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-[0_4px_20px_rgba(1,17,45,0.15)] hover:scale-[1.02] active:scale-[0.98]"
             >
-              Login
+              STAFF LOGIN
             </button>
           </div>
         </div>
