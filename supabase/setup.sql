@@ -799,5 +799,211 @@ INSERT INTO public.semi_finals (
 ON CONFLICT (match_number) DO NOTHING;
 
 -- ====================================================================
+-- 16. CREATE GRAND FINAL TABLE WITH POLICY ACCESSIBILITY
+-- ====================================================================
+DROP TABLE IF EXISTS public.grand_final CASCADE;
+
+CREATE TABLE public.grand_final (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  match_number INT NOT NULL UNIQUE CHECK (match_number = 1),
+  
+  -- Foreign keys referencing profiles table (nullable to allow TBD slots)
+  player1_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  player2_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  
+  -- Fallback names for rendering matches before profiles link or for demo slots
+  player1_name TEXT DEFAULT 'TBD' NOT NULL,
+  player2_name TEXT DEFAULT 'TBD' NOT NULL,
+  
+  -- Match Scores (number of frames won in Snooker)
+  player1_score INT DEFAULT 0,
+  player2_score INT DEFAULT 0,
+  
+  -- Frame points/sets
+  player1_set1 INT DEFAULT 0,
+  player1_set2 INT DEFAULT 0,
+  player1_set3 INT DEFAULT 0,
+  player2_set1 INT DEFAULT 0,
+  player2_set2 INT DEFAULT 0,
+  player2_set3 INT DEFAULT 0,
+
+  -- Snooker specific statistics
+  player1_highest_break INT DEFAULT 0,
+  player2_highest_break INT DEFAULT 0,
+  
+  -- Match standing/outcome
+  winner_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  winner_name TEXT,
+  status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'ongoing', 'completed', 'bye')),
+  
+  -- Logistics & Metadata
+  scheduled_time TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now() + interval '4 days'),
+  table_number INT,
+  referee_name TEXT,
+  tournament_type TEXT DEFAULT 'Snooker',
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and define fully permissive policies for grand_final
+ALTER TABLE public.grand_final ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access for grand_final" ON public.grand_final;
+DROP POLICY IF EXISTS "Allow public insert access for grand_final" ON public.grand_final;
+DROP POLICY IF EXISTS "Allow public update access for grand_final" ON public.grand_final;
+DROP POLICY IF EXISTS "Allow public delete access for grand_final" ON public.grand_final;
+
+CREATE POLICY "Allow public read access for grand_final" ON public.grand_final FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for grand_final" ON public.grand_final FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for grand_final" ON public.grand_final FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for grand_final" ON public.grand_final FOR DELETE USING (true);
+
+-- Auto-update updated_at timestamp trigger
+CREATE OR REPLACE TRIGGER update_grand_final_updated_at
+  BEFORE UPDATE ON public.grand_final
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_updated_at();
+
+COMMENT ON TABLE public.grand_final IS 'Stores the Grand Final match and frames for the championship stage.';
+
+-- SEED DUMMY DATA FOR THE GRAND FINAL MATCH
+INSERT INTO public.grand_final (
+  match_number,
+  player1_id,
+  player2_id,
+  player1_name,
+  player2_name,
+  player1_score,
+  player2_score,
+  player1_highest_break,
+  player2_highest_break,
+  winner_id,
+  winner_name,
+  status,
+  scheduled_time,
+  table_number,
+  referee_name,
+  tournament_type
+) VALUES 
+  (
+    1, 
+    NULL, NULL, 
+    'TBD', 'TBD', 
+    0, 0, 
+    0, 0, 
+    NULL, NULL, 
+    'scheduled', 
+    timezone('utc'::text, now() + interval '4 days'), 
+    1, 
+    'Jan Verhaas', 
+    'Snooker'
+  )
+ON CONFLICT (match_number) DO NOTHING;
+
+-- ====================================================================
+-- 17. CREATE THIRD PLACE TABLE WITH POLICY ACCESSIBILITY
+-- ====================================================================
+DROP TABLE IF EXISTS public.third_place CASCADE;
+
+CREATE TABLE public.third_place (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  match_number INT NOT NULL UNIQUE CHECK (match_number = 1),
+  
+  -- Foreign keys referencing profiles table (nullable to allow TBD slots)
+  player1_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  player2_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  
+  -- Fallback names for rendering matches before profiles link or for demo slots
+  player1_name TEXT DEFAULT 'TBD' NOT NULL,
+  player2_name TEXT DEFAULT 'TBD' NOT NULL,
+  
+  -- Match Scores (number of frames won in Snooker)
+  player1_score INT DEFAULT 0,
+  player2_score INT DEFAULT 0,
+  
+  -- Frame points/sets
+  player1_set1 INT DEFAULT 0,
+  player1_set2 INT DEFAULT 0,
+  player1_set3 INT DEFAULT 0,
+  player2_set1 INT DEFAULT 0,
+  player2_set2 INT DEFAULT 0,
+  player2_set3 INT DEFAULT 0,
+
+  -- Snooker specific statistics
+  player1_highest_break INT DEFAULT 0,
+  player2_highest_break INT DEFAULT 0,
+  
+  -- Match standing/outcome
+  winner_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  winner_name TEXT,
+  status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'ongoing', 'completed', 'bye')),
+  
+  -- Logistics & Metadata
+  scheduled_time TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now() + interval '3 days + 6 hours'),
+  table_number INT,
+  referee_name TEXT,
+  tournament_type TEXT DEFAULT 'Snooker',
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and define fully permissive policies for third_place
+ALTER TABLE public.third_place ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access for third_place" ON public.third_place;
+DROP POLICY IF EXISTS "Allow public insert access for third_place" ON public.third_place;
+DROP POLICY IF EXISTS "Allow public update access for third_place" ON public.third_place;
+DROP POLICY IF EXISTS "Allow public delete access for third_place" ON public.third_place;
+
+CREATE POLICY "Allow public read access for third_place" ON public.third_place FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for third_place" ON public.third_place FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for third_place" ON public.third_place FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for third_place" ON public.third_place FOR DELETE USING (true);
+
+-- Auto-update updated_at timestamp trigger
+CREATE OR REPLACE TRIGGER update_third_place_updated_at
+  BEFORE UPDATE ON public.third_place
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_updated_at();
+
+COMMENT ON TABLE public.third_place IS 'Stores the 3rd place match and frames for the championship stage.';
+
+-- SEED DUMMY DATA FOR THE THIRD PLACE MATCH
+INSERT INTO public.third_place (
+  match_number,
+  player1_id,
+  player2_id,
+  player1_name,
+  player2_name,
+  player1_score,
+  player2_score,
+  player1_highest_break,
+  player2_highest_break,
+  winner_id,
+  winner_name,
+  status,
+  scheduled_time,
+  table_number,
+  referee_name,
+  tournament_type
+) VALUES 
+  (
+    1, 
+    NULL, NULL, 
+    'TBD', 'TBD', 
+    0, 0, 
+    0, 0, 
+    NULL, NULL, 
+    'scheduled', 
+    timezone('utc'::text, now() + interval '3 days + 6 hours'), 
+    2, 
+    'Paul Collier', 
+    'Snooker'
+  )
+ON CONFLICT (match_number) DO NOTHING;
+
+-- ====================================================================
 -- SUCCESS: All tables, triggers, and sync systems are fully initialized!
 -- ====================================================================

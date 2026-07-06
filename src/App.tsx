@@ -408,17 +408,19 @@ export default function App() {
           }
         }
 
-        // 4. Update round_of_32, round_of_16, quarter_finals, and semi_finals tables on bracket start or match update
+        // 4. Update round_of_32, round_of_16, quarter_finals, semi_finals, grand_final, and third_place tables on bracket start or match update
         if (patch.isTournamentStarted === false || (patch.matches && patch.matches.length === 0)) {
           try {
             await Promise.all([
               supabase.from('round_of_32').delete().neq('match_number', 0),
               supabase.from('round_of_16').delete().neq('match_number', 0),
               supabase.from('quarter_finals').delete().neq('match_number', 0),
-              supabase.from('semi_finals').delete().neq('match_number', 0)
+              supabase.from('semi_finals').delete().neq('match_number', 0),
+              supabase.from('grand_final').delete().neq('match_number', 0),
+              supabase.from('third_place').delete().neq('match_number', 0)
             ]);
           } catch (e) {
-            console.log('[Client Supabase R32/R16/QF/SF Reset] Error:', e);
+            console.log('[Client Supabase R32/R16/QF/SF/GF/TP Reset] Error:', e);
           }
         }
 
@@ -657,6 +659,110 @@ export default function App() {
             }
           } catch (err: any) {
             console.log('[Client Supabase semi_finals Sync] General error:', err?.message || err);
+          }
+
+          // Sync Grand Final
+          try {
+            const gfMatches = patch.matches.filter((m: any) => m.id === 'FINAL' || m.round === 'F');
+            if (gfMatches.length > 0) {
+              const rowsToUpsertGF = gfMatches.map((m: any) => {
+                const p1 = currentPlayers.find(p => p.id === m.player1Id);
+                const p2 = currentPlayers.find(p => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: 1,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+                  table_number: m.table_number || 1,
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertGF.length > 0) {
+                const { error: upsertGFErr } = await supabase
+                  .from('grand_final')
+                  .upsert(rowsToUpsertGF, { onConflict: 'match_number' });
+
+                if (upsertGFErr) {
+                  console.log('[Client Supabase grand_final Sync] Upsert notice:', upsertGFErr.message);
+                } else {
+                  console.log('[Client Supabase grand_final Sync] Successfully synced match to grand_final');
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase grand_final Sync] General error:', err?.message || err);
+          }
+
+          // Sync 3rd Place Match
+          try {
+            const tpMatches = patch.matches.filter((m: any) => m.id === '3RD-1' || m.round === '3RD');
+            if (tpMatches.length > 0) {
+              const rowsToUpsertTP = tpMatches.map((m: any) => {
+                const p1 = currentPlayers.find(p => p.id === m.player1Id);
+                const p2 = currentPlayers.find(p => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: 1,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+                  table_number: m.table_number || 2,
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertTP.length > 0) {
+                const { error: upsertTPErr } = await supabase
+                  .from('third_place')
+                  .upsert(rowsToUpsertTP, { onConflict: 'match_number' });
+
+                if (upsertTPErr) {
+                  console.log('[Client Supabase third_place Sync] Upsert notice:', upsertTPErr.message);
+                } else {
+                  console.log('[Client Supabase third_place Sync] Successfully synced match to third_place');
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase third_place Sync] General error:', err?.message || err);
           }
         }
       }
@@ -1167,13 +1273,15 @@ export default function App() {
                   });
                 }
 
-                // Fetch round_of_32, round_of_16, quarter_finals, and semi_finals in parallel to sync matches
+                // Fetch round_of_32, round_of_16, quarter_finals, semi_finals, grand_final, and third_place in parallel to sync matches
                 try {
-                  const [r32Res, r16Res, qfRes, sfRes] = await Promise.all([
+                  const [r32Res, r16Res, qfRes, sfRes, gfRes, tpRes] = await Promise.all([
                     supabase.from('round_of_32').select('*'),
                     supabase.from('round_of_16').select('*'),
                     supabase.from('quarter_finals').select('*'),
-                    supabase.from('semi_finals').select('*')
+                    supabase.from('semi_finals').select('*'),
+                    supabase.from('grand_final').select('*'),
+                    supabase.from('third_place').select('*')
                   ]);
 
                   const dbR32Matches = r32Res.data;
@@ -1184,11 +1292,17 @@ export default function App() {
                   const qfError = qfRes.error;
                   const dbSFMatches = sfRes.data;
                   const sfError = sfRes.error;
+                  const dbGFMatches = gfRes.data;
+                  const gfError = gfRes.error;
+                  const dbTPMatches = tpRes.data;
+                  const tpError = tpRes.error;
 
                   let fetchedR32Mapped: any[] = [];
                   let fetchedR16Mapped: any[] = [];
                   let fetchedQFMapped: any[] = [];
                   let fetchedSFMapped: any[] = [];
+                  let fetchedGFMapped: any[] = [];
+                  let fetchedTPMapped: any[] = [];
 
                   if (!r32Error && dbR32Matches && dbR32Matches.length > 0) {
                     fetchedR32Mapped = dbR32Matches.map((m: any) => {
@@ -1457,7 +1571,150 @@ export default function App() {
                     });
                   }
 
-                  if (fetchedR32Mapped.length > 0 || fetchedR16Mapped.length > 0 || fetchedQFMapped.length > 0 || fetchedSFMapped.length > 0) {
+                  if (!gfError && dbGFMatches && dbGFMatches.length > 0) {
+                    fetchedGFMapped = dbGFMatches.map((m: any) => {
+                      const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                      
+                      const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                        if (!scheduledTimeIso) return "Day 3 - 19:00";
+                        if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                        try {
+                          const d = new Date(scheduledTimeIso);
+                          if (isNaN(d.getTime())) return "Day 3 - 19:00";
+                          
+                          const hh = String(d.getHours()).padStart(2, '0');
+                          const mm = String(d.getMinutes()).padStart(2, '0');
+                          const timeStr = `${hh}:${mm}`;
+
+                          const startStr = config?.dateRange?.split(' to ')[0];
+                          if (startStr) {
+                            const start = new Date(startStr);
+                            if (!isNaN(start.getTime())) {
+                              const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                              const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                              const diffTime = dDay.getTime() - startDay.getTime();
+                              const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                              const dayNum = Math.max(1, diffDays + 1);
+                              return `Day ${dayNum} - ${timeStr}`;
+                            }
+                          }
+                          return `Day 3 - ${timeStr}`;
+                        } catch (e) {
+                          return "Day 3 - 19:00";
+                        }
+                      };
+
+                      const currentPlayersList = [...dbPlayers, ...players.filter(p => !isUUID(p.id))];
+                      const p1ByName = currentPlayersList.find(p => p.name === m.player1_name);
+                      const p2ByName = currentPlayersList.find(p => p.name === m.player2_name);
+                      const winnerByName = m.winner_name ? currentPlayersList.find(p => p.name === m.winner_name) : null;
+
+                      const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                      const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                      const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                      return {
+                        id: 'FINAL',
+                        label: 'Grand Final',
+                        round: 'F' as const,
+                        day: 3,
+                        player1Id: player1Id,
+                        player2Id: player2Id,
+                        score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                        score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                        points1: null,
+                        points2: null,
+                        break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                        break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                        frames: [
+                          { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                          { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                          { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                        ],
+                        winnerId: winnerId,
+                        loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                        status: statusStr as 'scheduled' | 'playing' | 'completed',
+                        scheduledTime: fmtScheduledTime(m.scheduled_time, tournamentConfig)
+                      };
+                    });
+                  }
+
+                  if (!tpError && dbTPMatches && dbTPMatches.length > 0) {
+                    fetchedTPMapped = dbTPMatches.map((m: any) => {
+                      const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                      
+                      const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                        if (!scheduledTimeIso) return "Day 3 - 15:30";
+                        if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                        try {
+                          const d = new Date(scheduledTimeIso);
+                          if (isNaN(d.getTime())) return "Day 3 - 15:30";
+                          
+                          const hh = String(d.getHours()).padStart(2, '0');
+                          const mm = String(d.getMinutes()).padStart(2, '0');
+                          const timeStr = `${hh}:${mm}`;
+
+                          const startStr = config?.dateRange?.split(' to ')[0];
+                          if (startStr) {
+                            const start = new Date(startStr);
+                            if (!isNaN(start.getTime())) {
+                              const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                              const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                              const diffTime = dDay.getTime() - startDay.getTime();
+                              const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                              const dayNum = Math.max(1, diffDays + 1);
+                              return `Day ${dayNum} - ${timeStr}`;
+                            }
+                          }
+                          return `Day 3 - ${timeStr}`;
+                        } catch (e) {
+                          return "Day 3 - 15:30";
+                        }
+                      };
+
+                      const currentPlayersList = [...dbPlayers, ...players.filter(p => !isUUID(p.id))];
+                      const p1ByName = currentPlayersList.find(p => p.name === m.player1_name);
+                      const p2ByName = currentPlayersList.find(p => p.name === m.player2_name);
+                      const winnerByName = m.winner_name ? currentPlayersList.find(p => p.name === m.winner_name) : null;
+
+                      const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                      const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                      const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                      return {
+                        id: '3RD-1',
+                        label: '3rd Place Match',
+                        round: '3RD' as const,
+                        day: 3,
+                        player1Id: player1Id,
+                        player2Id: player2Id,
+                        score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                        score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                        points1: null,
+                        points2: null,
+                        break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                        break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                        frames: [
+                          { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                          { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                          { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                        ],
+                        winnerId: winnerId,
+                        loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                        status: statusStr as 'scheduled' | 'playing' | 'completed',
+                        scheduledTime: fmtScheduledTime(m.scheduled_time, tournamentConfig)
+                      };
+                    });
+                  }
+
+                  if (
+                    fetchedR32Mapped.length > 0 ||
+                    fetchedR16Mapped.length > 0 ||
+                    fetchedQFMapped.length > 0 ||
+                    fetchedSFMapped.length > 0 ||
+                    fetchedGFMapped.length > 0 ||
+                    fetchedTPMapped.length > 0
+                  ) {
                     setMatches((prev) => {
                       let updated = [...prev];
                       if (fetchedR32Mapped.length > 0) {
@@ -1475,6 +1732,14 @@ export default function App() {
                       if (fetchedSFMapped.length > 0) {
                         updated = updated.filter((m: any) => m.round !== 'SF' && !m.id.startsWith('SF-'));
                         updated = [...fetchedSFMapped, ...updated];
+                      }
+                      if (fetchedGFMapped.length > 0) {
+                        updated = updated.filter((m: any) => m.id !== 'FINAL' && m.round !== 'F');
+                        updated = [...fetchedGFMapped, ...updated];
+                      }
+                      if (fetchedTPMapped.length > 0) {
+                        updated = updated.filter((m: any) => m.id !== '3RD-1' && m.round !== '3RD');
+                        updated = [...fetchedTPMapped, ...updated];
                       }
                       if (JSON.stringify(prev) !== JSON.stringify(updated)) {
                         safeStorage.setItem('snooker_matches', JSON.stringify(updated));
@@ -1910,6 +2175,112 @@ export default function App() {
               console.error('[Supabase semi_finals Initial Sync] Insert error:', insertSFErr.message);
             } else {
               console.log('[Supabase semi_finals Initial Sync] Successfully populated semi_finals with initial bracket matches');
+            }
+          }
+        }
+
+        // Initialize grand_final if there are GF matches
+        const gfMatches = matchesToSet.filter((m: any) => m.id === 'FINAL' || m.round === 'F');
+        if (gfMatches.length > 0) {
+          await supabase
+            .from('grand_final')
+            .delete()
+            .neq('match_number', 0);
+
+          const gfRowsToInsert = gfMatches.map((m: any) => {
+            const p1 = activePlayers.find(p => p.id === m.player1Id);
+            const p2 = activePlayers.find(p => p.id === m.player2Id);
+            const p1Name = p1 ? p1.name : 'TBD';
+            const p2Name = p2 ? p2.name : 'TBD';
+
+            return {
+              match_number: 1,
+              player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+              player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+              player1_name: p1Name,
+              player2_name: p2Name,
+              player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+              player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+              player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+              player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+              player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+              player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+              player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+              player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+              player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+              player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+              winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+              winner_name: m.winnerId ? (activePlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+              status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+              scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+              table_number: m.table_number || 1,
+              referee_name: m.referee_name || null,
+              tournament_type: m.tournament_type || 'Snooker'
+            };
+          }).filter(Boolean);
+
+          if (gfRowsToInsert.length > 0) {
+            const { error: insertGFErr } = await supabase
+              .from('grand_final')
+              .insert(gfRowsToInsert);
+
+            if (insertGFErr) {
+              console.error('[Supabase grand_final Initial Sync] Insert error:', insertGFErr.message);
+            } else {
+              console.log('[Supabase grand_final Initial Sync] Successfully populated grand_final with initial match');
+            }
+          }
+        }
+
+        // Initialize third_place if there are TP matches
+        const tpMatches = matchesToSet.filter((m: any) => m.id === '3RD-1' || m.round === '3RD');
+        if (tpMatches.length > 0) {
+          await supabase
+            .from('third_place')
+            .delete()
+            .neq('match_number', 0);
+
+          const tpRowsToInsert = tpMatches.map((m: any) => {
+            const p1 = activePlayers.find(p => p.id === m.player1Id);
+            const p2 = activePlayers.find(p => p.id === m.player2Id);
+            const p1Name = p1 ? p1.name : 'TBD';
+            const p2Name = p2 ? p2.name : 'TBD';
+
+            return {
+              match_number: 1,
+              player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+              player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+              player1_name: p1Name,
+              player2_name: p2Name,
+              player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+              player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+              player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+              player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+              player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+              player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+              player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+              player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+              player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+              player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+              winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+              winner_name: m.winnerId ? (activePlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+              status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+              scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+              table_number: m.table_number || 2,
+              referee_name: m.referee_name || null,
+              tournament_type: m.tournament_type || 'Snooker'
+            };
+          }).filter(Boolean);
+
+          if (tpRowsToInsert.length > 0) {
+            const { error: insertTPErr } = await supabase
+              .from('third_place')
+              .insert(tpRowsToInsert);
+
+            if (insertTPErr) {
+              console.error('[Supabase third_place Initial Sync] Insert error:', insertTPErr.message);
+            } else {
+              console.log('[Supabase third_place Initial Sync] Successfully populated third_place with initial match');
             }
           }
         }

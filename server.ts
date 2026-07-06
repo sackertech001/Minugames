@@ -889,6 +889,170 @@ async function startServer() {
             console.log('[Supabase DB Sync] Error syncing semi_finals:', sfErr);
           }
 
+          // Fetch grand_final from Supabase to sync Grand Final matches
+          try {
+            const { data: dbGFMatches, error: gfError } = await supabase
+              .from('grand_final')
+              .select('*');
+
+            if (!gfError && dbGFMatches && dbGFMatches.length > 0) {
+              const mappedGFMatches = dbGFMatches.map((m: any) => {
+                const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                
+                const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                  if (!scheduledTimeIso) return "Day 3 - 19:00";
+                  if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                  try {
+                    const d = new Date(scheduledTimeIso);
+                    if (isNaN(d.getTime())) return "Day 3 - 19:00";
+                    
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mm = String(d.getMinutes()).padStart(2, '0');
+                    const timeStr = `${hh}:${mm}`;
+
+                    const startStr = config?.dateRange?.split(' to ')[0];
+                    if (startStr) {
+                      const start = new Date(startStr);
+                      if (!isNaN(start.getTime())) {
+                        const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                        const diffTime = dDay.getTime() - startDay.getTime();
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        const dayNum = Math.max(1, diffDays + 1);
+                        return `Day ${dayNum} - ${timeStr}`;
+                      }
+                    }
+                    return `Day 3 - ${timeStr}`;
+                  } catch (e) {
+                    return "Day 3 - 19:00";
+                  }
+                };
+
+                const p1ByName = state.players?.find((p: any) => p.name === m.player1_name);
+                const p2ByName = state.players?.find((p: any) => p.name === m.player2_name);
+                const winnerByName = m.winner_name ? state.players?.find((p: any) => p.name === m.winner_name) : null;
+
+                const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                return {
+                  id: 'FINAL',
+                  label: 'Grand Final',
+                  round: 'F' as const,
+                  day: 3,
+                  player1Id: player1Id,
+                  player2Id: player2Id,
+                  score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                  score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                  points1: null,
+                  points2: null,
+                  break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                  break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                  frames: [
+                    { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                    { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                    { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                  ],
+                  winnerId: winnerId,
+                  loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                  status: statusStr as 'scheduled' | 'playing' | 'completed',
+                  scheduledTime: fmtScheduledTime(m.scheduled_time, state.tournamentConfig)
+                };
+              });
+
+              // Merge mapped grand final matches into existing matches
+              const existingMatchesGF = state.matches || [];
+              const nonGFMatches = existingMatchesGF.filter((m: any) => m.round !== 'F' && m.id !== 'FINAL');
+              state.matches = [...mappedGFMatches, ...nonGFMatches];
+              console.log(`[Supabase DB Sync] Grand Final synced. Total GF matches merged: ${mappedGFMatches.length}`);
+            }
+          } catch (gfErr) {
+            console.log('[Supabase DB Sync] Error syncing grand_final:', gfErr);
+          }
+
+          // Fetch third_place from Supabase to sync 3rd Place matches
+          try {
+            const { data: dbTPMatches, error: tpError } = await supabase
+              .from('third_place')
+              .select('*');
+
+            if (!tpError && dbTPMatches && dbTPMatches.length > 0) {
+              const mappedTPMatches = dbTPMatches.map((m: any) => {
+                const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                
+                const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                  if (!scheduledTimeIso) return "Day 3 - 15:30";
+                  if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                  try {
+                    const d = new Date(scheduledTimeIso);
+                    if (isNaN(d.getTime())) return "Day 3 - 15:30";
+                    
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mm = String(d.getMinutes()).padStart(2, '0');
+                    const timeStr = `${hh}:${mm}`;
+
+                    const startStr = config?.dateRange?.split(' to ')[0];
+                    if (startStr) {
+                      const start = new Date(startStr);
+                      if (!isNaN(start.getTime())) {
+                        const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                        const diffTime = dDay.getTime() - startDay.getTime();
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        const dayNum = Math.max(1, diffDays + 1);
+                        return `Day ${dayNum} - ${timeStr}`;
+                      }
+                    }
+                    return `Day 3 - ${timeStr}`;
+                  } catch (e) {
+                    return "Day 3 - 15:30";
+                  }
+                };
+
+                const p1ByName = state.players?.find((p: any) => p.name === m.player1_name);
+                const p2ByName = state.players?.find((p: any) => p.name === m.player2_name);
+                const winnerByName = m.winner_name ? state.players?.find((p: any) => p.name === m.winner_name) : null;
+
+                const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                return {
+                  id: '3RD-1',
+                  label: '3rd Place Match',
+                  round: '3RD' as const,
+                  day: 3,
+                  player1Id: player1Id,
+                  player2Id: player2Id,
+                  score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                  score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                  points1: null,
+                  points2: null,
+                  break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                  break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                  frames: [
+                    { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                    { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                    { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                  ],
+                  winnerId: winnerId,
+                  loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                  status: statusStr as 'scheduled' | 'playing' | 'completed',
+                  scheduledTime: fmtScheduledTime(m.scheduled_time, state.tournamentConfig)
+                };
+              });
+
+              // Merge mapped 3rd place matches into existing matches
+              const existingMatchesTP = state.matches || [];
+              const nonTPMatches = existingMatchesTP.filter((m: any) => m.round !== '3RD' && m.id !== '3RD-1');
+              state.matches = [...mappedTPMatches, ...nonTPMatches];
+              console.log(`[Supabase DB Sync] 3rd Place synced. Total TP matches merged: ${mappedTPMatches.length}`);
+            }
+          } catch (tpErr) {
+            console.log('[Supabase DB Sync] Error syncing third_place:', tpErr);
+          }
+
           writeState(state);
         }
       })(), 12000, "Supabase connection timed out");
