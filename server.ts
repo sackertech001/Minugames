@@ -640,6 +640,89 @@ async function startServer() {
             console.log('[Supabase DB Sync] Error syncing round_of_32:', r32Err);
           }
 
+          // Fetch round_of_16 from Supabase to sync Round of 16 matches
+          try {
+            const { data: dbR16Matches, error: r16Error } = await supabase
+              .from('round_of_16')
+              .select('*');
+
+            if (!r16Error && dbR16Matches && dbR16Matches.length > 0) {
+              const mappedR16Matches = dbR16Matches.map((m: any) => {
+                const matchNumber = m.match_number;
+                const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                
+                const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                  if (!scheduledTimeIso) return "Day 2 - 10:00";
+                  if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                  try {
+                    const d = new Date(scheduledTimeIso);
+                    if (isNaN(d.getTime())) return "Day 2 - 10:00";
+                    
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mm = String(d.getMinutes()).padStart(2, '0');
+                    const timeStr = `${hh}:${mm}`;
+
+                    const startStr = config?.dateRange?.split(' to ')[0];
+                    if (startStr) {
+                      const start = new Date(startStr);
+                      if (!isNaN(start.getTime())) {
+                        const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                        const diffTime = dDay.getTime() - startDay.getTime();
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        const dayNum = Math.max(1, diffDays + 1);
+                        return `Day ${dayNum} - ${timeStr}`;
+                      }
+                    }
+                    return `Day 2 - ${timeStr}`;
+                  } catch (e) {
+                    return "Day 2 - 10:00";
+                  }
+                };
+
+                const p1ByName = state.players?.find((p: any) => p.name === m.player1_name);
+                const p2ByName = state.players?.find((p: any) => p.name === m.player2_name);
+                const winnerByName = m.winner_name ? state.players?.find((p: any) => p.name === m.winner_name) : null;
+
+                const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                return {
+                  id: `R16-${matchNumber}`,
+                  label: `R16 Match ${matchNumber}`,
+                  round: 'R16' as const,
+                  day: 2,
+                  player1Id: player1Id,
+                  player2Id: player2Id,
+                  score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                  score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                  points1: null,
+                  points2: null,
+                  break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                  break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                  frames: [
+                    { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                    { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                    { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                  ],
+                  winnerId: winnerId,
+                  loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                  status: statusStr as 'scheduled' | 'playing' | 'completed',
+                  scheduledTime: fmtScheduledTime(m.scheduled_time, state.tournamentConfig)
+                };
+              });
+
+              // Merge mapped R16 matches into existing matches
+              const existingMatches = state.matches || [];
+              const nonR16Matches = existingMatches.filter((m: any) => m.round !== 'R16' && !m.id.startsWith('R16-'));
+              state.matches = [...mappedR16Matches, ...nonR16Matches];
+              console.log(`[Supabase DB Sync] Round of 16 synced. Total R16 matches merged: ${mappedR16Matches.length}`);
+            }
+          } catch (r16Err) {
+            console.log('[Supabase DB Sync] Error syncing round_of_16:', r16Err);
+          }
+
           writeState(state);
         }
       })(), 12000, "Supabase connection timed out");

@@ -408,19 +408,21 @@ export default function App() {
           }
         }
 
-        // 4. Update round_of_32 table on bracket start or match update
+        // 4. Update round_of_32 and round_of_16 tables on bracket start or match update
         if (patch.isTournamentStarted === false || (patch.matches && patch.matches.length === 0)) {
           try {
-            await supabase
-              .from('round_of_32')
-              .delete()
-              .neq('match_number', 0);
+            await Promise.all([
+              supabase.from('round_of_32').delete().neq('match_number', 0),
+              supabase.from('round_of_16').delete().neq('match_number', 0)
+            ]);
           } catch (e) {
-            console.log('[Client Supabase round_of_32 Reset] Error:', e);
+            console.log('[Client Supabase R32/R16 Reset] Error:', e);
           }
         }
 
         if (patch.matches && Array.isArray(patch.matches)) {
+          const currentPlayers = patch.players || players;
+          // Sync Round of 32
           try {
             const r32Matches = patch.matches.filter((m: any) => m.round === 'R32' || m.id.startsWith('M'));
             if (r32Matches.length > 0) {
@@ -431,8 +433,8 @@ export default function App() {
                   return null;
                 }
 
-                const p1 = players.find(p => p.id === m.player1Id);
-                const p2 = players.find(p => p.id === m.player2Id);
+                const p1 = currentPlayers.find(p => p.id === m.player1Id);
+                const p2 = currentPlayers.find(p => p.id === m.player2Id);
                 const p1Name = p1 ? p1.name : 'TBD';
                 const p2Name = p2 ? p2.name : 'TBD';
 
@@ -453,7 +455,7 @@ export default function App() {
                   player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
                   player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
                   winner_id: isUUID(m.winnerId) ? m.winnerId : null,
-                  winner_name: m.winnerId ? (players.find(p => p.id === m.winnerId)?.name || null) : null,
+                  winner_name: m.winnerId ? (currentPlayers.find(p => p.id === m.winnerId)?.name || null) : null,
                   status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
                   scheduled_time: safeIsoString(m.scheduledTime, m.day || 1),
                   table_number: m.table_number || matchNumber,
@@ -476,6 +478,65 @@ export default function App() {
             }
           } catch (err: any) {
             console.log('[Client Supabase round_of_32 Sync] General error:', err?.message || err);
+          }
+
+          // Sync Round of 16
+          try {
+            const r16Matches = patch.matches.filter((m: any) => m.round === 'R16' || m.id.startsWith('R16-'));
+            if (r16Matches.length > 0) {
+              const rowsToUpsertR16 = r16Matches.map((m: any) => {
+                const matchNumber = m.id.includes('-') 
+                  ? parseInt(m.id.split('-').pop() || '', 10) 
+                  : parseInt(m.id.replace(/\D/g, ''), 10);
+                if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 8) {
+                  return null;
+                }
+
+                const p1 = currentPlayers.find(p => p.id === m.player1Id);
+                const p2 = currentPlayers.find(p => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: matchNumber,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 2),
+                  table_number: m.table_number || (matchNumber + 16),
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertR16.length > 0) {
+                const { error: upsertR16Err } = await supabase
+                  .from('round_of_16')
+                  .upsert(rowsToUpsertR16, { onConflict: 'match_number' });
+
+                if (upsertR16Err) {
+                  console.log('[Client Supabase round_of_16 Sync] Upsert notice:', upsertR16Err.message);
+                } else {
+                  console.log('[Client Supabase round_of_16 Sync] Successfully synced matches to round_of_16');
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase round_of_16 Sync] General error:', err?.message || err);
           }
         }
       }
@@ -782,6 +843,7 @@ export default function App() {
         if (!apiSucceeded) {
           const supabase = getSupabase();
           if (supabase) {
+            let dbPlayers: any[] = [];
             // Throttle client-side Supabase queries to every 10 seconds to avoid API limits exhaustion
             if (now - lastSupabaseFetchTime >= 10000) {
               lastSupabaseFetchTime = now;
@@ -815,7 +877,6 @@ export default function App() {
                   });
 
                   // Get players from players table in Supabase
-                  let dbPlayers: any[] = [];
                   try {
                     const { data: dbPlayersTable, error: playersFetchError } = await supabase
                       .from('players')
@@ -986,14 +1047,23 @@ export default function App() {
                   });
                 }
 
-                // Fetch round_of_32 from Supabase to sync Round of 32 matches
+                // Fetch round_of_32 and round_of_16 in parallel to sync matches
                 try {
-                  const { data: dbR32Matches, error: r32Error } = await supabase
-                    .from('round_of_32')
-                    .select('*');
+                  const [r32Res, r16Res] = await Promise.all([
+                    supabase.from('round_of_32').select('*'),
+                    supabase.from('round_of_16').select('*')
+                  ]);
+
+                  const dbR32Matches = r32Res.data;
+                  const r32Error = r32Res.error;
+                  const dbR16Matches = r16Res.data;
+                  const r16Error = r16Res.error;
+
+                  let fetchedR32Mapped: any[] = [];
+                  let fetchedR16Mapped: any[] = [];
 
                   if (!r32Error && dbR32Matches && dbR32Matches.length > 0) {
-                    const mappedMatches = dbR32Matches.map((m: any) => {
+                    fetchedR32Mapped = dbR32Matches.map((m: any) => {
                       const matchNumber = m.match_number;
                       const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
                       
@@ -1050,19 +1120,97 @@ export default function App() {
                         scheduledTime: fmtScheduledTime(m.scheduled_time, tournamentConfig)
                       };
                     });
+                  }
 
+                  if (!r16Error && dbR16Matches && dbR16Matches.length > 0) {
+                    fetchedR16Mapped = dbR16Matches.map((m: any) => {
+                      const matchNumber = m.match_number;
+                      const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                      
+                      const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                        if (!scheduledTimeIso) return "Day 2 - 10:00";
+                        if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                        try {
+                          const d = new Date(scheduledTimeIso);
+                          if (isNaN(d.getTime())) return "Day 2 - 10:00";
+                          
+                          const hh = String(d.getHours()).padStart(2, '0');
+                          const mm = String(d.getMinutes()).padStart(2, '0');
+                          const timeStr = `${hh}:${mm}`;
+
+                          const startStr = config?.dateRange?.split(' to ')[0];
+                          if (startStr) {
+                            const start = new Date(startStr);
+                            if (!isNaN(start.getTime())) {
+                              const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                              const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                              const diffTime = dDay.getTime() - startDay.getTime();
+                              const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                              const dayNum = Math.max(1, diffDays + 1);
+                              return `Day ${dayNum} - ${timeStr}`;
+                            }
+                          }
+                          return `Day 2 - ${timeStr}`;
+                        } catch (e) {
+                          return "Day 2 - 10:00";
+                        }
+                      };
+
+                      const currentPlayersList = [...dbPlayers, ...players.filter(p => !isUUID(p.id))];
+                      const p1ByName = currentPlayersList.find(p => p.name === m.player1_name);
+                      const p2ByName = currentPlayersList.find(p => p.name === m.player2_name);
+                      const winnerByName = m.winner_name ? currentPlayersList.find(p => p.name === m.winner_name) : null;
+
+                      const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                      const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                      const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                      return {
+                        id: `R16-${matchNumber}`,
+                        label: `R16 Match ${matchNumber}`,
+                        round: 'R16' as const,
+                        day: 2,
+                        player1Id: player1Id,
+                        player2Id: player2Id,
+                        score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                        score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                        points1: null,
+                        points2: null,
+                        break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                        break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                        frames: [
+                          { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                          { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                          { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                        ],
+                        winnerId: winnerId,
+                        loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                        status: statusStr as 'scheduled' | 'playing' | 'completed',
+                        scheduledTime: fmtScheduledTime(m.scheduled_time, tournamentConfig)
+                      };
+                    });
+                  }
+
+                  if (fetchedR32Mapped.length > 0 || fetchedR16Mapped.length > 0) {
                     setMatches((prev) => {
-                      const nonR32Matches = prev.filter((m: any) => m.round !== 'R32' && !m.id.startsWith('M'));
-                      const mergedMatches = [...mappedMatches, ...nonR32Matches];
-                      if (JSON.stringify(prev) !== JSON.stringify(mergedMatches)) {
-                        safeStorage.setItem('snooker_matches', JSON.stringify(mergedMatches));
-                        return mergedMatches;
+                      let updated = [...prev];
+                      if (fetchedR32Mapped.length > 0) {
+                        updated = updated.filter((m: any) => m.round !== 'R32' && !m.id.startsWith('M'));
+                        updated = [...fetchedR32Mapped, ...updated];
+                      }
+                      if (fetchedR16Mapped.length > 0) {
+                        updated = updated.filter((m: any) => m.round !== 'R16' && !m.id.startsWith('R16-'));
+                        updated = [...fetchedR16Mapped, ...updated];
+                      }
+                      if (JSON.stringify(prev) !== JSON.stringify(updated)) {
+                        safeStorage.setItem('snooker_matches', JSON.stringify(updated));
+                        return updated;
                       }
                       return prev;
                     });
                   }
-                } catch (r32Err) {
-                  console.log('[Client Supabase] round_of_32 fallback sync notice:', r32Err);
+                } catch (parallelErr) {
+                  console.log('[Client Supabase] Parallel round sync error:', parallelErr);
                 }
               } catch (dbErr) {
                 console.log('[Client Supabase] DB sync notice:', dbErr);
@@ -1233,7 +1381,7 @@ export default function App() {
     // Save state to local storage & server (which also triggers the saveStateToServer Supabase sync)
     saveStateToStorage(activePlayers, matchesToSet, true);
 
-    // Direct database write to round_of_32 for the initialized bracket matches to ensure complete instant population
+    // Direct database write to round_of_32 and round_of_16 for the initialized bracket matches to ensure complete instant population
     if (supabase) {
       try {
         // Also update 'Round of 32' to 'active' status in the 'rounds' table
@@ -1248,6 +1396,7 @@ export default function App() {
           setRounds(prev => prev.map(r => r.stage === 'Round of 32' ? { ...r, status: 'active' } : r));
         }
 
+        // Initialize round_of_32 if there are R32 matches
         const r32Matches = matchesToSet.filter((m: any) => m.round === 'R32' || m.id.startsWith('M'));
         if (r32Matches.length > 0) {
           // Clear table first to start fresh
@@ -1307,8 +1456,69 @@ export default function App() {
             }
           }
         }
+
+        // Initialize round_of_16 if there are R16 matches
+        const r16Matches = matchesToSet.filter((m: any) => m.round === 'R16' || m.id.startsWith('R16-'));
+        if (r16Matches.length > 0) {
+          // Clear table first to start fresh
+          await supabase
+            .from('round_of_16')
+            .delete()
+            .neq('match_number', 0);
+
+          const r16RowsToInsert = r16Matches.map((m: any) => {
+            const matchNumber = m.id.includes('-') 
+              ? parseInt(m.id.split('-').pop() || '', 10) 
+              : parseInt(m.id.replace(/\D/g, ''), 10);
+            if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 8) {
+              return null;
+            }
+
+            const p1 = activePlayers.find(p => p.id === m.player1Id);
+            const p2 = activePlayers.find(p => p.id === m.player2Id);
+            const p1Name = p1 ? p1.name : 'TBD';
+            const p2Name = p2 ? p2.name : 'TBD';
+
+            return {
+              match_number: matchNumber,
+              player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+              player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+              player1_name: p1Name,
+              player2_name: p2Name,
+              player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+              player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+              player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+              player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+              player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+              player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+              player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+              player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+              player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+              player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+              winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+              winner_name: m.winnerId ? (activePlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+              status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+              scheduled_time: safeIsoString(m.scheduledTime, m.day || 2),
+              table_number: m.table_number || (matchNumber + 16),
+              referee_name: m.referee_name || null,
+              tournament_type: m.tournament_type || 'Snooker'
+            };
+          }).filter(Boolean);
+
+          if (r16RowsToInsert.length > 0) {
+            const { error: insertR16Err } = await supabase
+              .from('round_of_16')
+              .insert(r16RowsToInsert);
+
+            if (insertR16Err) {
+              console.error('[Supabase round_of_16 Initial Sync] Insert error:', insertR16Err.message);
+            } else {
+              console.log('[Supabase round_of_16 Initial Sync] Successfully populated round_of_16 with initial bracket matches');
+            }
+          }
+        }
       } catch (err: any) {
-        console.error('Error during round_of_32 initial population:', err);
+        console.error('Error during bracket DB initial population:', err);
       }
     }
   };

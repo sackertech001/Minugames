@@ -155,7 +155,6 @@ export default function MatchScorerModal({
       updated.splice(count);
     }
     setSetScores(updated);
-    triggerLiveUpdate(updated);
   };
 
   if (!match) return null;
@@ -195,7 +194,6 @@ export default function MatchScorerModal({
     });
 
     setSetScores(simulatedScores);
-    triggerLiveUpdate(simulatedScores);
   };
 
   // Declare winner of match and proceed
@@ -238,9 +236,13 @@ export default function MatchScorerModal({
     setError('');
     setSuccessMessage('');
 
-    // Compute player scores as "cumulatrion of the players score each set"
-    const player1_score = setScores.reduce((sum, score) => sum + score.player1Points, 0);
-    const player2_score = setScores.reduce((sum, score) => sum + score.player2Points, 0);
+    // Compute player scores as "cumulatrion of the players score each set/period"
+    const player1_score = formatType === 'group'
+      ? (soccerScores.firstHalf.player1Points + soccerScores.secondHalf.player1Points + (soccerScores.extraTime?.player1Points || 0) + (soccerScores.penalties?.player1Points || 0))
+      : setScores.reduce((sum, score) => sum + score.player1Points, 0);
+    const player2_score = formatType === 'group'
+      ? (soccerScores.firstHalf.player2Points + soccerScores.secondHalf.player2Points + (soccerScores.extraTime?.player2Points || 0) + (soccerScores.penalties?.player2Points || 0))
+      : setScores.reduce((sum, score) => sum + score.player2Points, 0);
 
     const isR32 = match.round === 'R32' || match.id.startsWith('M');
 
@@ -299,7 +301,8 @@ export default function MatchScorerModal({
         player1_score,
         player2_score,
         player1_score, // points1
-        player2_score  // points2
+        player2_score, // points2
+        formatType === 'group' ? soccerScores : undefined
       );
     }
 
@@ -482,14 +485,12 @@ export default function MatchScorerModal({
                                const val = Math.max(0, parseInt(e.target.value) || 0);
                                const updated = {...soccerScores, [period]: {...soccerScores[period as keyof SoccerScore], player1Points: val}};
                                setSoccerScores(updated);
-                               triggerLiveUpdate(null, updated);
                              }} className="w-16 text-center font-mono font-bold text-xs rounded-lg py-1 bg-[#091A2E] border border-rose-500/15 text-slate-100 placeholder-slate-600 outline-none transition-all focus:border-rose-500/50"/>
                              <span className="font-black text-rose-500/40 text-xs">:</span>
                              <input type="number" disabled={match.status === 'completed'} value={soccerScores[period as keyof SoccerScore]?.player2Points || ''} onChange={(e) => {
                                const val = Math.max(0, parseInt(e.target.value) || 0);
                                const updated = {...soccerScores, [period]: {...soccerScores[period as keyof SoccerScore], player2Points: val}};
                                setSoccerScores(updated);
-                               triggerLiveUpdate(null, updated);
                              }} className="w-16 text-center font-mono font-bold text-xs rounded-lg py-1 bg-[#091A2E] border border-rose-500/15 text-slate-100 placeholder-slate-600 outline-none transition-all focus:border-rose-500/50"/>
                           </div>
                         </div>
@@ -506,7 +507,6 @@ export default function MatchScorerModal({
                                  const next = [...setScores];
                                  next[idx] = { ...next[idx], player1Points: val };
                                  setSetScores(next);
-                                 triggerLiveUpdate(next);
                                }} className="w-16 text-center font-mono font-bold text-xs rounded-lg py-1.5 bg-[#091A2E] border border-rose-500/15 text-slate-100 placeholder-slate-600 outline-none transition-all focus:border-rose-500/50"/>
                              </div>
                              <span className="font-black text-rose-500/40 text-xs">:</span>
@@ -516,7 +516,6 @@ export default function MatchScorerModal({
                                  const next = [...setScores];
                                  next[idx] = { ...next[idx], player2Points: val };
                                  setSetScores(next);
-                                 triggerLiveUpdate(next);
                                }} className="w-16 text-center font-mono font-bold text-xs rounded-lg py-1.5 bg-[#091A2E] border border-rose-500/15 text-slate-100 placeholder-slate-600 outline-none transition-all focus:border-rose-500/50"/>
                              </div>
                           </div>
