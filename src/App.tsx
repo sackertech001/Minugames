@@ -318,9 +318,105 @@ export default function App() {
             for (const player of patch.players) {
               if (!isUUID(player.id)) continue; // Only process valid UUIDs
 
+              let currentPhotoUrl = player.photoUrl;
+
+              // Handle base64 image replacement and upload on the client
+              if (currentPhotoUrl && currentPhotoUrl.startsWith('data:')) {
+                try {
+                  // Fetch the existing profile to get the old photo url
+                  const { data: existingProfile } = await supabase
+                    .from('profiles')
+                    .select('photo_url')
+                    .eq('id', player.id)
+                    .maybeSingle();
+
+                  const oldPhotoUrl = existingProfile?.photo_url;
+
+                  // Convert base64 to Blob
+                  const base64ToBlobLocal = (base64String: string) => {
+                    const parts = base64String.split(',');
+                    if (parts.length < 2) return null;
+                    const metadata = parts[0];
+                    const base64Data = parts[1];
+                    const contentTypeMatch = metadata.match(/data:([^;]+);/);
+                    const contentType = contentTypeMatch ? contentTypeMatch[1] : 'application/octet-stream';
+                    
+                    let binary: string;
+                    if (metadata.includes('base64')) {
+                      binary = atob(base64Data);
+                    } else {
+                      binary = decodeURIComponent(base64Data);
+                    }
+                    const len = binary.length;
+                    const buffer = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                      buffer[i] = binary.charCodeAt(i);
+                    }
+                    return { blob: new Blob([buffer], { type: contentType }), contentType };
+                  };
+
+                  const fileRes = base64ToBlobLocal(currentPhotoUrl);
+                  if (fileRes) {
+                    const ext = fileRes.contentType.split('/')[1] || 'png';
+                    const fileName = `${player.id}_photo_${Date.now()}.${ext}`;
+                    
+                    const bucketCandidates = [
+                      'player photos',
+                      'player-photos',
+                      'player_photos'
+                    ];
+                    
+                    let uploadedUrl = null;
+                    for (const bucketId of bucketCandidates) {
+                      try {
+                        const fileToUpload = new File([fileRes.blob], fileName, { type: fileRes.contentType });
+                        const { data, error } = await supabase.storage
+                          .from(bucketId)
+                          .upload(fileName, fileToUpload, { contentType: fileRes.contentType, upsert: true });
+
+                        if (!error && data) {
+                          const { data: { publicUrl } } = supabase.storage.from(bucketId).getPublicUrl(fileName);
+                          uploadedUrl = publicUrl;
+                          break;
+                        }
+                      } catch (err) {}
+                    }
+
+                    if (uploadedUrl) {
+                      currentPhotoUrl = uploadedUrl;
+                      player.photoUrl = uploadedUrl; // Update local reference so state stays synchronized
+
+                      // Remove old photo from storage if it existed
+                      if (oldPhotoUrl && oldPhotoUrl.includes('/storage/v1/object/public/')) {
+                        try {
+                          const parts = oldPhotoUrl.split('/');
+                          const oldFilename = parts[parts.length - 1];
+                          if (oldFilename) {
+                            const bucketCandidates = ['player photos', 'player-photos', 'player_photos'];
+                            for (const b of bucketCandidates) {
+                              await supabase.storage.from(b).remove([oldFilename]);
+                            }
+                          }
+                        } catch (delErr) {
+                          console.log('[Client Supabase Storage] Old photo deletion issue:', delErr);
+                        }
+                      }
+                    }
+                  }
+                } catch (photoErr: any) {
+                  console.log(`[Client Supabase Player Photo Sync Error] ${player.id}:`, photoErr?.message || photoErr);
+                }
+              }
+
+              // Update profiles
               const { error: updateError } = await supabase
                 .from('profiles')
                 .update({
+                  full_name: player.name,
+                  nickname: player.nickname || null,
+                  club: player.club || null,
+                  photo_url: currentPhotoUrl || null,
+                  tournament_type: player.tournamentType || null,
                   status: player.status,
                   seed: player.seed,
                   matches_played: player.matchesPlayed,
@@ -330,7 +426,50 @@ export default function App() {
                 })
                 .eq('id', player.id);
               if (updateError) {
-                console.log(`[Client Supabase] Update stats notice for user ${player.id}:`, updateError.message);
+                console.log(`[Client Supabase] Update profile stats notice for user ${player.id}:`, updateError.message);
+              }
+
+              // Update players table
+              try {
+                // Try to update with all possible variants of name, photo_url, and tournament_type
+                const { error: pError1 } = await supabase
+                  .from('players')
+                  .update({
+                    player_name: player.name,
+                    name: player.name,
+                    nickname: player.nickname || null,
+                    club: player.club || null,
+                    photo_url: currentPhotoUrl || null,
+                    photoUrl: currentPhotoUrl || null,
+                    tournament_type: player.tournamentType || null,
+                    tournamentType: player.tournamentType || null,
+                    status: player.status,
+                    seed: player.seed,
+                    matches_played: player.matchesPlayed,
+                    matches_won: player.matchesWon,
+                    total_points: player.totalPoints,
+                    highest_break: player.highestBreak,
+                  })
+                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                if (pError1) {
+                  // Fallback: try with a subset of common columns if there was a column error
+                  await supabase
+                    .from('players')
+                    .update({
+                      player_name: player.name,
+                      nickname: player.nickname || null,
+                      club: player.club || null,
+                      seed: player.seed,
+                      status: player.status,
+                      matches_played: player.matchesPlayed,
+                      matches_won: player.matchesWon,
+                      total_points: player.totalPoints,
+                      highest_break: player.highestBreak,
+                    })
+                    .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                }
+              } catch (pe) {
+                console.log(`[Client Supabase] Update players table error:`, pe);
               }
             }
           } catch (err: any) {
@@ -1185,7 +1324,7 @@ export default function App() {
                         const matchingProfile = dbProfiles.find((profile: any) => profile.id === pt.profile_id || profile.id === pt.id);
                         return {
                           id: pt.profile_id || pt.id || (matchingProfile ? matchingProfile.id : ''),
-                          name: pt.player_name || pt.name || (matchingProfile ? matchingProfile.full_name : 'Tournament Player'),
+                          name: (matchingProfile ? matchingProfile.full_name : '') || pt.player_name || pt.name || 'Tournament Player',
                           nickname: pt.nickname || (matchingProfile ? matchingProfile.nickname : '') || '',
                           club: pt.club || (matchingProfile ? matchingProfile.club : '') || '',
                           seed: pt.seed !== undefined && pt.seed !== null ? Number(pt.seed) : (matchingProfile && matchingProfile.seed !== undefined && matchingProfile.seed !== null ? Number(matchingProfile.seed) : 1),
@@ -1870,7 +2009,7 @@ export default function App() {
             const matchingProfile = dbProfiles?.find((profile: any) => profile.id === pt.profile_id);
             return {
               id: pt.profile_id || pt.id,
-              name: pt.player_name || pt.name || (matchingProfile ? matchingProfile.full_name : 'Tournament Player'),
+              name: (matchingProfile ? matchingProfile.full_name : '') || pt.player_name || pt.name || 'Tournament Player',
               nickname: pt.nickname || (matchingProfile ? matchingProfile.nickname : '') || '',
               club: pt.club || (matchingProfile ? matchingProfile.club : '') || '',
               seed: pt.seed !== undefined && pt.seed !== null ? Number(pt.seed) : (matchingProfile && matchingProfile.seed !== undefined && matchingProfile.seed !== null ? Number(matchingProfile.seed) : 1),

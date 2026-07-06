@@ -219,6 +219,38 @@ CREATE POLICY "Allow public update access for players" ON public.players FOR UPD
 CREATE POLICY "Allow public delete access for players" ON public.players FOR DELETE USING (true);
 
 -- ====================================================================
+-- 8.1 TRIGGER TO PROPAGATE PROFILE UPDATES TO PLAYERS TABLE
+-- ====================================================================
+-- Automatically synchronizes name, nickname, club, photo_url, and tournament_type 
+-- from profiles to the players table when a profile is updated.
+CREATE OR REPLACE FUNCTION public.handle_profile_update()
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.players
+  SET 
+    name = NEW.full_name,
+    player_name = NEW.full_name,
+    nickname = NEW.nickname,
+    club = NEW.club,
+    photo_url = NEW.photo_url,
+    tournament_type = NEW.tournament_type
+  WHERE profile_id = NEW.id;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_profile_updated ON public.profiles;
+CREATE TRIGGER on_profile_updated
+  AFTER UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_profile_update();
+
+-- ====================================================================
 -- 9. DEFINE ROUND OF 32 TABLE
 -- ====================================================================
 -- Re-create round_of_32 table to ensure player columns are flexible TEXT fields, allowing both UUID profiles and string demo player IDs without foreign-key blocks.

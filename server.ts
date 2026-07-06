@@ -483,7 +483,7 @@ async function startServer() {
                 const matchingProfile = dbProfiles.find((profile: any) => profile.id === pt.profile_id || profile.id === pt.id);
                 return {
                   id: pt.profile_id || pt.id || (matchingProfile ? matchingProfile.id : ''),
-                  name: pt.player_name || pt.name || (matchingProfile ? matchingProfile.full_name : 'Tournament Player'),
+                  name: (matchingProfile ? matchingProfile.full_name : '') || pt.player_name || pt.name || 'Tournament Player',
                   nickname: pt.nickname || (matchingProfile ? matchingProfile.nickname : '') || '',
                   club: pt.club || (matchingProfile ? matchingProfile.club : '') || '',
                   seed: pt.seed !== undefined && pt.seed !== null ? Number(pt.seed) : (matchingProfile && matchingProfile.seed !== undefined && matchingProfile.seed !== null ? Number(matchingProfile.seed) : 1),
@@ -1231,10 +1231,63 @@ async function startServer() {
           // Update stats in parallel using Promise.all on both profiles and players tables (only for valid UUIDs)
           const validPlayers = req.body.players.filter((player: any) => isUUID(player.id));
           const updatePromises = validPlayers.map(async (player: any) => {
+            let currentPhotoUrl = player.photoUrl;
+
+            // Handle base64 image replacement and upload
+            if (currentPhotoUrl && currentPhotoUrl.startsWith('data:')) {
+              try {
+                // Fetch the existing profile to get the old photo url
+                const { data: existingProfile } = await supabase
+                  .from('profiles')
+                  .select('photo_url')
+                  .eq('id', player.id)
+                  .maybeSingle();
+
+                const oldPhotoUrl = existingProfile?.photo_url;
+
+                // Upload new photo
+                const uploadedPhotoUrl = await uploadBase64ToSupabase(
+                  supabase,
+                  'player photos',
+                  currentPhotoUrl,
+                  player.id,
+                  'photo'
+                );
+
+                if (uploadedPhotoUrl) {
+                  currentPhotoUrl = uploadedPhotoUrl;
+                  player.photoUrl = uploadedPhotoUrl;
+
+                  // Remove old photo from storage if it existed
+                  if (oldPhotoUrl && oldPhotoUrl.includes('/storage/v1/object/public/')) {
+                    try {
+                      const parts = oldPhotoUrl.split('/');
+                      const oldFilename = parts[parts.length - 1];
+                      if (oldFilename) {
+                        const bucketCandidates = ['player photos', 'player-photos', 'player_photos'];
+                        for (const b of bucketCandidates) {
+                          await supabase.storage.from(b).remove([oldFilename]);
+                        }
+                      }
+                    } catch (delErr) {
+                      console.log('[Supabase Storage] Old photo deletion issue:', delErr);
+                    }
+                  }
+                }
+              } catch (photoErr: any) {
+                console.log(`[Supabase Player Photo Sync Error] ${player.id}:`, photoErr?.message || photoErr);
+              }
+            }
+
             // Update profiles
             const { error: profileErr } = await supabase
               .from('profiles')
               .update({
+                full_name: player.name,
+                nickname: player.nickname || null,
+                club: player.club || null,
+                photo_url: currentPhotoUrl || null,
+                tournament_type: player.tournamentType || null,
                 status: player.status,
                 seed: player.seed,
                 matches_played: player.matchesPlayed,
@@ -1262,7 +1315,7 @@ async function startServer() {
                 name: player.name,
                 nickname: player.nickname,
                 club: player.club,
-                photo_url: player.photoUrl,
+                photo_url: currentPhotoUrl,
                 tournament_type: player.tournamentType
               })
               .eq('profile_id', player.id);
@@ -1282,7 +1335,7 @@ async function startServer() {
                   name: player.name,
                   nickname: player.nickname,
                   club: player.club,
-                  photo_url: player.photoUrl,
+                  photo_url: currentPhotoUrl,
                   tournament_type: player.tournamentType
                 })
                 .eq('id', player.id);

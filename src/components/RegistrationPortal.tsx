@@ -166,13 +166,18 @@ export default function RegistrationPortal({
       return;
     }
 
-    // Check seed duplication
-    const duplicateSeed = players.find(
-      (p) => p.seed === Number(seed) && p.id !== editingPlayerId
-    );
-    if (duplicateSeed) {
-      setError(`Seed #${seed} is already assigned to ${duplicateSeed.name}.`);
-      return;
+    // Check seed duplication only if registering a new player or if seed is being changed
+    const originalPlayer = editingPlayerId ? players.find((p) => p.id === editingPlayerId) : null;
+    const isSeedChanged = !originalPlayer || originalPlayer.seed !== Number(seed);
+
+    if (isSeedChanged) {
+      const duplicateSeed = players.find(
+        (p) => p.seed === Number(seed) && p.id !== editingPlayerId
+      );
+      if (duplicateSeed) {
+        setError(`Seed #${seed} is already assigned to ${duplicateSeed.name}.`);
+        return;
+      }
     }
 
     const finalPhoto = photoDataUrl || generateSnookerAvatar(name, Number(seed) || 5);
@@ -315,13 +320,13 @@ export default function RegistrationPortal({
           </div>
         </div>
 
-        {isTournamentStarted ? (
-          <div className="p-4 bg-[#EF4444]/10 border border-[#EF4444]/25 rounded-2xl flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
+        {isTournamentStarted && !editingPlayerId ? (
+          <div className="p-4 bg-[#1A6DFF]/10 border border-[#1A6DFF]/25 rounded-2xl flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-[#1A6DFF] shrink-0 mt-0.5" />
             <div className="text-left">
-              <span className="text-xs font-black text-[#EF4444] uppercase tracking-wider block">Registration Locked</span>
+              <span className="text-xs font-black text-[#1A6DFF] uppercase tracking-wider block">Registration Closed</span>
               <p className="text-xs text-[#B2B6C2] mt-1 leading-relaxed">
-                The tournament has already started. Roster modifications, seeds assignments, and registrations are disabled during live bracket feeds.
+                The tournament has started, closing new registrations. However, you can still <strong>update contender profiles (portrait, full name, nickname)</strong> by clicking the edit pencil icon on any player in the Active Roster list.
               </p>
             </div>
           </div>
@@ -442,7 +447,12 @@ export default function RegistrationPortal({
                     min="1"
                     max={playersCount}
                     placeholder="e.g. 1"
-                    className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl px-4 py-3 text-sm text-[#EEF1F5] placeholder-[#787E90] outline-none focus:border-[#1A6DFF] transition-colors"
+                    disabled={isTournamentStarted}
+                    className={`w-full bg-[#04142B] border border-[#1A2740] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#1A6DFF] transition-colors ${
+                      isTournamentStarted 
+                        ? 'text-[#787E90] bg-[#04142B]/50 border-[#1A2740]/40 cursor-not-allowed' 
+                        : 'text-[#EEF1F5] placeholder-[#787E90]'
+                    }`}
                   />
                 </div>
               </div>
@@ -700,7 +710,7 @@ export default function RegistrationPortal({
                       </div>
 
                       {/* Hover action tray */}
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                      <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all shrink-0">
                         <button
                           onClick={() => handleEdit(p)}
                           className="p-1.5 hover:bg-[#1A6DFF]/15 text-[#787E90] hover:text-[#1A6DFF] rounded-lg transition-colors cursor-pointer"

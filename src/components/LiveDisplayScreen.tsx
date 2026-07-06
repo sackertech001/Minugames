@@ -21,50 +21,35 @@ const PieChartIcon = () => (
   </svg>
 );
 
-function ShieldBadge({ color, photoUrl, seed }: { color: 'blue' | 'red'; photoUrl?: string; seed?: number }) {
-  const stripeColor = color === 'blue' ? 'bg-cyan-500/80' : 'bg-rose-500/80';
+function PlayerScoreboardAvatar({ color, photoUrl, seed }: { color: 'blue' | 'red'; photoUrl?: string; seed?: number }) {
   const glowColor = color === 'blue' 
-    ? 'shadow-[0_0_20px_rgba(6,182,212,0.35)] border-cyan-400/40' 
-    : 'shadow-[0_0_20px_rgba(244,63,94,0.35)] border-rose-400/40';
+    ? 'shadow-[0_0_25px_rgba(6,182,212,0.4)] border-cyan-400' 
+    : 'shadow-[0_0_25px_rgba(244,63,94,0.4)] border-rose-400';
 
   return (
-    <div className={`relative w-20 h-24 bg-gradient-to-b from-slate-200 via-slate-400 to-slate-600 p-[3px] rounded-b-[40%] rounded-t-lg shrink-0 flex items-center justify-center ${glowColor}`}>
-      <div className="w-full h-full bg-[#05101E] rounded-b-[38%] rounded-t-md overflow-hidden relative flex flex-col justify-center items-center">
-        {/* Striped Background */}
-        <div className="absolute inset-0 flex justify-center gap-1 opacity-30 pointer-events-none">
-          <div className={`w-3.5 h-full ${stripeColor}`} />
-          <div className="w-3.5 h-full bg-slate-300" />
-          <div className={`w-3.5 h-full ${stripeColor}`} />
-          <div className="w-3.5 h-full bg-slate-300" />
-          <div className={`w-3.5 h-full ${stripeColor}`} />
+    <div className="relative shrink-0 select-none">
+      {/* Player Avatar with nice glowing circular ring */}
+      {photoUrl ? (
+        <div className={`w-24 h-24 md:w-28 md:h-28 rounded-full p-[3px] bg-gradient-to-b from-slate-200 to-slate-400 border-2 ${glowColor} flex items-center justify-center overflow-hidden bg-[#05101E]`}>
+          <img 
+            src={photoUrl} 
+            alt="Player avatar" 
+            className="w-full h-full rounded-full object-cover"
+            referrerPolicy="no-referrer"
+          />
         </div>
+      ) : (
+        <div className={`w-24 h-24 md:w-28 md:h-28 rounded-full bg-[#05101E] border-4 ${color === 'blue' ? 'border-cyan-400/40' : 'border-rose-400/40'} ${glowColor} flex items-center justify-center text-3xl font-black text-slate-400`}>
+          ?
+        </div>
+      )}
 
-        {/* Diagonal high contrast sheen overlay */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-black/60 via-transparent to-white/10 pointer-events-none" />
-
-        {/* Player Avatar inside a circular silver rim */}
-        {photoUrl ? (
-          <div className="relative w-12 h-12 rounded-full p-[2px] bg-gradient-to-b from-slate-200 to-slate-400 shadow-md z-10 overflow-hidden">
-            <img 
-              src={photoUrl || null} 
-              alt="Player avatar" 
-              className="w-full h-full rounded-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center z-10 text-xs font-bold text-slate-500">
-            ?
-          </div>
-        )}
-
-        {/* Seed indicator at the bottom */}
-        {seed !== undefined && (
-          <span className="absolute bottom-1 bg-[#091A2E]/90 border border-slate-600 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded text-[#D4AF37] z-10">
-            S{seed}
-          </span>
-        )}
-      </div>
+      {/* Seed indicator at the bottom-center */}
+      {seed !== undefined && (
+        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-[#091A2E]/95 border border-slate-600 text-[9px] md:text-xs font-mono font-bold px-2 py-0.5 rounded-full text-[#D4AF37] shadow-lg z-10 whitespace-nowrap">
+          S{seed}
+        </span>
+      )}
     </div>
   );
 }
@@ -173,7 +158,7 @@ function SportLiveScoreboard({ activeMatch, actP1, actP2 }: SportLiveScoreboardP
               </p>
             )}
           </div>
-          <ShieldBadge color="blue" photoUrl={actP1?.photoUrl} seed={actP1?.seed} />
+          <PlayerScoreboardAvatar color="blue" photoUrl={actP1?.photoUrl} seed={actP1?.seed} />
         </div>
 
         {/* Giant Score Divider */}
@@ -206,7 +191,7 @@ function SportLiveScoreboard({ activeMatch, actP1, actP2 }: SportLiveScoreboardP
               </p>
             )}
           </div>
-          <ShieldBadge color="red" photoUrl={actP2?.photoUrl} seed={actP2?.seed} />
+          <PlayerScoreboardAvatar color="red" photoUrl={actP2?.photoUrl} seed={actP2?.seed} />
         </div>
       </div>
 
