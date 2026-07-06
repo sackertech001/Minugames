@@ -408,15 +408,17 @@ export default function App() {
           }
         }
 
-        // 4. Update round_of_32 and round_of_16 tables on bracket start or match update
+        // 4. Update round_of_32, round_of_16, quarter_finals, and semi_finals tables on bracket start or match update
         if (patch.isTournamentStarted === false || (patch.matches && patch.matches.length === 0)) {
           try {
             await Promise.all([
               supabase.from('round_of_32').delete().neq('match_number', 0),
-              supabase.from('round_of_16').delete().neq('match_number', 0)
+              supabase.from('round_of_16').delete().neq('match_number', 0),
+              supabase.from('quarter_finals').delete().neq('match_number', 0),
+              supabase.from('semi_finals').delete().neq('match_number', 0)
             ]);
           } catch (e) {
-            console.log('[Client Supabase R32/R16 Reset] Error:', e);
+            console.log('[Client Supabase R32/R16/QF/SF Reset] Error:', e);
           }
         }
 
@@ -537,6 +539,124 @@ export default function App() {
             }
           } catch (err: any) {
             console.log('[Client Supabase round_of_16 Sync] General error:', err?.message || err);
+          }
+
+          // Sync Quarter Finals
+          try {
+            const qfMatches = patch.matches.filter((m: any) => m.round === 'QF' || m.id.startsWith('QF-'));
+            if (qfMatches.length > 0) {
+              const rowsToUpsertQF = qfMatches.map((m: any) => {
+                const matchNumber = m.id.includes('-') 
+                  ? parseInt(m.id.split('-').pop() || '', 10) 
+                  : parseInt(m.id.replace(/\D/g, ''), 10);
+                if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 4) {
+                  return null;
+                }
+
+                const p1 = currentPlayers.find(p => p.id === m.player1Id);
+                const p2 = currentPlayers.find(p => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: matchNumber,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 2),
+                  table_number: m.table_number || (matchNumber + 24),
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertQF.length > 0) {
+                const { error: upsertQFErr } = await supabase
+                  .from('quarter_finals')
+                  .upsert(rowsToUpsertQF, { onConflict: 'match_number' });
+
+                if (upsertQFErr) {
+                  console.log('[Client Supabase quarter_finals Sync] Upsert notice:', upsertQFErr.message);
+                } else {
+                  console.log('[Client Supabase quarter_finals Sync] Successfully synced matches to quarter_finals');
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase quarter_finals Sync] General error:', err?.message || err);
+          }
+
+          // Sync Semi Finals
+          try {
+            const sfMatches = patch.matches.filter((m: any) => m.round === 'SF' || m.id.startsWith('SF-'));
+            if (sfMatches.length > 0) {
+              const rowsToUpsertSF = sfMatches.map((m: any) => {
+                const matchNumber = m.id.includes('-') 
+                  ? parseInt(m.id.split('-').pop() || '', 10) 
+                  : parseInt(m.id.replace(/\D/g, ''), 10);
+                if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 2) {
+                  return null;
+                }
+
+                const p1 = currentPlayers.find(p => p.id === m.player1Id);
+                const p2 = currentPlayers.find(p => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: matchNumber,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+                  table_number: m.table_number || (matchNumber + 28),
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertSF.length > 0) {
+                const { error: upsertSFErr } = await supabase
+                  .from('semi_finals')
+                  .upsert(rowsToUpsertSF, { onConflict: 'match_number' });
+
+                if (upsertSFErr) {
+                  console.log('[Client Supabase semi_finals Sync] Upsert notice:', upsertSFErr.message);
+                } else {
+                  console.log('[Client Supabase semi_finals Sync] Successfully synced matches to semi_finals');
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase semi_finals Sync] General error:', err?.message || err);
           }
         }
       }
@@ -1047,20 +1167,28 @@ export default function App() {
                   });
                 }
 
-                // Fetch round_of_32 and round_of_16 in parallel to sync matches
+                // Fetch round_of_32, round_of_16, quarter_finals, and semi_finals in parallel to sync matches
                 try {
-                  const [r32Res, r16Res] = await Promise.all([
+                  const [r32Res, r16Res, qfRes, sfRes] = await Promise.all([
                     supabase.from('round_of_32').select('*'),
-                    supabase.from('round_of_16').select('*')
+                    supabase.from('round_of_16').select('*'),
+                    supabase.from('quarter_finals').select('*'),
+                    supabase.from('semi_finals').select('*')
                   ]);
 
                   const dbR32Matches = r32Res.data;
                   const r32Error = r32Res.error;
                   const dbR16Matches = r16Res.data;
                   const r16Error = r16Res.error;
+                  const dbQFMatches = qfRes.data;
+                  const qfError = qfRes.error;
+                  const dbSFMatches = sfRes.data;
+                  const sfError = sfRes.error;
 
                   let fetchedR32Mapped: any[] = [];
                   let fetchedR16Mapped: any[] = [];
+                  let fetchedQFMapped: any[] = [];
+                  let fetchedSFMapped: any[] = [];
 
                   if (!r32Error && dbR32Matches && dbR32Matches.length > 0) {
                     fetchedR32Mapped = dbR32Matches.map((m: any) => {
@@ -1191,7 +1319,145 @@ export default function App() {
                     });
                   }
 
-                  if (fetchedR32Mapped.length > 0 || fetchedR16Mapped.length > 0) {
+                  if (!qfError && dbQFMatches && dbQFMatches.length > 0) {
+                    fetchedQFMapped = dbQFMatches.map((m: any) => {
+                      const matchNumber = m.match_number;
+                      const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                      
+                      const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                        if (!scheduledTimeIso) return "Day 2 - 14:00";
+                        if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                        try {
+                          const d = new Date(scheduledTimeIso);
+                          if (isNaN(d.getTime())) return "Day 2 - 14:00";
+                          
+                          const hh = String(d.getHours()).padStart(2, '0');
+                          const mm = String(d.getMinutes()).padStart(2, '0');
+                          const timeStr = `${hh}:${mm}`;
+
+                          const startStr = config?.dateRange?.split(' to ')[0];
+                          if (startStr) {
+                            const start = new Date(startStr);
+                            if (!isNaN(start.getTime())) {
+                              const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                              const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                              const diffTime = dDay.getTime() - startDay.getTime();
+                              const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                              const dayNum = Math.max(1, diffDays + 1);
+                              return `Day ${dayNum} - ${timeStr}`;
+                            }
+                          }
+                          return `Day 2 - ${timeStr}`;
+                        } catch (e) {
+                          return "Day 2 - 14:00";
+                        }
+                      };
+
+                      const currentPlayersList = [...dbPlayers, ...players.filter(p => !isUUID(p.id))];
+                      const p1ByName = currentPlayersList.find(p => p.name === m.player1_name);
+                      const p2ByName = currentPlayersList.find(p => p.name === m.player2_name);
+                      const winnerByName = m.winner_name ? currentPlayersList.find(p => p.name === m.winner_name) : null;
+
+                      const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                      const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                      const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                      return {
+                        id: `QF-${matchNumber}`,
+                        label: `QF Match ${matchNumber}`,
+                        round: 'QF' as const,
+                        day: 2,
+                        player1Id: player1Id,
+                        player2Id: player2Id,
+                        score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                        score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                        points1: null,
+                        points2: null,
+                        break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                        break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                        frames: [
+                          { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                          { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                          { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                        ],
+                        winnerId: winnerId,
+                        loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                        status: statusStr as 'scheduled' | 'playing' | 'completed',
+                        scheduledTime: fmtScheduledTime(m.scheduled_time, tournamentConfig)
+                      };
+                    });
+                  }
+
+                  if (!sfError && dbSFMatches && dbSFMatches.length > 0) {
+                    fetchedSFMapped = dbSFMatches.map((m: any) => {
+                      const matchNumber = m.match_number;
+                      const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                      
+                      const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                        if (!scheduledTimeIso) return "Day 3 - 14:00";
+                        if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                        try {
+                          const d = new Date(scheduledTimeIso);
+                          if (isNaN(d.getTime())) return "Day 3 - 14:00";
+                          
+                          const hh = String(d.getHours()).padStart(2, '0');
+                          const mm = String(d.getMinutes()).padStart(2, '0');
+                          const timeStr = `${hh}:${mm}`;
+
+                          const startStr = config?.dateRange?.split(' to ')[0];
+                          if (startStr) {
+                            const start = new Date(startStr);
+                            if (!isNaN(start.getTime())) {
+                              const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                              const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                              const diffTime = dDay.getTime() - startDay.getTime();
+                              const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                              const dayNum = Math.max(1, diffDays + 1);
+                              return `Day ${dayNum} - ${timeStr}`;
+                            }
+                          }
+                          return `Day 3 - ${timeStr}`;
+                        } catch (e) {
+                          return "Day 3 - 14:00";
+                        }
+                      };
+
+                      const currentPlayersList = [...dbPlayers, ...players.filter(p => !isUUID(p.id))];
+                      const p1ByName = currentPlayersList.find(p => p.name === m.player1_name);
+                      const p2ByName = currentPlayersList.find(p => p.name === m.player2_name);
+                      const winnerByName = m.winner_name ? currentPlayersList.find(p => p.name === m.winner_name) : null;
+
+                      const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                      const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                      const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                      return {
+                        id: `SF-${matchNumber}`,
+                        label: `SF Match ${matchNumber}`,
+                        round: 'SF' as const,
+                        day: 3,
+                        player1Id: player1Id,
+                        player2Id: player2Id,
+                        score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                        score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                        points1: null,
+                        points2: null,
+                        break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                        break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                        frames: [
+                          { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                          { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                          { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                        ],
+                        winnerId: winnerId,
+                        loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                        status: statusStr as 'scheduled' | 'playing' | 'completed',
+                        scheduledTime: fmtScheduledTime(m.scheduled_time, tournamentConfig)
+                      };
+                    });
+                  }
+
+                  if (fetchedR32Mapped.length > 0 || fetchedR16Mapped.length > 0 || fetchedQFMapped.length > 0 || fetchedSFMapped.length > 0) {
                     setMatches((prev) => {
                       let updated = [...prev];
                       if (fetchedR32Mapped.length > 0) {
@@ -1201,6 +1467,14 @@ export default function App() {
                       if (fetchedR16Mapped.length > 0) {
                         updated = updated.filter((m: any) => m.round !== 'R16' && !m.id.startsWith('R16-'));
                         updated = [...fetchedR16Mapped, ...updated];
+                      }
+                      if (fetchedQFMapped.length > 0) {
+                        updated = updated.filter((m: any) => m.round !== 'QF' && !m.id.startsWith('QF-'));
+                        updated = [...fetchedQFMapped, ...updated];
+                      }
+                      if (fetchedSFMapped.length > 0) {
+                        updated = updated.filter((m: any) => m.round !== 'SF' && !m.id.startsWith('SF-'));
+                        updated = [...fetchedSFMapped, ...updated];
                       }
                       if (JSON.stringify(prev) !== JSON.stringify(updated)) {
                         safeStorage.setItem('snooker_matches', JSON.stringify(updated));
@@ -1514,6 +1788,128 @@ export default function App() {
               console.error('[Supabase round_of_16 Initial Sync] Insert error:', insertR16Err.message);
             } else {
               console.log('[Supabase round_of_16 Initial Sync] Successfully populated round_of_16 with initial bracket matches');
+            }
+          }
+        }
+
+        // Initialize quarter_finals if there are QF matches
+        const qfMatches = matchesToSet.filter((m: any) => m.round === 'QF' || m.id.startsWith('QF-'));
+        if (qfMatches.length > 0) {
+          // Clear table first to start fresh
+          await supabase
+            .from('quarter_finals')
+            .delete()
+            .neq('match_number', 0);
+
+          const qfRowsToInsert = qfMatches.map((m: any) => {
+            const matchNumber = m.id.includes('-') 
+              ? parseInt(m.id.split('-').pop() || '', 10) 
+              : parseInt(m.id.replace(/\D/g, ''), 10);
+            if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 4) {
+              return null;
+            }
+
+            const p1 = activePlayers.find(p => p.id === m.player1Id);
+            const p2 = activePlayers.find(p => p.id === m.player2Id);
+            const p1Name = p1 ? p1.name : 'TBD';
+            const p2Name = p2 ? p2.name : 'TBD';
+
+            return {
+              match_number: matchNumber,
+              player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+              player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+              player1_name: p1Name,
+              player2_name: p2Name,
+              player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+              player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+              player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+              player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+              player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+              player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+              player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+              player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+              player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+              player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+              winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+              winner_name: m.winnerId ? (activePlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+              status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+              scheduled_time: safeIsoString(m.scheduledTime, m.day || 2),
+              table_number: m.table_number || (matchNumber + 24),
+              referee_name: m.referee_name || null,
+              tournament_type: m.tournament_type || 'Snooker'
+            };
+          }).filter(Boolean);
+
+          if (qfRowsToInsert.length > 0) {
+            const { error: insertQFErr } = await supabase
+              .from('quarter_finals')
+              .insert(qfRowsToInsert);
+
+            if (insertQFErr) {
+              console.error('[Supabase quarter_finals Initial Sync] Insert error:', insertQFErr.message);
+            } else {
+              console.log('[Supabase quarter_finals Initial Sync] Successfully populated quarter_finals with initial bracket matches');
+            }
+          }
+        }
+
+        // Initialize semi_finals if there are SF matches
+        const sfMatches = matchesToSet.filter((m: any) => m.round === 'SF' || m.id.startsWith('SF-'));
+        if (sfMatches.length > 0) {
+          // Clear table first to start fresh
+          await supabase
+            .from('semi_finals')
+            .delete()
+            .neq('match_number', 0);
+
+          const sfRowsToInsert = sfMatches.map((m: any) => {
+            const matchNumber = m.id.includes('-') 
+              ? parseInt(m.id.split('-').pop() || '', 10) 
+              : parseInt(m.id.replace(/\D/g, ''), 10);
+            if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 2) {
+              return null;
+            }
+
+            const p1 = activePlayers.find(p => p.id === m.player1Id);
+            const p2 = activePlayers.find(p => p.id === m.player2Id);
+            const p1Name = p1 ? p1.name : 'TBD';
+            const p2Name = p2 ? p2.name : 'TBD';
+
+            return {
+              match_number: matchNumber,
+              player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+              player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+              player1_name: p1Name,
+              player2_name: p2Name,
+              player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+              player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+              player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+              player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+              player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+              player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+              player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+              player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+              player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+              player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+              winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+              winner_name: m.winnerId ? (activePlayers.find(p => p.id === m.winnerId)?.name || null) : null,
+              status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+              scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+              table_number: m.table_number || (matchNumber + 28),
+              referee_name: m.referee_name || null,
+              tournament_type: m.tournament_type || 'Snooker'
+            };
+          }).filter(Boolean);
+
+          if (sfRowsToInsert.length > 0) {
+            const { error: insertSFErr } = await supabase
+              .from('semi_finals')
+              .insert(sfRowsToInsert);
+
+            if (insertSFErr) {
+              console.error('[Supabase semi_finals Initial Sync] Insert error:', insertSFErr.message);
+            } else {
+              console.log('[Supabase semi_finals Initial Sync] Successfully populated semi_finals with initial bracket matches');
             }
           }
         }

@@ -723,6 +723,172 @@ async function startServer() {
             console.log('[Supabase DB Sync] Error syncing round_of_16:', r16Err);
           }
 
+          // Fetch quarter_finals from Supabase to sync Quarter Finals matches
+          try {
+            const { data: dbQFMatches, error: qfError } = await supabase
+              .from('quarter_finals')
+              .select('*');
+
+            if (!qfError && dbQFMatches && dbQFMatches.length > 0) {
+              const mappedQFMatches = dbQFMatches.map((m: any) => {
+                const matchNumber = m.match_number;
+                const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                
+                const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                  if (!scheduledTimeIso) return "Day 2 - 14:00";
+                  if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                  try {
+                    const d = new Date(scheduledTimeIso);
+                    if (isNaN(d.getTime())) return "Day 2 - 14:00";
+                    
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mm = String(d.getMinutes()).padStart(2, '0');
+                    const timeStr = `${hh}:${mm}`;
+
+                    const startStr = config?.dateRange?.split(' to ')[0];
+                    if (startStr) {
+                      const start = new Date(startStr);
+                      if (!isNaN(start.getTime())) {
+                        const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                        const diffTime = dDay.getTime() - startDay.getTime();
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        const dayNum = Math.max(1, diffDays + 1);
+                        return `Day ${dayNum} - ${timeStr}`;
+                      }
+                    }
+                    return `Day 2 - ${timeStr}`;
+                  } catch (e) {
+                    return "Day 2 - 14:00";
+                  }
+                };
+
+                const p1ByName = state.players?.find((p: any) => p.name === m.player1_name);
+                const p2ByName = state.players?.find((p: any) => p.name === m.player2_name);
+                const winnerByName = m.winner_name ? state.players?.find((p: any) => p.name === m.winner_name) : null;
+
+                const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                return {
+                  id: `QF-${matchNumber}`,
+                  label: `QF Match ${matchNumber}`,
+                  round: 'QF' as const,
+                  day: 2,
+                  player1Id: player1Id,
+                  player2Id: player2Id,
+                  score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                  score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                  points1: null,
+                  points2: null,
+                  break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                  break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                  frames: [
+                    { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                    { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                    { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                  ],
+                  winnerId: winnerId,
+                  loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                  status: statusStr as 'scheduled' | 'playing' | 'completed',
+                  scheduledTime: fmtScheduledTime(m.scheduled_time, state.tournamentConfig)
+                };
+              });
+
+              // Merge mapped QF matches into existing matches
+              const existingMatchesQF = state.matches || [];
+              const nonQFMatches = existingMatchesQF.filter((m: any) => m.round !== 'QF' && !m.id.startsWith('QF-'));
+              state.matches = [...mappedQFMatches, ...nonQFMatches];
+              console.log(`[Supabase DB Sync] Quarter Finals synced. Total QF matches merged: ${mappedQFMatches.length}`);
+            }
+          } catch (qfErr) {
+            console.log('[Supabase DB Sync] Error syncing quarter_finals:', qfErr);
+          }
+
+          // Fetch semi_finals from Supabase to sync Semi Finals matches
+          try {
+            const { data: dbSFMatches, error: sfError } = await supabase
+              .from('semi_finals')
+              .select('*');
+
+            if (!sfError && dbSFMatches && dbSFMatches.length > 0) {
+              const mappedSFMatches = dbSFMatches.map((m: any) => {
+                const matchNumber = m.match_number;
+                const statusStr = m.status === 'ongoing' ? 'playing' : (m.status === 'completed' ? 'completed' : 'scheduled');
+                
+                const fmtScheduledTime = (scheduledTimeIso: string, config: any) => {
+                  if (!scheduledTimeIso) return "Day 3 - 14:00";
+                  if (scheduledTimeIso.includes(' - ')) return scheduledTimeIso;
+                  try {
+                    const d = new Date(scheduledTimeIso);
+                    if (isNaN(d.getTime())) return "Day 3 - 14:00";
+                    
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mm = String(d.getMinutes()).padStart(2, '0');
+                    const timeStr = `${hh}:${mm}`;
+
+                    const startStr = config?.dateRange?.split(' to ')[0];
+                    if (startStr) {
+                      const start = new Date(startStr);
+                      if (!isNaN(start.getTime())) {
+                        const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                        const diffTime = dDay.getTime() - startDay.getTime();
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        const dayNum = Math.max(1, diffDays + 1);
+                        return `Day ${dayNum} - ${timeStr}`;
+                      }
+                    }
+                    return `Day 3 - ${timeStr}`;
+                  } catch (e) {
+                    return "Day 3 - 14:00";
+                  }
+                };
+
+                const p1ByName = state.players?.find((p: any) => p.name === m.player1_name);
+                const p2ByName = state.players?.find((p: any) => p.name === m.player2_name);
+                const winnerByName = m.winner_name ? state.players?.find((p: any) => p.name === m.winner_name) : null;
+
+                const player1Id = m.player1_id || (p1ByName ? p1ByName.id : null);
+                const player2Id = m.player2_id || (p2ByName ? p2ByName.id : null);
+                const winnerId = m.winner_id || (winnerByName ? winnerByName.id : null);
+
+                return {
+                  id: `SF-${matchNumber}`,
+                  label: `SF Match ${matchNumber}`,
+                  round: 'SF' as const,
+                  day: 3,
+                  player1Id: player1Id,
+                  player2Id: player2Id,
+                  score1: m.player1_score !== null && m.player1_score !== undefined ? Number(m.player1_score) : null,
+                  score2: m.player2_score !== null && m.player2_score !== undefined ? Number(m.player2_score) : null,
+                  points1: null,
+                  points2: null,
+                  break1: m.player1_highest_break !== null && m.player1_highest_break !== undefined ? Number(m.player1_highest_break) : null,
+                  break2: m.player2_highest_break !== null && m.player2_highest_break !== undefined ? Number(m.player2_highest_break) : null,
+                  frames: [
+                    { player1Points: Number(m.player1_set1 || 0), player2Points: Number(m.player2_set1 || 0) },
+                    { player1Points: Number(m.player1_set2 || 0), player2Points: Number(m.player2_set2 || 0) },
+                    { player1Points: Number(m.player1_set3 || 0), player2Points: Number(m.player2_set3 || 0) }
+                  ],
+                  winnerId: winnerId,
+                  loserId: winnerId ? (winnerId === player1Id ? player2Id : player1Id) : null,
+                  status: statusStr as 'scheduled' | 'playing' | 'completed',
+                  scheduledTime: fmtScheduledTime(m.scheduled_time, state.tournamentConfig)
+                };
+              });
+
+              // Merge mapped SF matches into existing matches
+              const existingMatchesSF = state.matches || [];
+              const nonSFMatches = existingMatchesSF.filter((m: any) => m.round !== 'SF' && !m.id.startsWith('SF-'));
+              state.matches = [...mappedSFMatches, ...nonSFMatches];
+              console.log(`[Supabase DB Sync] Semi Finals synced. Total SF matches merged: ${mappedSFMatches.length}`);
+            }
+          } catch (sfErr) {
+            console.log('[Supabase DB Sync] Error syncing semi_finals:', sfErr);
+          }
+
           writeState(state);
         }
       })(), 12000, "Supabase connection timed out");
