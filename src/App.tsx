@@ -477,6 +477,35 @@ export default function App() {
           }
         }
 
+        if (patch.wipeBoard) {
+          try {
+            console.log('[Client Supabase] Wipe Board action. Deleting players and resetting profiles status and seed...');
+            
+            // 1. Delete all rows from players table
+            const { error: deletePlayersErr } = await supabase
+              .from('players')
+              .delete()
+              .neq('id', '00000000-0000-0000-0000-000000000000');
+            if (deletePlayersErr) {
+              console.log('[Client Supabase] Wipe Board delete players notice:', deletePlayersErr.message);
+            }
+
+            // 2. Update profiles table status back to pending and seed back to null
+            const { error: resetProfilesErr } = await supabase
+              .from('profiles')
+              .update({
+                status: 'pending',
+                seed: null
+              })
+              .neq('id', '00000000-0000-0000-0000-000000000000');
+            if (resetProfilesErr) {
+              console.log('[Client Supabase] Wipe Board reset profiles notice:', resetProfilesErr.message);
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase] Wipe Board error:', err?.message || err);
+          }
+        }
+
         if (patch.wipePlayersAndAuthUsers) {
           try {
             const { data: dbProfiles, error: fetchErr } = await supabase
@@ -1934,11 +1963,12 @@ export default function App() {
   const saveStateToStorage = (
     newPlayers: Player[],
     newMatches: Match[],
-    started: boolean
+    started: boolean,
+    options?: { wipeBoard?: boolean }
   ) => {
     safeStorage.setItem('snooker_matches', JSON.stringify(newMatches));
     safeStorage.setItem('snooker_started', JSON.stringify(started));
-    saveStateToServer({ players: newPlayers, matches: newMatches, isTournamentStarted: started });
+    saveStateToServer({ players: newPlayers, matches: newMatches, isTournamentStarted: started, wipeBoard: options?.wipeBoard });
   };
 
   // RBAC Action handlers
@@ -2908,7 +2938,11 @@ export default function App() {
 
   const handlePlayersChange = (newPlayers: Player[]) => {
     setPlayers(newPlayers);
-    saveStateToStorage(newPlayers, matches, isTournamentStarted);
+    if (newPlayers.length === 0) {
+      saveStateToStorage(newPlayers, matches, isTournamentStarted, { wipeBoard: true });
+    } else {
+      saveStateToStorage(newPlayers, matches, isTournamentStarted);
+    }
   };
 
   const handleApplicationsChange = (newApps: PlayerApplication[]) => {

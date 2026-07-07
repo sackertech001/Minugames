@@ -7,6 +7,7 @@ import {
 import { getDemoPlayers } from '../utils/demoData';
 import { generateSnookerAvatar } from '../utils/avatar';
 import ConfirmModal from './ConfirmModal';
+import { getSupabase } from '../utils/supabaseClient';
 
 interface RegistrationPortalProps {
   players: Player[];
@@ -48,6 +49,8 @@ export default function RegistrationPortal({
   // Sub-tabs and Application states
   const [activeSubTab, setActiveSubTab] = useState<'roster' | 'applications'>('roster');
   const [tournamentType, setTournamentType] = useState(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
+  
+  const pendingApplications = applications.filter(a => a.status === 'pending');
 
   React.useEffect(() => {
     setTournamentType(config.selectedTournamentType || config.tournamentTypes?.[0] || 'Snooker');
@@ -60,8 +63,49 @@ export default function RegistrationPortal({
 
   // Search and filter states for Applications list
   const [appSearch, setAppSearch] = useState('');
-  const [appFilter, setAppFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [appFilter, setAppFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [selectedSeeds, setSelectedSeeds] = useState<Record<string, number>>({});
+  const [profileSeeds, setProfileSeeds] = useState<number[]>([]);
+  const [seedingMode, setSeedingMode] = useState<'random' | 'serial'>('random');
+  const [hasApprovedInDb, setHasApprovedInDb] = useState(false);
+
+  const playersLength = players.length;
+  const appsLength = applications.length;
+
+  React.useEffect(() => {
+    const fetchProfileSeedsAndApprovedStatus = async () => {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('seed, status');
+          if (!error && data) {
+            const seeds = data
+              .map((p: any) => p.seed)
+              .filter((s: any) => s !== null && s !== undefined && typeof s === 'number');
+            setProfileSeeds(seeds);
+
+            const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+            const hasApprovedProfile = data.some((p: any) => approvedStatuses.includes(p.status));
+            if (hasApprovedProfile) {
+              setHasApprovedInDb(true);
+            } else {
+              const { count, error: countError } = await supabase
+                .from('players')
+                .select('*', { count: 'exact', head: true });
+              if (!countError && count !== null) {
+                setHasApprovedInDb(count > 0);
+              }
+            }
+          }
+        } catch (err) {
+          console.log('[RegistrationPortal] Error fetching profile seeds / approved status:', err);
+        }
+      }
+    };
+    fetchProfileSeedsAndApprovedStatus();
+  }, [playersLength, appsLength]);
 
   // Find next available seed
   const getNextAvailableSeed = (): number => {
@@ -252,6 +296,43 @@ export default function RegistrationPortal({
   const handleConfirmDelete = () => {
     if (playerToDelete) {
       onPlayersChange(players.filter((p) => p.id !== playerToDelete));
+      
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(playerToDelete);
+      if (isUuid) {
+        // Direct Supabase update for immediate, rock-solid consistency
+        const supabase = getSupabase();
+        if (supabase) {
+          // Update profile status to pending and seed to null
+          supabase
+            .from('profiles')
+            .update({ status: 'pending', seed: null })
+            .eq('id', playerToDelete)
+            .then(({ error: err }) => {
+              if (err) console.log('[RegistrationPortal] Supabase direct status/seed update error on delete:', err.message);
+            });
+
+          // Delete from players table
+          supabase
+            .from('players')
+            .delete()
+            .or(`profile_id.eq.${playerToDelete},id.eq.${playerToDelete}`)
+            .then(({ error: err }) => {
+              if (err) console.log('[RegistrationPortal] Supabase direct players deletion error:', err.message);
+            });
+        }
+
+        // Also update local application status back to pending so it instantly reflects in applications tab
+        if (onApplicationsChange && applications) {
+          const updated = applications.map((a) => {
+            if (a.id === playerToDelete) {
+              return { ...a, status: 'pending' as const };
+            }
+            return a;
+          });
+          onApplicationsChange(updated);
+        }
+      }
+
       setPlayerToDelete(null);
       if (editingPlayerId === playerToDelete) {
         setEditingPlayerId(null);
@@ -266,10 +347,28 @@ export default function RegistrationPortal({
 
   // Helper for available seeds calculation
   const getAvailableSeeds = (): number[] => {
-    const registeredSeeds = players.map((p) => p.seed);
+    const counts: Record<number, number> = {};
+    for (let s = 1; s <= 32; s++) {
+      counts[s] = 0;
+    }
+
+    if (profileSeeds.length > 0) {
+      profileSeeds.forEach((s) => {
+        if (counts[s] !== undefined) {
+          counts[s]++;
+        }
+      });
+    } else {
+      players.forEach((p) => {
+        if (p.seed && counts[p.seed] !== undefined) {
+          counts[p.seed]++;
+        }
+      });
+    }
+
     const available: number[] = [];
-    for (let s = 1; s <= playersCount; s++) {
-      if (!registeredSeeds.includes(s)) {
+    for (let s = 1; s <= 32; s++) {
+      if (counts[s] < 1) { // Strictly 1 player per seed
         available.push(s);
       }
     }
@@ -524,12 +623,7 @@ export default function RegistrationPortal({
                 : 'border-transparent text-[#787E90] hover:text-[#EEF1F5]'
             }`}
           >
-            <FileText className="w-4 h-4" /> Applications ({applications.length})
-            {applications.filter(a => a.status === 'pending').length > 0 && (
-              <span className="bg-[#EF4444] text-white font-sans text-[9px] font-black px-1.5 py-0.5 rounded-full ml-1 animate-pulse">
-                {applications.filter(a => a.status === 'pending').length}
-              </span>
-            )}
+            <FileText className="w-4 h-4" /> Applications ({pendingApplications.length})
           </button>
         </div>
 
@@ -767,38 +861,77 @@ export default function RegistrationPortal({
                   type="text"
                   value={appSearch}
                   onChange={(e) => setAppSearch(e.target.value)}
-                  placeholder="Search applicant name, club, phone..."
+                  placeholder="Search pending applicants..."
                   className="w-full bg-[#04142B] border border-[#1A2740] rounded-xl pl-10 pr-4 py-2.5 text-xs text-[#EEF1F5] placeholder-[#787E90] outline-none focus:border-[#1A6DFF] transition-colors"
                 />
               </div>
 
-              {/* Status Filter */}
-              <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
-                <span className="text-[#787E90] font-sans font-black uppercase tracking-wider text-[10px]">Filter by:</span>
-                <select
-                  value={appFilter}
-                  onChange={(e) => setAppFilter(e.target.value as any)}
-                  className="bg-[#04142B] border border-[#1A2740] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none cursor-pointer"
-                >
-                  <option value="all">All Applications</option>
-                  <option value="pending">Pending Review</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
+              {/* Status Info Badge */}
+              <div className="flex items-center gap-2 self-start sm:self-auto text-xs">
+                <span className="text-[10px] font-sans font-black uppercase tracking-widest bg-[#F1C317]/10 text-[#F1C317] border border-[#F1C317]/20 px-3 py-1.5 rounded-xl animate-pulse">
+                  ● PENDING APPLICATIONS ONLY
+                </span>
               </div>
             </div>
 
+            {/* Seeding Mode Toggle */}
+            {(() => {
+              const isSeedingToggleDisabled = hasApprovedInDb || players.length > 0 || applications.some(a => a.status === 'approved');
+              return (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#04142B] border border-[#1A2740] rounded-2xl p-4">
+                  <div className="text-left">
+                    <span className="text-xs font-black text-white uppercase tracking-wider block">Automatic Seeding Mode</span>
+                    <p className="text-[11px] text-[#B2B6C2] mt-0.5">
+                      Choose how seed ranks (1 to 32) are assigned upon applicant approval.
+                    </p>
+                    {isSeedingToggleDisabled && (
+                      <p className="text-[10px] text-[#F1C317] font-semibold mt-1">
+                        ⚠️ Toggle locked: approved players exist in the tournament records.
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center bg-[#121F32] p-1 rounded-xl border border-[#1A2740] self-start sm:self-auto shrink-0">
+                    <button
+                      type="button"
+                      disabled={isSeedingToggleDisabled}
+                      onClick={() => setSeedingMode('random')}
+                      className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                        seedingMode === 'random'
+                          ? 'bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] text-white shadow'
+                          : 'text-[#787E90] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'
+                      }`}
+                    >
+                      🎲 Random (1-32)
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSeedingToggleDisabled}
+                      onClick={() => setSeedingMode('serial')}
+                      className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                        seedingMode === 'serial'
+                          ? 'bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] text-white shadow'
+                          : 'text-[#787E90] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'
+                      }`}
+                    >
+                      🔢 Serial (1-32)
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Applications List overflow block */}
-            {applications.length === 0 ? (
+            {pendingApplications.length === 0 ? (
               <div className="text-center py-12 border border-dashed border-[#1A2740] rounded-2xl">
                 <FileText className="w-10 h-10 text-[#787E90]/30 mx-auto mb-3" />
                 <p className="text-xs text-[#B2B6C2] max-w-sm mx-auto leading-relaxed">
-                  No online applications registered. Players can apply publicly using the Registration Token.
+                  No pending online applications registered. Players can apply publicly using the Registration Token.
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {applications
+                {pendingApplications
                   .filter((app) => {
                     // Filter logic
                     const matchSearch = 
@@ -806,8 +939,7 @@ export default function RegistrationPortal({
                       (app.club && app.club.toLowerCase().includes(appSearch.toLowerCase())) ||
                       app.phoneNumber.includes(appSearch);
                     
-                    const matchFilter = appFilter === 'all' ? true : app.status === appFilter;
-                    return matchSearch && matchFilter;
+                    return matchSearch;
                   })
                   .map((app) => {
                     const selectedSeed = selectedSeeds[app.id] || availableSeeds[0];
@@ -936,7 +1068,17 @@ export default function RegistrationPortal({
                                     return;
                                   }
                                   
-                                  const finalSeed = selectedSeeds[app.id] || availableSeeds[0];
+                                  // Pick seed based on active seeding mode if not manually selected
+                                  let finalSeed = selectedSeeds[app.id];
+                                  if (!finalSeed && availableSeeds.length > 0) {
+                                    if (seedingMode === 'random') {
+                                      const randomIndex = Math.floor(Math.random() * availableSeeds.length);
+                                      finalSeed = availableSeeds[randomIndex];
+                                    } else {
+                                      finalSeed = availableSeeds[0];
+                                    }
+                                  }
+                                  
                                   if (!finalSeed) {
                                     setError('No available seeds left.');
                                     return;
@@ -956,6 +1098,18 @@ export default function RegistrationPortal({
                                     status: 'active',
                                     tournamentType: app.tournamentType,
                                   };
+
+                                  // Direct Supabase update for immediate, rock-solid consistency
+                                  const supabase = getSupabase();
+                                  if (supabase) {
+                                    supabase
+                                      .from('profiles')
+                                      .update({ status: 'approved', seed: finalSeed })
+                                      .eq('id', app.id)
+                                      .then(({ error: err }) => {
+                                        if (err) console.log('[RegistrationPortal] Supabase direct status/seed update error:', err.message);
+                                      });
+                                  }
 
                                   onPlayersChange([...players, newPlayer].sort((a, b) => a.seed - b.seed));
 
