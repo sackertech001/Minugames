@@ -3326,7 +3326,7 @@ export default function App() {
   const isMaximizedFullBracket = activeTab === 'bracket' && bracketView === 'full' && effectiveTournamentStarted && tournamentConfig.formatType !== 'group';
 
   return (
-    <div className="min-h-screen flex bg-bg-primary text-text-primary">
+    <div className="min-h-screen flex bg-bg-primary text-text-primary w-full overflow-x-hidden">
       {!isMaximizedFullBracket && (
         <Sidebar 
           activeTab={activeTab} 
