@@ -196,7 +196,7 @@ function SportLiveScoreboard({ activeMatch, actP1, actP2 }: SportLiveScoreboardP
       </div>
 
       {/* New Stats/Metrics row (Round, Duration, Frame Score) */}
-      <div className="grid grid-cols-3 gap-6 py-6 border-t border-b border-cyan-500/10 mb-6 relative z-10 text-center">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 py-6 border-t border-b border-cyan-500/10 mb-6 relative z-10 text-center">
         <div>
           <div className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Round</div>
           <div className="text-xl font-black text-white">{activeMatch.round}</div>

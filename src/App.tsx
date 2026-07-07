@@ -3338,7 +3338,7 @@ export default function App() {
         />
       )}
       
-      <div className={`flex-1 transition-all duration-300 ${isMaximizedFullBracket ? 'ml-0' : isSidebarCollapsed ? 'ml-24' : 'ml-72'}`}>
+      <div className={`flex-1 transition-all duration-300 ${isMaximizedFullBracket ? 'ml-0' : isSidebarCollapsed ? 'ml-0 md:ml-24' : 'ml-0 md:ml-72'} pb-20 md:pb-0`}>
         {/* Premium Luxury Header Bar */}
         {!isMaximizedFullBracket && (
           <header className="bg-bg-secondary border-b border-[#1A2740] py-4 px-4 md:px-8 sticky top-0 z-30 shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-colors duration-300">

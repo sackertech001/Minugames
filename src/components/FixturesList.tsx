@@ -45,15 +45,22 @@ export default function FixturesList({ matches, players, onStartMatch, onViewMat
               className="grid grid-cols-1 lg:grid-cols-6 gap-3 lg:gap-4 items-center bg-[#04142B] border border-[#1A2740] p-4 rounded-2xl text-xs hover:border-[#1A6DFF]/30 transition-all duration-300"
             >
               {/* Match ID label */}
-              <span className="text-[#1A6DFF] font-sans font-black uppercase tracking-wider">{match.label}</span>
+              <div className="flex justify-between items-center lg:block">
+                <span className="lg:hidden text-[10px] font-sans font-black text-[#787E90] uppercase tracking-widest">Match ID</span>
+                <span className="text-[#1A6DFF] font-sans font-black uppercase tracking-wider">{match.label}</span>
+              </div>
               
               {/* Contenders name */}
-              <span className="text-[#EEF1F5] font-sans font-bold truncate">
-                {player1?.name || 'TBD'} <span className="text-[#787E90] font-medium font-sans">vs</span> {player2?.name || 'TBD'}
-              </span>
+              <div className="flex justify-between items-center lg:block min-w-0">
+                <span className="lg:hidden text-[10px] font-sans font-black text-[#787E90] uppercase tracking-widest">Fixture</span>
+                <span className="text-[#EEF1F5] font-sans font-bold truncate">
+                  {player1?.name || 'TBD'} <span className="text-[#787E90] font-medium font-sans">vs</span> {player2?.name || 'TBD'}
+                </span>
+              </div>
               
               {/* Date Input */}
-              <div className="relative">
+              <div className="flex flex-col gap-1 lg:block">
+                <span className="lg:hidden text-[10px] font-sans font-black text-[#787E90] uppercase tracking-widest text-left">Date</span>
                 <input 
                   type="date" 
                   value={match.matchDate || ''} 
@@ -65,7 +72,8 @@ export default function FixturesList({ matches, players, onStartMatch, onViewMat
               </div>
               
               {/* Time Input */}
-              <div className="relative">
+              <div className="flex flex-col gap-1 lg:block">
+                <span className="lg:hidden text-[10px] font-sans font-black text-[#787E90] uppercase tracking-widest text-left">Time</span>
                 <input 
                   type="text" 
                   value={match.scheduledTime || ''} 
@@ -76,40 +84,46 @@ export default function FixturesList({ matches, players, onStartMatch, onViewMat
               </div>
               
               {/* Match Status Badge */}
-              <div className="flex">
-                {match.status === 'scheduled' && (
-                  <span className="bg-[#121F32] text-[#B2B6C2] border border-[#1A2740] font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md">
-                    Scheduled
-                  </span>
-                )}
-                {match.status === 'playing' && (
-                  <span className="bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/25 font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md animate-pulse flex items-center gap-1">
-                    <span className="w-1 h-1 bg-[#EF4444] rounded-full animate-ping"></span> Live
-                  </span>
-                )}
-                {match.status === 'completed' && (
-                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md">
-                    Completed
-                  </span>
-                )}
+              <div className="flex justify-between items-center lg:block">
+                <span className="lg:hidden text-[10px] font-sans font-black text-[#787E90] uppercase tracking-widest">Status</span>
+                <div className="flex">
+                  {match.status === 'scheduled' && (
+                    <span className="bg-[#121F32] text-[#B2B6C2] border border-[#1A2740] font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md">
+                      Scheduled
+                    </span>
+                  )}
+                  {match.status === 'playing' && (
+                    <span className="bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/25 font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md animate-pulse flex items-center gap-1">
+                      <span className="w-1 h-1 bg-[#EF4444] rounded-full animate-ping"></span> Live
+                    </span>
+                  )}
+                  {match.status === 'completed' && (
+                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-sans font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md">
+                      Completed
+                    </span>
+                  )}
+                </div>
               </div>
               
               {/* Action buttons */}
-              <div className="flex gap-2 justify-start lg:justify-end">
-                {match.status === 'scheduled' && (
+              <div className="flex justify-between items-center lg:block">
+                <span className="lg:hidden text-[10px] font-sans font-black text-[#787E90] uppercase tracking-widest">Actions</span>
+                <div className="flex gap-2 justify-end">
+                  {match.status === 'scheduled' && (
+                    <button
+                      onClick={() => onStartMatch(match.id)}
+                      className="bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] hover:from-[#4088FF] hover:to-[#1A6DFF] text-white font-sans font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1 hover:scale-[1.01]"
+                    >
+                      <Play className="w-3.5 h-3.5" /> Start
+                    </button>
+                  )}
                   <button
-                    onClick={() => onStartMatch(match.id)}
-                    className="bg-gradient-to-r from-[#1A6DFF] to-[#0C48B8] hover:from-[#4088FF] hover:to-[#1A6DFF] text-white font-sans font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1 hover:scale-[1.01]"
+                    onClick={() => onViewMatch(match.id)}
+                    className="bg-[#121F32] hover:bg-[#1A2740] text-[#B2B6C2] hover:text-white border border-[#1A2740] font-sans font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1"
                   >
-                    <Play className="w-3.5 h-3.5" /> Start
+                    <Eye className="w-3.5 h-3.5 text-[#787E90]" /> View
                   </button>
-                )}
-                <button
-                  onClick={() => onViewMatch(match.id)}
-                  className="bg-[#121F32] hover:bg-[#1A2740] text-[#B2B6C2] hover:text-white border border-[#1A2740] font-sans font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1"
-                >
-                  <Eye className="w-3.5 h-3.5 text-[#787E90]" /> View
-                </button>
+                </div>
               </div>
             </div>
           );

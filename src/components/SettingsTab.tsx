@@ -1352,7 +1352,8 @@ export default function SettingsTab({
 
             {/* List Table */}
             <div className="bg-bg-primary rounded-xl border border-rose-500/10 overflow-hidden">
-              <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-rose-500/10 bg-bg-tertiary">
                     <th className="py-2.5 px-4 text-[10px] font-sans font-black text-slate-400 uppercase tracking-widest">Tournament Type Name</th>
@@ -1398,6 +1399,7 @@ export default function SettingsTab({
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         ) : (
