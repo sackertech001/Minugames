@@ -314,23 +314,9 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
     return () => clearInterval(progressInterval);
   }, [liveIndex, liveMatches.length, isAutoplayPaused]);
 
-  // Find active/ongoing matches (if any, otherwise latest completed, or next scheduled)
-  const getActiveDisplayMatch = (): Match | null => {
-    if (matches.length === 0) return null;
-    
-    // Check if we have any completed matches (show the most recent completed match)
-    const reversedCompleted = [...completedMatches].reverse();
-    if (reversedCompleted.length > 0) {
-      return reversedCompleted[0];
-    }
-
-    // Default to Match 1
-    return matches[0];
-  };
-
   const activeMatch = liveMatches.length > 0
     ? liveMatches[liveIndex % liveMatches.length]
-    : getActiveDisplayMatch();
+    : null;
 
   const actP1 = activeMatch ? players.find((p) => p.id === activeMatch.player1Id) : null;
   const actP2 = activeMatch ? players.find((p) => p.id === activeMatch.player2Id) : null;
@@ -573,13 +559,13 @@ export default function LiveDisplayScreen({ players, matches, showOnlyScoreboard
                   <div className="text-[11px] font-sans font-black min-w-[130px] uppercase tracking-wider">
                     <div className="flex justify-between items-center gap-4">
                       <span className={`truncate max-w-[85px] ${isActive ? 'text-white font-black' : 'text-slate-400 font-bold'}`}>
-                        {p1Local?.name.split(' ').slice(-1)[0] || 'P1'}
+                        {p1Local?.name || 'P1'}
                       </span>
                       <span className="text-[#D4AF37]">{m.score1 ?? 0}</span>
                     </div>
                     <div className="flex justify-between items-center mt-0.5 gap-4">
                       <span className={`truncate max-w-[85px] ${isActive ? 'text-white font-black' : 'text-slate-400 font-bold'}`}>
-                        {p2Local?.name.split(' ').slice(-1)[0] || 'P2'}
+                        {p2Local?.name || 'P2'}
                       </span>
                       <span className="text-[#D4AF37]">{m.score2 ?? 0}</span>
                     </div>

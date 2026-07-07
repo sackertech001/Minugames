@@ -932,6 +932,38 @@ export default function App() {
           } catch (err: any) {
             console.log('[Client Supabase third_place Sync] General error:', err?.message || err);
           }
+
+          // Sync rounds table status to active when a match in that round is playing or ongoing
+          try {
+            const hasActiveR32 = patch.matches.some((m: any) => (m.round === 'R32' || m.id.startsWith('M')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveR16 = patch.matches.some((m: any) => (m.round === 'R16' || m.id.startsWith('R16-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveQF = patch.matches.some((m: any) => (m.round === 'QF' || m.id.startsWith('QF-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveSF = patch.matches.some((m: any) => (m.round === 'SF' || m.id.startsWith('SF-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveGF = patch.matches.some((m: any) => (m.id === 'FINAL' || m.round === 'F') && (m.status === 'playing' || m.status === 'ongoing'));
+
+            if (hasActiveR32) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 32');
+              setRounds(prev => prev.map(r => r.stage === 'Round of 32' ? { ...r, status: 'active' } : r));
+            }
+            if (hasActiveR16) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 16');
+              setRounds(prev => prev.map(r => r.stage === 'Round of 16' ? { ...r, status: 'active' } : r));
+            }
+            if (hasActiveQF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Quarter finals');
+              setRounds(prev => prev.map(r => r.stage === 'Quarter finals' ? { ...r, status: 'active' } : r));
+            }
+            if (hasActiveSF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Semi finals');
+              setRounds(prev => prev.map(r => r.stage === 'Semi finals' ? { ...r, status: 'active' } : r));
+            }
+            if (hasActiveGF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Final');
+              setRounds(prev => prev.map(r => r.stage === 'Final' ? { ...r, status: 'active' } : r));
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase rounds active update] General error:', err?.message || err);
+          }
         }
       }
     };

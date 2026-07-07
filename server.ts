@@ -1475,6 +1475,410 @@ async function startServer() {
       }
     }
 
+    // If matches list is changed, sync details back to Supabase round tables on the server side
+    if (req.body.matches && Array.isArray(req.body.matches)) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+
+          const currentPlayers = req.body.players || readState().players || [];
+
+          const safeIsoString = (timeStr: any, dayNum?: number): string => {
+            if (!timeStr) return new Date().toISOString();
+            const parsed = new Date(timeStr);
+            if (!isNaN(parsed.getTime())) {
+              return parsed.toISOString();
+            }
+            try {
+              const day = dayNum || 1;
+              let hour = 12;
+              let minute = 0;
+              const timeMatch = String(timeStr).match(/(\d{1,2}):(\d{2})/);
+              if (timeMatch) {
+                hour = parseInt(timeMatch[1], 10);
+                minute = parseInt(timeMatch[2], 10);
+              }
+              const date = new Date();
+              date.setDate(date.getDate() + (day - 1));
+              date.setHours(hour, minute, 0, 0);
+              return date.toISOString();
+            } catch (e) {
+              return new Date().toISOString();
+            }
+          };
+
+          // Sync Round of 32
+          try {
+            const r32Matches = req.body.matches.filter((m: any) => m.round === 'R32' || m.id.startsWith('M'));
+            if (r32Matches.length > 0) {
+              const rowsToUpsert = r32Matches.map((m: any) => {
+                const matchNumStr = m.id.replace(/\D/g, ''); // Extract digits
+                const matchNumber = parseInt(matchNumStr, 10);
+                if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 16) {
+                  return null;
+                }
+
+                const p1 = currentPlayers.find((p: any) => p.id === m.player1Id);
+                const p2 = currentPlayers.find((p: any) => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: matchNumber,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find((p: any) => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 1),
+                  table_number: m.table_number || matchNumber,
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsert.length > 0) {
+                const { error: upsertErr } = await supabase
+                  .from('round_of_32')
+                  .upsert(rowsToUpsert, { onConflict: 'match_number' });
+
+                if (upsertErr) {
+                  console.log('[Server Supabase round_of_32 Sync] Upsert notice:', upsertErr.message);
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Server Supabase round_of_32 Sync] General error:', err?.message || err);
+          }
+
+          // Sync Round of 16
+          try {
+            const r16Matches = req.body.matches.filter((m: any) => m.round === 'R16' || m.id.startsWith('R16-'));
+            if (r16Matches.length > 0) {
+              const rowsToUpsertR16 = r16Matches.map((m: any) => {
+                const matchNumber = m.id.includes('-') 
+                  ? parseInt(m.id.split('-').pop() || '', 10) 
+                  : parseInt(m.id.replace(/\D/g, ''), 10);
+                if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 8) {
+                  return null;
+                }
+
+                const p1 = currentPlayers.find((p: any) => p.id === m.player1Id);
+                const p2 = currentPlayers.find((p: any) => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: matchNumber,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find((p: any) => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 2),
+                  table_number: m.table_number || (matchNumber + 16),
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertR16.length > 0) {
+                const { error: upsertR16Err } = await supabase
+                  .from('round_of_16')
+                  .upsert(rowsToUpsertR16, { onConflict: 'match_number' });
+
+                if (upsertR16Err) {
+                  console.log('[Server Supabase round_of_16 Sync] Upsert notice:', upsertR16Err.message);
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Server Supabase round_of_16 Sync] General error:', err?.message || err);
+          }
+
+          // Sync Quarter Finals
+          try {
+            const qfMatches = req.body.matches.filter((m: any) => m.round === 'QF' || m.id.startsWith('QF-'));
+            if (qfMatches.length > 0) {
+              const rowsToUpsertQF = qfMatches.map((m: any) => {
+                const matchNumber = m.id.includes('-') 
+                  ? parseInt(m.id.split('-').pop() || '', 10) 
+                  : parseInt(m.id.replace(/\D/g, ''), 10);
+                if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 4) {
+                  return null;
+                }
+
+                const p1 = currentPlayers.find((p: any) => p.id === m.player1Id);
+                const p2 = currentPlayers.find((p: any) => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: matchNumber,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find((p: any) => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 2),
+                  table_number: m.table_number || (matchNumber + 24),
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertQF.length > 0) {
+                const { error: upsertQFErr } = await supabase
+                  .from('quarter_finals')
+                  .upsert(rowsToUpsertQF, { onConflict: 'match_number' });
+
+                if (upsertQFErr) {
+                  console.log('[Server Supabase quarter_finals Sync] Upsert notice:', upsertQFErr.message);
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Server Supabase quarter_finals Sync] General error:', err?.message || err);
+          }
+
+          // Sync Semi Finals
+          try {
+            const sfMatches = req.body.matches.filter((m: any) => m.round === 'SF' || m.id.startsWith('SF-'));
+            if (sfMatches.length > 0) {
+              const rowsToUpsertSF = sfMatches.map((m: any) => {
+                const matchNumber = m.id.includes('-') 
+                  ? parseInt(m.id.split('-').pop() || '', 10) 
+                  : parseInt(m.id.replace(/\D/g, ''), 10);
+                if (isNaN(matchNumber) || matchNumber < 1 || matchNumber > 2) {
+                  return null;
+                }
+
+                const p1 = currentPlayers.find((p: any) => p.id === m.player1Id);
+                const p2 = currentPlayers.find((p: any) => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: matchNumber,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find((p: any) => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+                  table_number: m.table_number || (matchNumber + 28),
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertSF.length > 0) {
+                const { error: upsertSFErr } = await supabase
+                  .from('semi_finals')
+                  .upsert(rowsToUpsertSF, { onConflict: 'match_number' });
+
+                if (upsertSFErr) {
+                  console.log('[Server Supabase semi_finals Sync] Upsert notice:', upsertSFErr.message);
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Server Supabase semi_finals Sync] General error:', err?.message || err);
+          }
+
+          // Sync Grand Final
+          try {
+            const gfMatches = req.body.matches.filter((m: any) => m.id === 'FINAL' || m.round === 'F');
+            if (gfMatches.length > 0) {
+              const rowsToUpsertGF = gfMatches.map((m: any) => {
+                const p1 = currentPlayers.find((p: any) => p.id === m.player1Id);
+                const p2 = currentPlayers.find((p: any) => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: 1,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find((p: any) => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+                  table_number: m.table_number || 1,
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertGF.length > 0) {
+                const { error: upsertGFErr } = await supabase
+                  .from('grand_final')
+                  .upsert(rowsToUpsertGF, { onConflict: 'match_number' });
+
+                if (upsertGFErr) {
+                  console.log('[Server Supabase grand_final Sync] Upsert notice:', upsertGFErr.message);
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Server Supabase grand_final Sync] General error:', err?.message || err);
+          }
+
+          // Sync 3rd Place Match
+          try {
+            const tpMatches = req.body.matches.filter((m: any) => m.id === '3RD-1' || m.round === '3RD');
+            if (tpMatches.length > 0) {
+              const rowsToUpsertTP = tpMatches.map((m: any) => {
+                const p1 = currentPlayers.find((p: any) => p.id === m.player1Id);
+                const p2 = currentPlayers.find((p: any) => p.id === m.player2Id);
+                const p1Name = p1 ? p1.name : 'TBD';
+                const p2Name = p2 ? p2.name : 'TBD';
+
+                return {
+                  match_number: 1,
+                  player1_id: isUUID(m.player1Id) ? m.player1Id : null,
+                  player2_id: isUUID(m.player2Id) ? m.player2Id : null,
+                  player1_name: p1Name,
+                  player2_name: p2Name,
+                  player1_score: m.score1 !== null && m.score1 !== undefined ? Number(m.score1) : 0,
+                  player2_score: m.score2 !== null && m.score2 !== undefined ? Number(m.score2) : 0,
+                  player1_set1: m.frames && m.frames[0] ? Number(m.frames[0].player1Points || 0) : 0,
+                  player1_set2: m.frames && m.frames[1] ? Number(m.frames[1].player1Points || 0) : 0,
+                  player1_set3: m.frames && m.frames[2] ? Number(m.frames[2].player1Points || 0) : 0,
+                  player2_set1: m.frames && m.frames[0] ? Number(m.frames[0].player2Points || 0) : 0,
+                  player2_set2: m.frames && m.frames[1] ? Number(m.frames[1].player2Points || 0) : 0,
+                  player2_set3: m.frames && m.frames[2] ? Number(m.frames[2].player2Points || 0) : 0,
+                  player1_highest_break: m.break1 !== null && m.break1 !== undefined ? Number(m.break1) : 0,
+                  player2_highest_break: m.break2 !== null && m.break2 !== undefined ? Number(m.break2) : 0,
+                  winner_id: isUUID(m.winnerId) ? m.winnerId : null,
+                  winner_name: m.winnerId ? (currentPlayers.find((p: any) => p.id === m.winnerId)?.name || null) : null,
+                  status: m.status === 'playing' ? 'ongoing' : (m.status === 'completed' ? 'completed' : 'scheduled'),
+                  scheduled_time: safeIsoString(m.scheduledTime, m.day || 3),
+                  table_number: m.table_number || 2,
+                  referee_name: m.referee_name || null,
+                  tournament_type: m.tournament_type || 'Snooker'
+                };
+              }).filter(Boolean);
+
+              if (rowsToUpsertTP.length > 0) {
+                const { error: upsertTPErr } = await supabase
+                  .from('third_place')
+                  .upsert(rowsToUpsertTP, { onConflict: 'match_number' });
+
+                if (upsertTPErr) {
+                  console.log('[Server Supabase third_place Sync] Upsert notice:', upsertTPErr.message);
+                }
+              }
+            }
+          } catch (err: any) {
+            console.log('[Server Supabase third_place Sync] General error:', err?.message || err);
+          }
+
+          // Check for active or ongoing matches in each round, and update the rounds table status to 'active'
+          try {
+            const hasActiveR32 = req.body.matches.some((m: any) => (m.round === 'R32' || m.id.startsWith('M')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveR16 = req.body.matches.some((m: any) => (m.round === 'R16' || m.id.startsWith('R16-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveQF = req.body.matches.some((m: any) => (m.round === 'QF' || m.id.startsWith('QF-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveSF = req.body.matches.some((m: any) => (m.round === 'SF' || m.id.startsWith('SF-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveGF = req.body.matches.some((m: any) => (m.id === 'FINAL' || m.round === 'F') && (m.status === 'playing' || m.status === 'ongoing'));
+
+            if (hasActiveR32) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 32');
+            }
+            if (hasActiveR16) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 16');
+            }
+            if (hasActiveQF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Quarter finals');
+            }
+            if (hasActiveSF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Semi finals');
+            }
+            if (hasActiveGF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Final');
+            }
+          } catch (err: any) {
+            console.log('[Server Supabase rounds active update] General error:', err?.message || err);
+          }
+
+          lastSupabaseFetchTime = 0;
+        } catch (err: any) {
+          console.log('[Server Supabase Matches Sync] Operation details:', err?.message || err);
+        }
+      }
+    }
+
     res.json({ success: true, state: newState });
   });
 

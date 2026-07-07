@@ -184,12 +184,9 @@ export default function MatchScorerModal({
 
     const simulatedScores: FrameScore[] = Array.from({ length: gamesCount }, () => {
       const p1WinsSet = Math.random() > 0.5;
-      const winnerPoints = Math.floor(Math.random() * 40) + 40; // 40-80 points
-      const loserPoints = Math.floor(Math.random() * (winnerPoints - 10)) + 10; // strictly less than winner
-
       return {
-        player1Points: p1WinsSet ? winnerPoints : loserPoints,
-        player2Points: p1WinsSet ? loserPoints : winnerPoints,
+        player1Points: p1WinsSet ? 1 : 0,
+        player2Points: p1WinsSet ? 0 : 1,
       };
     });
 
@@ -502,8 +499,8 @@ export default function MatchScorerModal({
                           <span className="font-sans text-[11px] font-black text-slate-300 uppercase tracking-wider w-16">Set {idx + 1}</span>
                           <div className="flex items-center justify-end gap-3 flex-1">
                              <div className="flex items-center gap-2">
-                               <input type="number" disabled={match.status === 'completed'} value={score.player1Points || ''} onChange={(e) => {
-                                 const val = Math.max(0, parseInt(e.target.value) || 0);
+                               <input type="number" min="0" max="1" disabled={match.status === 'completed'} value={score.player1Points || ''} onChange={(e) => {
+                                 const val = Math.min(1, Math.max(0, parseInt(e.target.value) || 0));
                                  const next = [...setScores];
                                  next[idx] = { ...next[idx], player1Points: val };
                                  setSetScores(next);
@@ -511,8 +508,8 @@ export default function MatchScorerModal({
                              </div>
                              <span className="font-black text-rose-500/40 text-xs">:</span>
                              <div className="flex items-center gap-2">
-                               <input type="number" disabled={match.status === 'completed'} value={score.player2Points || ''} onChange={(e) => {
-                                 const val = Math.max(0, parseInt(e.target.value) || 0);
+                               <input type="number" min="0" max="1" disabled={match.status === 'completed'} value={score.player2Points || ''} onChange={(e) => {
+                                 const val = Math.min(1, Math.max(0, parseInt(e.target.value) || 0));
                                  const next = [...setScores];
                                  next[idx] = { ...next[idx], player2Points: val };
                                  setSetScores(next);
@@ -584,10 +581,10 @@ export default function MatchScorerModal({
                 {/* Button for Draw */}
                 <button
                     type="button"
-                    onClick={() => handleDeclareWinner('draw')}
-                    className="w-full mt-4 p-3 rounded-xl border border-rose-500/15 bg-[#05101E] text-slate-300 hover:border-rose-500/35 hover:text-white text-center flex items-center justify-center gap-2 cursor-pointer transition-all font-sans font-black text-xs uppercase tracking-wider"
+                    disabled={true}
+                    className="w-full mt-4 p-3 rounded-xl border border-rose-500/10 bg-[#05101E] text-slate-500 cursor-not-allowed transition-all font-sans font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 opacity-50"
                   >
-                    <Trophy className="w-4 h-4 shrink-0 text-[#D4AF37]" />
+                    <Trophy className="w-4 h-4 shrink-0 text-slate-500" />
                     <div>
                       Declare Draw
                     </div>
