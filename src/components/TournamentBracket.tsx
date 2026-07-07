@@ -240,7 +240,7 @@ export default function TournamentBracket({
         </div>
 
         {/* Start Match button or Live Now badge */}
-        {hasPlayers && match.status === 'scheduled' && (
+        {hasPlayers && match.status === 'scheduled' && onStartMatch && (
           <div className="p-3 bg-[#04142B] border-t border-[#1A2740]">
             <button
               onClick={(e) => {
