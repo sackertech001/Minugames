@@ -103,24 +103,24 @@ export default function TournamentLandingPage({ config, onApply, players, matche
         </div>
 
         {!hideTabs && (
-          <div className="flex justify-center gap-2 border-b border-[#1A1D24] pb-4">
+          <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2 border-b border-[#1A1D24] pb-4 px-2">
               <button 
                 onClick={() => setActiveTab('info')} 
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-xs tracking-wider uppercase transition-all duration-300 ${activeTab === 'info' ? 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'text-slate-400 hover:text-slate-200 hover:bg-[#12151C]'}`}
+                className={`flex items-center gap-1.5 px-3 sm:px-5 py-2 rounded-lg font-bold text-[10px] sm:text-xs tracking-wider uppercase transition-all duration-300 ${activeTab === 'info' ? 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'text-slate-400 hover:text-slate-200 hover:bg-[#12151C]'}`}
               >
-                  <Info className="w-4 h-4 text-rose-500" /> Info
+                  <Info className="w-3.5 h-3.5 text-rose-500" /> Info
               </button>
               <button 
                 onClick={() => setActiveTab('fixtures')} 
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-xs tracking-wider uppercase transition-all duration-300 ${activeTab === 'fixtures' ? 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'text-slate-400 hover:text-slate-200 hover:bg-[#12151C]'}`}
+                className={`flex items-center gap-1.5 px-3 sm:px-5 py-2 rounded-lg font-bold text-[10px] sm:text-xs tracking-wider uppercase transition-all duration-300 ${activeTab === 'fixtures' ? 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'text-slate-400 hover:text-slate-200 hover:bg-[#12151C]'}`}
               >
-                  <LayoutGrid className="w-4 h-4 text-rose-500" /> Fixtures
+                  <LayoutGrid className="w-3.5 h-3.5 text-rose-500" /> Fixtures
               </button>
               <button 
                 onClick={() => setActiveTab('live')} 
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-xs tracking-wider uppercase transition-all duration-300 ${activeTab === 'live' ? 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'text-slate-400 hover:text-slate-200 hover:bg-[#12151C]'}`}
+                className={`flex items-center gap-1.5 px-3 sm:px-5 py-2 rounded-lg font-bold text-[10px] sm:text-xs tracking-wider uppercase transition-all duration-300 ${activeTab === 'live' ? 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'text-slate-400 hover:text-slate-200 hover:bg-[#12151C]'}`}
               >
-                  <Radio className="w-4 h-4 text-rose-500" /> Live
+                  <Radio className="w-3.5 h-3.5 text-rose-500" /> Live
               </button>
           </div>
         )}

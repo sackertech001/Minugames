@@ -3326,7 +3326,7 @@ export default function App() {
   const isMaximizedFullBracket = activeTab === 'bracket' && bracketView === 'full' && effectiveTournamentStarted && tournamentConfig.formatType !== 'group';
 
   return (
-    <div className="min-h-screen flex bg-bg-primary text-text-primary w-full overflow-x-hidden">
+    <div className="min-h-screen flex bg-bg-primary text-text-primary w-full">
       {!isMaximizedFullBracket && (
         <Sidebar 
           activeTab={activeTab} 
@@ -3345,38 +3345,38 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           
           {/* Logo & Headline */}
-          <div className="flex items-center gap-4">
-            <div className="relative w-14 h-14 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="relative w-10 h-10 sm:w-14 sm:h-14 shrink-0">
               <img 
                 src={systemLogo || "https://fmbwnbvhvcuihzifiajk.supabase.co/storage/v1/object/public/website_logo/46.png"} 
                 alt="Logo" 
-                className="w-full h-full object-contain rounded-2xl border border-rose-500/20 p-1 bg-bg-primary shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                className="w-full h-full object-contain rounded-xl sm:rounded-2xl border border-rose-500/20 p-1 bg-bg-primary shadow-[0_0_15px_rgba(239,68,68,0.1)]"
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col">
-                  <span className="text-[11px] font-sans font-black text-rose-500 tracking-[0.2em] uppercase">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col text-left">
+                  <span className="text-[9px] sm:text-[11px] font-sans font-black text-rose-500 tracking-[0.2em] uppercase">
                     CLASS 46
                   </span>
-                  <h1 className="font-sans font-black text-lg md:text-xl text-text-primary tracking-[0.05em] uppercase">
+                  <h1 className="font-sans font-black text-sm sm:text-base md:text-xl text-text-primary tracking-[0.05em] uppercase leading-tight truncate">
                     SNOOKER CHAMPIONSHIP
                   </h1>
                 </div>
-                <span className="text-[9px] font-sans font-extrabold bg-rose-500/10 text-rose-500 px-2.5 py-0.5 rounded-full border border-rose-500/20 uppercase tracking-widest">
+                <span className="text-[8px] sm:text-[9px] font-sans font-extrabold bg-rose-500/10 text-rose-500 px-2 sm:px-2.5 py-0.5 rounded-full border border-rose-500/20 uppercase tracking-widest whitespace-nowrap">
                   {tournamentConfig.playersCount} PLAYERS
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-muted mt-1 font-medium">
-                <span className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] sm:text-[11px] text-text-muted mt-1 font-medium text-left">
+                <span className="flex items-center gap-1 whitespace-nowrap">
                   <Calendar className="w-3.5 h-3.5 text-rose-500" />
                   {tournamentConfig.dateRange}
                 </span>
-                <span className="text-rose-500/30">|</span>
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                  Venue: <span className="text-text-primary font-black uppercase">{tournamentConfig.venue}</span>
+                <span className="text-rose-500/30 hidden sm:inline">|</span>
+                <span className="flex items-center gap-1 min-w-0">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <span className="truncate">Venue: <span className="text-text-primary font-black uppercase">{tournamentConfig.venue}</span></span>
                 </span>
               </div>
             </div>
@@ -3473,7 +3473,7 @@ export default function App() {
       )}
 
       {/* Main Content Body */}
-      <main className={`flex-1 w-full mx-auto space-y-8 ${isMaximizedFullBracket ? 'max-w-none p-2 md:p-4' : 'max-w-7xl p-4 md:p-8'}`}>
+      <main className={`flex-1 w-full mx-auto space-y-6 sm:space-y-8 ${isMaximizedFullBracket ? 'max-w-none p-2 md:p-4' : 'max-w-7xl p-2 sm:p-4 md:p-8'}`}>
         
         {/* Navigation Tabs bar removed in favor of Sidebar */}
 
