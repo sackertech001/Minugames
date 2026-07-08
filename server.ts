@@ -1153,6 +1153,25 @@ async function startServer() {
             console.log('[Supabase Wipe Board] All profiles reset to pending with NULL seed.');
           }
 
+          // 3. Reset all tournament rounds back to 'not started'
+          const { error: resetRoundsErr } = await supabase
+            .from('rounds')
+            .update({ status: 'not started' })
+            .neq('stage', '');
+          if (resetRoundsErr) {
+            console.log('[Supabase Wipe Board] Reset rounds error:', resetRoundsErr.message);
+          } else {
+            console.log('[Supabase Wipe Board] All rounds successfully reset to "not started".');
+          }
+
+          // 4. Clear matches from all round tables
+          await supabase.from('round_of_32').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('round_of_16').delete().gt('match_number', 0);
+          await supabase.from('quarter_finals').delete().gt('match_number', 0);
+          await supabase.from('semi_finals').delete().gt('match_number', 0);
+          await supabase.from('grand_final').delete().gt('match_number', 0);
+          await supabase.from('third_place').delete().gt('match_number', 0);
+
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
           console.log('[Supabase Wipe Board Status] Error details:', err?.message || err);
@@ -1867,31 +1886,34 @@ async function startServer() {
             console.log('[Server Supabase third_place Sync] General error:', err?.message || err);
           }
 
-          // Check for active or ongoing matches in each round, and update the rounds table status to 'active'
-          try {
-            const hasActiveR32 = req.body.matches.some((m: any) => (m.round === 'R32' || m.id.startsWith('M')) && (m.status === 'playing' || m.status === 'ongoing'));
-            const hasActiveR16 = req.body.matches.some((m: any) => (m.round === 'R16' || m.id.startsWith('R16-')) && (m.status === 'playing' || m.status === 'ongoing'));
-            const hasActiveQF = req.body.matches.some((m: any) => (m.round === 'QF' || m.id.startsWith('QF-')) && (m.status === 'playing' || m.status === 'ongoing'));
-            const hasActiveSF = req.body.matches.some((m: any) => (m.round === 'SF' || m.id.startsWith('SF-')) && (m.status === 'playing' || m.status === 'ongoing'));
-            const hasActiveGF = req.body.matches.some((m: any) => (m.id === 'FINAL' || m.round === 'F') && (m.status === 'playing' || m.status === 'ongoing'));
+          // Check for active or ongoing matches in each round, and update the rounds table status to 'active', ONLY if the tournament has actually started!
+          const tournamentStarted = newState.isTournamentStarted;
+          if (tournamentStarted) {
+            try {
+              const hasActiveR32 = req.body.matches.some((m: any) => (m.round === 'R32' || m.id.startsWith('M')) && (m.status === 'playing' || m.status === 'ongoing'));
+              const hasActiveR16 = req.body.matches.some((m: any) => (m.round === 'R16' || m.id.startsWith('R16-')) && (m.status === 'playing' || m.status === 'ongoing'));
+              const hasActiveQF = req.body.matches.some((m: any) => (m.round === 'QF' || m.id.startsWith('QF-')) && (m.status === 'playing' || m.status === 'ongoing'));
+              const hasActiveSF = req.body.matches.some((m: any) => (m.round === 'SF' || m.id.startsWith('SF-')) && (m.status === 'playing' || m.status === 'ongoing'));
+              const hasActiveGF = req.body.matches.some((m: any) => (m.id === 'FINAL' || m.round === 'F') && (m.status === 'playing' || m.status === 'ongoing'));
 
-            if (hasActiveR32) {
-              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 32');
+              if (hasActiveR32) {
+                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 32');
+              }
+              if (hasActiveR16) {
+                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 16');
+              }
+              if (hasActiveQF) {
+                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Quarter finals');
+              }
+              if (hasActiveSF) {
+                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Semi finals');
+              }
+              if (hasActiveGF) {
+                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Final');
+              }
+            } catch (err: any) {
+              console.log('[Server Supabase rounds active update] General error:', err?.message || err);
             }
-            if (hasActiveR16) {
-              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 16');
-            }
-            if (hasActiveQF) {
-              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Quarter finals');
-            }
-            if (hasActiveSF) {
-              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Semi finals');
-            }
-            if (hasActiveGF) {
-              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Final');
-            }
-          } catch (err: any) {
-            console.log('[Server Supabase rounds active update] General error:', err?.message || err);
           }
 
           lastSupabaseFetchTime = 0;
