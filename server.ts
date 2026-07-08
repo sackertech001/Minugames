@@ -45,6 +45,7 @@ interface TournamentState {
   playerApplications: any[];
   publicRegistrationEnabled: boolean;
   systemLogo?: string;
+  systemUsersTableMissing?: boolean;
 }
 
 const DEFAULT_STATE: TournamentState = {
@@ -72,14 +73,7 @@ const DEFAULT_STATE: TournamentState = {
       second: "₦150,000"
     }
   },
-  systemUsers: [
-    { id: "u-admin", username: "admin", role: "Admin", pin: "1234" },
-    { id: "u-owner", username: "owner", role: "Owner", pin: "5555" },
-    { id: "u-gameadmin", username: "game_admin", role: "Game Admin", pin: "7777" },
-    { id: "u-referee", username: "referee", role: "Referee", pin: "2222" },
-    { id: "u-scorer", username: "scorer", role: "Scorer", pin: "3333" },
-    { id: "u-player", username: "player", role: "Player", pin: "4444" }
-  ],
+  systemUsers: [],
   rolePermissions: [
     {
       role: "Admin",
@@ -114,7 +108,8 @@ const DEFAULT_STATE: TournamentState = {
   ],
   playerApplications: [],
   publicRegistrationEnabled: true,
-  systemLogo: ""
+  systemLogo: "",
+  systemUsersTableMissing: false
 };
 
 function readState(): TournamentState {
@@ -1053,6 +1048,33 @@ async function startServer() {
             console.log('[Supabase DB Sync] Error syncing third_place:', tpErr);
           }
 
+          // Fetch system_users from Supabase to sync RBAC users
+          try {
+            const { data: dbSystemUsers, error: usersError } = await supabase
+              .from('system_users')
+              .select('*');
+
+            if (!usersError && dbSystemUsers) {
+              const mappedUsers = dbSystemUsers.map((u: any) => ({
+                id: u.id,
+                username: u.username,
+                role: u.role,
+                pin: u.pin
+              }));
+              state.systemUsers = mappedUsers;
+              state.systemUsersTableMissing = false;
+              console.log(`[Supabase DB Sync] System users synced. Total: ${mappedUsers.length}`);
+            } else if (usersError) {
+              console.log('[Supabase DB Sync] Error syncing system_users:', usersError.message);
+              if (usersError.code === '42P01' || usersError.message?.includes('does not exist')) {
+                state.systemUsersTableMissing = true;
+              }
+            }
+          } catch (usersErr: any) {
+            console.log('[Supabase DB Sync] Error syncing system_users:', usersErr);
+            state.systemUsersTableMissing = true;
+          }
+
           writeState(state);
         }
       })(), 12000, "Supabase connection timed out");
@@ -1235,42 +1257,15 @@ async function startServer() {
                   .maybeSingle();
 
                 if (!existingPlayer) {
-                  const insertObj = {
-                    profile_id: app.id,
-                    name: app.fullName,
-                    player_name: app.fullName
-                  };
-
                   const { error: insertErr } = await supabase
                     .from('players')
-                    .insert(insertObj);
-
+                    .insert({
+                      profile_id: app.id,
+                      name: app.fullName,
+                      player_name: app.fullName
+                    });
                   if (insertErr) {
-                    console.log(`[Supabase Player Table Sync] Insert with full object failed, trying fallback 1 (no player_name)...`, insertErr.message);
-                    const fb1 = { ...insertObj };
-                    delete (fb1 as any).player_name;
-                    
-                    const { error: err1 } = await supabase
-                      .from('players')
-                      .insert(fb1);
-
-                    if (err1) {
-                      console.log(`[Supabase Player Table Sync] Fallback 1 failed, trying fallback 2 (no name)...`, err1.message);
-                      const fb2 = { ...insertObj };
-                      delete (fb2 as any).name;
-
-                      const { error: err2 } = await supabase
-                        .from('players')
-                        .insert(fb2);
-
-                      if (err2) {
-                        console.log(`[Supabase Player Table Sync] All insertion fallbacks failed:`, err2.message);
-                      } else {
-                        console.log(`[Supabase Player Table Sync] Fallback 2 players insert successful for ${app.fullName}`);
-                      }
-                    } else {
-                      console.log(`[Supabase Player Table Sync] Fallback 1 players insert successful for ${app.fullName}`);
-                    }
+                    console.log(`[Supabase Player Table Sync] Insert details for user ${app.id}:`, insertErr.message);
                   } else {
                     console.log(`[Supabase Player Table Sync] Successfully created player row for ${app.fullName}`);
                   }
@@ -1902,6 +1897,78 @@ async function startServer() {
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
           console.log('[Server Supabase Matches Sync] Operation details:', err?.message || err);
+        }
+      }
+    }
+
+    // If systemUsers list is changed, sync details back to Supabase system_users table
+    if (req.body.systemUsers && Array.isArray(req.body.systemUsers)) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+
+          // Fetch currently existing usernames in DB to handle deletion
+          const { data: dbCurrentUsers, error: selectErr } = await supabase
+            .from('system_users')
+            .select('id, username');
+
+          if (!selectErr && dbCurrentUsers) {
+            const incomingUsernames = req.body.systemUsers.map((u: any) => u.username);
+
+            // Delete users no longer present
+            const toDelete = dbCurrentUsers.filter((u: any) => !incomingUsernames.includes(u.username));
+            if (toDelete.length > 0) {
+              const toDeleteIds = toDelete.map((u: any) => u.id);
+              const { error: delErr } = await supabase
+                .from('system_users')
+                .delete()
+                .in('id', toDeleteIds);
+              if (delErr) {
+                console.log('[Supabase System Users Sync] Delete user notice:', delErr.message);
+              }
+            }
+
+            // Upsert incoming users
+            for (const user of req.body.systemUsers) {
+              const isUuidVal = isUUID(user.id);
+              const payload: any = {
+                username: user.username,
+                role: user.role,
+                pin: user.pin
+              };
+              if (isUuidVal) {
+                payload.id = user.id;
+              }
+
+              const { error: upsertErr } = await supabase
+                .from('system_users')
+                .upsert(payload, { onConflict: 'username' });
+
+              if (upsertErr) {
+                console.log(`[Supabase System Users Sync] Upsert user "${user.username}" notice:`, upsertErr.message);
+              }
+            }
+            newState.systemUsersTableMissing = false;
+          } else if (selectErr) {
+            console.log('[Supabase System Users Sync] Fetch current users error:', selectErr.message);
+            if (selectErr.code === '42P01' || selectErr.message?.includes('does not exist')) {
+              newState.systemUsersTableMissing = true;
+            }
+          }
+          lastSupabaseFetchTime = 0;
+        } catch (err: any) {
+          console.log('[Supabase System Users Sync] Operation details:', err?.message || err);
         }
       }
     }

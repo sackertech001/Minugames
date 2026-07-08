@@ -146,14 +146,9 @@ export default function App() {
   });
 
   // Role-Based Access Control users state with rich defaults
-  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([
-    { id: 'u-admin', username: 'admin', role: 'Admin', pin: '1234' },
-    { id: 'u-owner', username: 'owner', role: 'Owner', pin: '5555' },
-    { id: 'u-gameadmin', username: 'game_admin', role: 'Game Admin', pin: '7777' },
-    { id: 'u-referee', username: 'referee', role: 'Referee', pin: '2222' },
-    { id: 'u-scorer', username: 'scorer', role: 'Scorer', pin: '3333' },
-    { id: 'u-player', username: 'player', role: 'Player', pin: '4444' }
-  ]);
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
+
+  const [systemUsersTableMissing, setSystemUsersTableMissing] = useState<boolean>(false);
 
   // Dynamic role permissions matrix configuration state
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
@@ -431,42 +426,70 @@ export default function App() {
 
               // Update players table
               try {
-                // Try to update with all possible variants of name, photo_url, and tournament_type
-                const { error: pError1 } = await supabase
+                // Check if they exist in the players table
+                const { data: existingPlayer } = await supabase
                   .from('players')
-                  .update({
-                    player_name: player.name,
-                    name: player.name,
-                    nickname: player.nickname || null,
-                    club: player.club || null,
-                    photo_url: currentPhotoUrl || null,
-                    photoUrl: currentPhotoUrl || null,
-                    tournament_type: player.tournamentType || null,
-                    tournamentType: player.tournamentType || null,
-                    status: player.status,
-                    seed: player.seed,
-                    matches_played: player.matchesPlayed,
-                    matches_won: player.matchesWon,
-                    total_points: player.totalPoints,
-                    highest_break: player.highestBreak,
-                  })
-                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
-                if (pError1) {
-                  // Fallback: try with a subset of common columns if there was a column error
+                  .select('id')
+                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`)
+                  .maybeSingle();
+
+                if (!existingPlayer) {
+                  // Insert
                   await supabase
+                    .from('players')
+                    .insert({
+                      profile_id: player.id,
+                      player_name: player.name,
+                      name: player.name,
+                      nickname: player.nickname || null,
+                      club: player.club || null,
+                      photo_url: currentPhotoUrl || null,
+                      tournament_type: player.tournamentType || null,
+                      status: player.status,
+                      seed: player.seed,
+                      matches_played: player.matchesPlayed,
+                      matches_won: player.matchesWon,
+                      total_points: player.totalPoints,
+                      highest_break: player.highestBreak,
+                    });
+                } else {
+                  // Update
+                  const { error: pError1 } = await supabase
                     .from('players')
                     .update({
                       player_name: player.name,
+                      name: player.name,
                       nickname: player.nickname || null,
                       club: player.club || null,
-                      seed: player.seed,
+                      photo_url: currentPhotoUrl || null,
+                      photoUrl: currentPhotoUrl || null,
+                      tournament_type: player.tournamentType || null,
+                      tournamentType: player.tournamentType || null,
                       status: player.status,
+                      seed: player.seed,
                       matches_played: player.matchesPlayed,
                       matches_won: player.matchesWon,
                       total_points: player.totalPoints,
                       highest_break: player.highestBreak,
                     })
                     .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                  if (pError1) {
+                    // Fallback: try with a subset of common columns if there was a column error
+                    await supabase
+                      .from('players')
+                      .update({
+                        player_name: player.name,
+                        nickname: player.nickname || null,
+                        club: player.club || null,
+                        seed: player.seed,
+                        status: player.status,
+                        matches_played: player.matchesPlayed,
+                        matches_won: player.matchesWon,
+                        total_points: player.totalPoints,
+                        highest_break: player.highestBreak,
+                      })
+                      .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                  }
                 }
               } catch (pe) {
                 console.log(`[Client Supabase] Update players table error:`, pe);
@@ -965,6 +988,60 @@ export default function App() {
             console.log('[Client Supabase rounds active update] General error:', err?.message || err);
           }
         }
+
+        if (patch.systemUsers && Array.isArray(patch.systemUsers)) {
+          try {
+            const { data: dbCurrentUsers, error: selectErr } = await supabase
+              .from('system_users')
+              .select('id, username');
+
+            if (!selectErr && dbCurrentUsers) {
+              const incomingUsernames = patch.systemUsers.map((u: any) => u.username);
+
+              // Delete users no longer present
+              const toDelete = dbCurrentUsers.filter((u: any) => !incomingUsernames.includes(u.username));
+              if (toDelete.length > 0) {
+                const toDeleteIds = toDelete.map((u: any) => u.id);
+                const { error: delErr } = await supabase
+                  .from('system_users')
+                  .delete()
+                  .in('id', toDeleteIds);
+                if (delErr) {
+                  console.log('[Client Supabase System Users Sync] Delete user notice:', delErr.message);
+                }
+              }
+
+              // Upsert incoming users
+              for (const user of patch.systemUsers) {
+                const isUuidVal = isUUID(user.id);
+                const payload: any = {
+                  username: user.username,
+                  role: user.role,
+                  pin: user.pin
+                };
+                if (isUuidVal) {
+                  payload.id = user.id;
+                }
+
+                const { error: upsertErr } = await supabase
+                  .from('system_users')
+                  .upsert(payload, { onConflict: 'username' });
+
+                if (upsertErr) {
+                  console.log(`[Client Supabase System Users Sync] Upsert user "${user.username}" notice:`, upsertErr.message);
+                }
+              }
+              setSystemUsersTableMissing(false);
+            } else if (selectErr) {
+              console.log('[Client Supabase System Users Sync] Fetch current users error:', selectErr.message);
+              if (selectErr.code === '42P01' || selectErr.message?.includes('does not exist')) {
+                setSystemUsersTableMissing(true);
+              }
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase System Users Sync] General error:', err?.message || err);
+          }
+        }
       }
     };
 
@@ -1029,9 +1106,7 @@ export default function App() {
       const savedMatches = safeStorage.getItem('snooker_matches');
       const savedStarted = safeStorage.getItem('snooker_started');
       const savedConfig = safeStorage.getItem('snooker_config');
-      const savedUsers = safeStorage.getItem('snooker_users');
       const savedPermissions = safeStorage.getItem('snooker_role_permissions');
-      const savedCurrentUser = safeStorage.getItem('snooker_current_user');
       const savedApplications = safeStorage.getItem('snooker_player_applications');
       const savedLogo = safeStorage.getItem('snooker_system_logo');
 
@@ -1076,9 +1151,6 @@ export default function App() {
           safeStorage.setItem('snooker_config', JSON.stringify(parsed));
         }
       }
-      if (savedUsers) {
-        setSystemUsers(JSON.parse(savedUsers));
-      }
       if (savedPermissions) {
         const parsedPermissions = JSON.parse(savedPermissions);
         // Ensure dashboard is included, especially for Admin
@@ -1090,11 +1162,16 @@ export default function App() {
         setRolePermissions(parsedPermissions);
         safeStorage.setItem('snooker_role_permissions', JSON.stringify(parsedPermissions));
       }
-      if (savedCurrentUser) {
-        setCurrentUser(JSON.parse(savedCurrentUser));
-      }
       if (savedLogo) {
         setSystemLogo(savedLogo);
+      }
+      const savedCurrentUser = safeStorage.getItem('snooker_current_user');
+      if (savedCurrentUser) {
+        try {
+          setCurrentUser(JSON.parse(savedCurrentUser));
+        } catch (err) {
+          console.warn('Failed to parse saved current user', err);
+        }
       }
     } catch (e) {
       console.log('Storage read notice:', e);
@@ -1106,7 +1183,11 @@ export default function App() {
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       try {
-        if (e.key === 'snooker_matches') {
+        if (e.key === 'snooker_players') {
+          if (e.newValue) {
+            setPlayers(JSON.parse(e.newValue));
+          }
+        } else if (e.key === 'snooker_matches') {
           if (e.newValue) {
             setMatches(JSON.parse(e.newValue));
           }
@@ -1143,6 +1224,7 @@ export default function App() {
             
             setPlayers((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.players)) {
+                safeStorage.setItem('snooker_players', JSON.stringify(data.players));
                 return data.players;
               }
               return prev;
@@ -1174,11 +1256,42 @@ export default function App() {
 
             setSystemUsers((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.systemUsers)) {
-                safeStorage.setItem('snooker_users', JSON.stringify(data.systemUsers));
                 return data.systemUsers;
               }
               return prev;
             });
+
+            // Validate current logged-in session against live users
+            if (data.systemUsers && Array.isArray(data.systemUsers)) {
+              const savedUserStr = safeStorage.getItem('snooker_current_user');
+              if (savedUserStr) {
+                try {
+                  const savedUser = JSON.parse(savedUserStr);
+                  const matchedUser = data.systemUsers.find((u: any) => u.username.toLowerCase() === savedUser.username.toLowerCase());
+                  if (matchedUser && matchedUser.pin === savedUser.pin) {
+                    // Match found! Sync role if updated
+                    setCurrentUser((prev) => {
+                      if (!prev || prev.role !== matchedUser.role || prev.pin !== matchedUser.pin) {
+                        safeStorage.setItem('snooker_current_user', JSON.stringify(matchedUser));
+                        return matchedUser;
+                      }
+                      return prev;
+                    });
+                  } else {
+                    // PIN mismatch or user deleted, log out
+                    setCurrentUser(null);
+                    safeStorage.removeItem('snooker_current_user');
+                  }
+                } catch (e) {
+                  setCurrentUser(null);
+                  safeStorage.removeItem('snooker_current_user');
+                }
+              }
+            }
+
+            if (data.systemUsersTableMissing !== undefined) {
+              setSystemUsersTableMissing(data.systemUsersTableMissing);
+            }
 
             setRolePermissions((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.rolePermissions)) {
@@ -1427,6 +1540,7 @@ export default function App() {
                     const demoPlayers = prev.filter((p) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
                     const mergedPlayers = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
                     if (JSON.stringify(prev) !== JSON.stringify(mergedPlayers)) {
+                      safeStorage.setItem('snooker_players', JSON.stringify(mergedPlayers));
                       return mergedPlayers;
                     }
                     return prev;
@@ -1471,6 +1585,65 @@ export default function App() {
                     }
                     return prev;
                   });
+                }
+
+                // Direct Client-side system_users table sync
+                try {
+                  const { data: dbSystemUsers, error: usersError } = await supabase
+                    .from('system_users')
+                    .select('*');
+
+                  if (!usersError && dbSystemUsers) {
+                    const mappedUsers = dbSystemUsers.map((u: any) => ({
+                      id: u.id,
+                      username: u.username,
+                      role: u.role,
+                      pin: u.pin
+                    }));
+                    
+                    setSystemUsers((prev) => {
+                      if (JSON.stringify(prev) !== JSON.stringify(mappedUsers)) {
+                        return mappedUsers;
+                      }
+                      return prev;
+                    });
+
+                    // Validate current logged-in session against live users
+                    const savedUserStr = safeStorage.getItem('snooker_current_user');
+                    if (savedUserStr) {
+                      try {
+                        const savedUser = JSON.parse(savedUserStr);
+                        const matchedUser = mappedUsers.find((u: any) => u.username.toLowerCase() === savedUser.username.toLowerCase());
+                        if (matchedUser && matchedUser.pin === savedUser.pin) {
+                          // Match found! Sync role if updated
+                          setCurrentUser((prev) => {
+                            if (!prev || prev.role !== matchedUser.role || prev.pin !== matchedUser.pin) {
+                              safeStorage.setItem('snooker_current_user', JSON.stringify(matchedUser));
+                              return matchedUser;
+                            }
+                            return prev;
+                          });
+                        } else {
+                          // PIN mismatch or user deleted, log out
+                          setCurrentUser(null);
+                          safeStorage.removeItem('snooker_current_user');
+                        }
+                      } catch (e) {
+                        setCurrentUser(null);
+                        safeStorage.removeItem('snooker_current_user');
+                      }
+                    }
+
+                    setSystemUsersTableMissing(false);
+                  } else if (usersError) {
+                    console.log('[Client Supabase Sync] Fetch system_users error:', usersError.message);
+                    if (usersError.code === '42P01' || usersError.message?.includes('does not exist')) {
+                      setSystemUsersTableMissing(true);
+                    }
+                  }
+                } catch (usersErr: any) {
+                  console.log('[Client Supabase Sync] Fetch system_users exception:', usersErr);
+                  setSystemUsersTableMissing(true);
                 }
 
                 // Fetch round_of_32, round_of_16, quarter_finals, semi_finals, grand_final, and third_place in parallel to sync matches
@@ -1998,6 +2171,7 @@ export default function App() {
     started: boolean,
     options?: { wipeBoard?: boolean }
   ) => {
+    safeStorage.setItem('snooker_players', JSON.stringify(newPlayers));
     safeStorage.setItem('snooker_matches', JSON.stringify(newMatches));
     safeStorage.setItem('snooker_started', JSON.stringify(started));
     saveStateToServer({ players: newPlayers, matches: newMatches, isTournamentStarted: started, wipeBoard: options?.wipeBoard });
@@ -2012,7 +2186,6 @@ export default function App() {
 
   const handleUpdateUsers = (newUsers: SystemUser[]) => {
     setSystemUsers(newUsers);
-    safeStorage.setItem('snooker_users', JSON.stringify(newUsers));
     saveStateToServer({ systemUsers: newUsers });
   };
 
@@ -2897,14 +3070,7 @@ export default function App() {
     };
     setTournamentConfig(defaultConfig);
     
-    const defaultUsers: SystemUser[] = [
-      { id: 'u-admin', username: 'admin', role: 'Admin', pin: '1234' },
-      { id: 'u-owner', username: 'owner', role: 'Owner', pin: '5555' },
-      { id: 'u-gameadmin', username: 'game_admin', role: 'Game Admin', pin: '7777' },
-      { id: 'u-referee', username: 'referee', role: 'Referee', pin: '2222' },
-      { id: 'u-scorer', username: 'scorer', role: 'Scorer', pin: '3333' },
-      { id: 'u-player', username: 'player', role: 'Player', pin: '4444' }
-    ];
+    const defaultUsers: SystemUser[] = [];
     setSystemUsers(defaultUsers);
 
     const defaultPermissions: RolePermission[] = [
@@ -3317,6 +3483,7 @@ export default function App() {
         setTheme={setTheme}
         systemLogo={systemLogo}
         onBackToHome={() => setShowMainLogin(false)}
+        systemUsersTableMissing={systemUsersTableMissing}
       />
     );
   }
@@ -3574,6 +3741,7 @@ export default function App() {
               }}
               systemLogo={systemLogo}
               onUpdateSystemLogo={handleUpdateSystemLogo}
+              systemUsersTableMissing={systemUsersTableMissing}
             />
           )}
         </div>

@@ -230,7 +230,6 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- 1. Try to update the matching row in players table if it already exists
   UPDATE public.players
   SET 
     name = NEW.full_name,
@@ -240,37 +239,6 @@ BEGIN
     photo_url = NEW.photo_url,
     tournament_type = NEW.tournament_type
   WHERE profile_id = NEW.id;
-
-  -- 2. If profile is approved/active but no player row exists, auto-insert it
-  IF NEW.status IN ('approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place') THEN
-    IF NOT EXISTS (SELECT 1 FROM public.players WHERE profile_id = NEW.id) THEN
-      INSERT INTO public.players (
-        profile_id,
-        name,
-        player_name,
-        nickname,
-        club,
-        seed,
-        photo_url,
-        status,
-        tournament_type
-      ) VALUES (
-        NEW.id,
-        NEW.full_name,
-        NEW.full_name,
-        NEW.nickname,
-        NEW.club,
-        COALESCE(NEW.seed, 1),
-        NEW.photo_url,
-        'active',
-        NEW.tournament_type
-      )
-      ON CONFLICT (profile_id) DO NOTHING;
-    END IF;
-  ELSIF NEW.status IN ('pending', 'rejected') THEN
-    -- 3. If profile status is reverted to pending/rejected, automatically remove from players table
-    DELETE FROM public.players WHERE profile_id = NEW.id;
-  END IF;
 
   RETURN NEW;
 END;
@@ -1067,6 +1035,55 @@ INSERT INTO public.third_place (
     'Snooker'
   )
 ON CONFLICT (match_number) DO NOTHING;
+
+-- ====================================================================
+-- 18. DEFINE SYSTEM USERS TABLE (RBAC)
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.system_users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL,
+  pin TEXT NOT NULL CHECK (length(pin) >= 4),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and define fully permissive policies for system_users
+ALTER TABLE public.system_users ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access for system_users" ON public.system_users;
+DROP POLICY IF EXISTS "Allow public insert access for system_users" ON public.system_users;
+DROP POLICY IF EXISTS "Allow public update access for system_users" ON public.system_users;
+DROP POLICY IF EXISTS "Allow public delete access for system_users" ON public.system_users;
+
+CREATE POLICY "Allow public read access for system_users" ON public.system_users FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for system_users" ON public.system_users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for system_users" ON public.system_users FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for system_users" ON public.system_users FOR DELETE USING (true);
+
+-- Auto-update updated_at timestamp trigger for system_users
+DROP TRIGGER IF EXISTS update_system_users_updated_at ON public.system_users;
+CREATE TRIGGER update_system_users_updated_at
+  BEFORE UPDATE ON public.system_users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_updated_at();
+
+COMMENT ON TABLE public.system_users IS 'Stores system users for Role-Based Access Control (RBAC).';
+COMMENT ON COLUMN public.system_users.username IS 'Unique handle or call sign of the system user.';
+COMMENT ON COLUMN public.system_users.role IS 'Assigned RBAC role (e.g., Admin, Referee, Scorer, Player).';
+COMMENT ON COLUMN public.system_users.pin IS 'Security PIN code used for system authentication.';
+
+-- Seed initial default system users
+INSERT INTO public.system_users (id, username, role, pin) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'admin', 'Admin', '1234'),
+  ('22222222-2222-2222-2222-222222222222', 'owner', 'Owner', '5555'),
+  ('33333333-3333-3333-3333-333333333333', 'game_admin', 'Game Admin', '7777'),
+  ('44444444-4444-4444-4444-444444444444', 'referee', 'Referee', '2222'),
+  ('55555555-5555-5555-5555-555555555555', 'scorer', 'Scorer', '3333'),
+  ('66666666-6666-6666-6666-666666666666', 'player', 'Player', '4444')
+ON CONFLICT (username) DO UPDATE SET 
+  role = EXCLUDED.role,
+  pin = EXCLUDED.pin;
 
 -- ====================================================================
 -- SUCCESS: All tables, triggers, and sync systems are fully initialized!

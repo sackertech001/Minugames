@@ -18,6 +18,7 @@ interface SettingsTabProps {
   onPublicRegistrationEnabledChange?: (enabled: boolean) => void;
   systemLogo?: string;
   onUpdateSystemLogo?: (newLogo: string) => void;
+  systemUsersTableMissing?: boolean;
 }
 
 export default function SettingsTab({
@@ -35,6 +36,7 @@ export default function SettingsTab({
   onPublicRegistrationEnabledChange,
   systemLogo = '',
   onUpdateSystemLogo,
+  systemUsersTableMissing = false,
 }: SettingsTabProps) {
   // Logo upload states
   const [logoUrl, setLogoUrl] = useState(systemLogo);
@@ -1006,6 +1008,93 @@ export default function SettingsTab({
               </p>
             </div>
           </div>
+
+          {systemUsersTableMissing && (
+            <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-5 space-y-3.5 text-left">
+              <div className="flex items-center gap-2 text-amber-400">
+                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+                <span className="text-xs font-sans font-black uppercase tracking-wider">
+                  Supabase "system_users" Table Missing
+                </span>
+              </div>
+              <p className="text-xs text-amber-200 leading-relaxed">
+                The <code className="bg-black/45 px-1 py-0.5 rounded font-mono text-xs text-white">system_users</code> table does not exist in your live Supabase database. System users created or edited below will only persist temporarily in the server's cache and will be reset when the container restarts.
+              </p>
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Copy & Run this SQL in your Supabase SQL Editor to enable database users:
+                </p>
+                <div className="relative">
+                  <pre className="bg-[#030914] text-[#EEF1F5] text-[10px] font-mono p-4 rounded-xl border border-slate-800 overflow-x-auto leading-relaxed select-all max-h-48">
+{`-- Create system_users table for Role-Based Access Control
+CREATE TABLE IF NOT EXISTS public.system_users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL,
+  pin TEXT NOT NULL CHECK (length(pin) >= 4),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.system_users ENABLE ROW LEVEL SECURITY;
+
+-- Define fully permissive policies
+CREATE POLICY "Allow public read access for system_users" ON public.system_users FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for system_users" ON public.system_users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for system_users" ON public.system_users FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for system_users" ON public.system_users FOR DELETE USING (true);
+
+-- Seed initial default users
+INSERT INTO public.system_users (username, role, pin) VALUES
+  ('admin', 'Admin', '1234'),
+  ('owner', 'Owner', '5555'),
+  ('game_admin', 'Game Admin', '7777'),
+  ('referee', 'Referee', '2222'),
+  ('scorer', 'Scorer', '3333'),
+  ('player', 'Player', '4444')
+ON CONFLICT (username) DO NOTHING;`}
+                  </pre>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`-- Create system_users table for Role-Based Access Control
+CREATE TABLE IF NOT EXISTS public.system_users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL,
+  pin TEXT NOT NULL CHECK (length(pin) >= 4),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.system_users ENABLE ROW LEVEL SECURITY;
+
+-- Define fully permissive policies
+CREATE POLICY "Allow public read access for system_users" ON public.system_users FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access for system_users" ON public.system_users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access for system_users" ON public.system_users FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access for system_users" ON public.system_users FOR DELETE USING (true);
+
+-- Seed initial default users
+INSERT INTO public.system_users (username, role, pin) VALUES
+  ('admin', 'Admin', '1234'),
+  ('owner', 'Owner', '5555'),
+  ('game_admin', 'Game Admin', '7777'),
+  ('referee', 'Referee', '2222'),
+  ('scorer', 'Scorer', '3333'),
+  ('player', 'Player', '4444')
+ON CONFLICT (username) DO NOTHING;`);
+                      alert('SQL Script copied to clipboard!');
+                    }}
+                    className="absolute top-2 right-2 bg-slate-850 hover:bg-slate-750 border border-slate-700 text-amber-400 hover:text-amber-300 text-[10px] px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5" /> Copy SQL
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {isUserMgmtAllowed ? (
             <div className="space-y-6">
