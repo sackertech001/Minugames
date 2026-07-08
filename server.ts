@@ -73,14 +73,7 @@ const DEFAULT_STATE: TournamentState = {
       second: "₦150,000"
     }
   },
-  systemUsers: [
-    { id: "u-admin", username: "admin", role: "Admin", pin: "1234" },
-    { id: "u-owner", username: "owner", role: "Owner", pin: "5555" },
-    { id: "u-gameadmin", username: "game_admin", role: "Game Admin", pin: "7777" },
-    { id: "u-referee", username: "referee", role: "Referee", pin: "2222" },
-    { id: "u-scorer", username: "scorer", role: "Scorer", pin: "3333" },
-    { id: "u-player", username: "player", role: "Player", pin: "4444" }
-  ],
+  systemUsers: [],
   rolePermissions: [
     {
       role: "Admin",

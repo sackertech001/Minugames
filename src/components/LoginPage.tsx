@@ -140,10 +140,22 @@ export default function LoginPage({
                 <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" /> Database Table Missing
               </p>
               <p className="text-xs text-amber-200 leading-normal">
-                The <code className="bg-black/30 px-1 py-0.5 rounded font-mono text-[11px]">system_users</code> table does not exist in your Supabase live database. The app has fallen back to default credentials.
+                The <code className="bg-black/30 px-1 py-0.5 rounded font-mono text-[11px]">system_users</code> table does not exist in your Supabase live database.
               </p>
               <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
                 Please copy and run the SQL script in the System Settings (User Management section) or the <code className="bg-black/30 px-1 py-0.5 rounded font-mono text-[10px]">supabase/setup.sql</code> file in your Supabase SQL Editor.
+              </p>
+            </div>
+          )}
+
+          {/* Loading users status */}
+          {!systemUsersTableMissing && users.length === 0 && (
+            <div className="mb-6 bg-[#1A6DFF]/10 border border-[#1A6DFF]/25 rounded-2xl p-4 text-left">
+              <p className="text-[10px] font-black text-[#1A6DFF] uppercase tracking-wider mb-1 flex items-center gap-1.5 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-[#1A6DFF] inline-block animate-ping" /> Loading live security keys...
+              </p>
+              <p className="text-xs text-slate-300 leading-normal">
+                Connecting to Supabase to retrieve active credentials. Please wait...
               </p>
             </div>
           )}
