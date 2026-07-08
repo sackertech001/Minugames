@@ -1235,15 +1235,42 @@ async function startServer() {
                   .maybeSingle();
 
                 if (!existingPlayer) {
+                  const insertObj = {
+                    profile_id: app.id,
+                    name: app.fullName,
+                    player_name: app.fullName
+                  };
+
                   const { error: insertErr } = await supabase
                     .from('players')
-                    .insert({
-                      profile_id: app.id,
-                      name: app.fullName,
-                      player_name: app.fullName
-                    });
+                    .insert(insertObj);
+
                   if (insertErr) {
-                    console.log(`[Supabase Player Table Sync] Insert details for user ${app.id}:`, insertErr.message);
+                    console.log(`[Supabase Player Table Sync] Insert with full object failed, trying fallback 1 (no player_name)...`, insertErr.message);
+                    const fb1 = { ...insertObj };
+                    delete (fb1 as any).player_name;
+                    
+                    const { error: err1 } = await supabase
+                      .from('players')
+                      .insert(fb1);
+
+                    if (err1) {
+                      console.log(`[Supabase Player Table Sync] Fallback 1 failed, trying fallback 2 (no name)...`, err1.message);
+                      const fb2 = { ...insertObj };
+                      delete (fb2 as any).name;
+
+                      const { error: err2 } = await supabase
+                        .from('players')
+                        .insert(fb2);
+
+                      if (err2) {
+                        console.log(`[Supabase Player Table Sync] All insertion fallbacks failed:`, err2.message);
+                      } else {
+                        console.log(`[Supabase Player Table Sync] Fallback 2 players insert successful for ${app.fullName}`);
+                      }
+                    } else {
+                      console.log(`[Supabase Player Table Sync] Fallback 1 players insert successful for ${app.fullName}`);
+                    }
                   } else {
                     console.log(`[Supabase Player Table Sync] Successfully created player row for ${app.fullName}`);
                   }

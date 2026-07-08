@@ -1102,12 +1102,61 @@ export default function RegistrationPortal({
                                   // Direct Supabase update for immediate, rock-solid consistency
                                   const supabase = getSupabase();
                                   if (supabase) {
+                                    // 1. Update status and seed in profiles table
                                     supabase
                                       .from('profiles')
                                       .update({ status: 'approved', seed: finalSeed })
                                       .eq('id', app.id)
                                       .then(({ error: err }) => {
                                         if (err) console.log('[RegistrationPortal] Supabase direct status/seed update error:', err.message);
+                                      });
+
+                                    // 2. Insert into players table with column fallbacks (just in case they don't have name or player_name)
+                                    const insertObj = {
+                                      profile_id: app.id,
+                                      name: app.fullName,
+                                      player_name: app.fullName,
+                                      nickname: app.nickname || '',
+                                      club: app.club || '',
+                                      seed: finalSeed,
+                                      photo_url: app.photoUrl || '',
+                                      status: 'active',
+                                      tournament_type: app.tournamentType || ''
+                                    };
+
+                                    supabase
+                                      .from('players')
+                                      .insert(insertObj)
+                                      .then(({ error: insertErr }) => {
+                                        if (insertErr) {
+                                          console.log('[RegistrationPortal] Direct players insert with full object failed, trying fallback 1 (no player_name)...', insertErr.message);
+                                          const fb1 = { ...insertObj };
+                                          delete (fb1 as any).player_name;
+                                          supabase
+                                            .from('players')
+                                            .insert(fb1)
+                                            .then(({ error: err1 }) => {
+                                              if (err1) {
+                                                console.log('[RegistrationPortal] Fallback 1 failed, trying fallback 2 (no name)...', err1.message);
+                                                const fb2 = { ...insertObj };
+                                                delete (fb2 as any).name;
+                                                supabase
+                                                  .from('players')
+                                                  .insert(fb2)
+                                                  .then(({ error: err2 }) => {
+                                                    if (err2) {
+                                                      console.log('[RegistrationPortal] All direct insertion fallbacks failed:', err2.message);
+                                                    } else {
+                                                      console.log('[RegistrationPortal] Fallback 2 players insert successful');
+                                                    }
+                                                  });
+                                              } else {
+                                                console.log('[RegistrationPortal] Fallback 1 players insert successful');
+                                              }
+                                            });
+                                        } else {
+                                          console.log('[RegistrationPortal] Supabase direct players insert success');
+                                        }
                                       });
                                   }
 

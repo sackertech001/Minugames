@@ -230,6 +230,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  -- 1. Try to update the matching row in players table if it already exists
   UPDATE public.players
   SET 
     name = NEW.full_name,
@@ -239,6 +240,37 @@ BEGIN
     photo_url = NEW.photo_url,
     tournament_type = NEW.tournament_type
   WHERE profile_id = NEW.id;
+
+  -- 2. If profile is approved/active but no player row exists, auto-insert it
+  IF NEW.status IN ('approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place') THEN
+    IF NOT EXISTS (SELECT 1 FROM public.players WHERE profile_id = NEW.id) THEN
+      INSERT INTO public.players (
+        profile_id,
+        name,
+        player_name,
+        nickname,
+        club,
+        seed,
+        photo_url,
+        status,
+        tournament_type
+      ) VALUES (
+        NEW.id,
+        NEW.full_name,
+        NEW.full_name,
+        NEW.nickname,
+        NEW.club,
+        COALESCE(NEW.seed, 1),
+        NEW.photo_url,
+        'active',
+        NEW.tournament_type
+      )
+      ON CONFLICT (profile_id) DO NOTHING;
+    END IF;
+  ELSIF NEW.status IN ('pending', 'rejected') THEN
+    -- 3. If profile status is reverted to pending/rejected, automatically remove from players table
+    DELETE FROM public.players WHERE profile_id = NEW.id;
+  END IF;
 
   RETURN NEW;
 END;
