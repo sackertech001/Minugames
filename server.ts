@@ -1053,6 +1053,26 @@ async function startServer() {
             console.log('[Supabase DB Sync] Error syncing third_place:', tpErr);
           }
 
+          // Fetch system_users from Supabase to sync RBAC users
+          try {
+            const { data: dbSystemUsers, error: usersError } = await supabase
+              .from('system_users')
+              .select('*');
+
+            if (!usersError && dbSystemUsers && dbSystemUsers.length > 0) {
+              const mappedUsers = dbSystemUsers.map((u: any) => ({
+                id: u.id,
+                username: u.username,
+                role: u.role,
+                pin: u.pin
+              }));
+              state.systemUsers = mappedUsers;
+              console.log(`[Supabase DB Sync] System users synced. Total: ${mappedUsers.length}`);
+            }
+          } catch (usersErr) {
+            console.log('[Supabase DB Sync] Error syncing system_users:', usersErr);
+          }
+
           writeState(state);
         }
       })(), 12000, "Supabase connection timed out");
@@ -1875,6 +1895,72 @@ async function startServer() {
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
           console.log('[Server Supabase Matches Sync] Operation details:', err?.message || err);
+        }
+      }
+    }
+
+    // If systemUsers list is changed, sync details back to Supabase system_users table
+    if (req.body.systemUsers && Array.isArray(req.body.systemUsers)) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+
+          // Fetch currently existing usernames in DB to handle deletion
+          const { data: dbCurrentUsers, error: selectErr } = await supabase
+            .from('system_users')
+            .select('id, username');
+
+          if (!selectErr && dbCurrentUsers) {
+            const incomingUsernames = req.body.systemUsers.map((u: any) => u.username);
+
+            // Delete users no longer present
+            const toDelete = dbCurrentUsers.filter((u: any) => !incomingUsernames.includes(u.username));
+            if (toDelete.length > 0) {
+              const toDeleteIds = toDelete.map((u: any) => u.id);
+              const { error: delErr } = await supabase
+                .from('system_users')
+                .delete()
+                .in('id', toDeleteIds);
+              if (delErr) {
+                console.log('[Supabase System Users Sync] Delete user notice:', delErr.message);
+              }
+            }
+
+            // Upsert incoming users
+            for (const user of req.body.systemUsers) {
+              const isUuidVal = isUUID(user.id);
+              const payload: any = {
+                username: user.username,
+                role: user.role,
+                pin: user.pin
+              };
+              if (isUuidVal) {
+                payload.id = user.id;
+              }
+
+              const { error: upsertErr } = await supabase
+                .from('system_users')
+                .upsert(payload, { onConflict: 'username' });
+
+              if (upsertErr) {
+                console.log(`[Supabase System Users Sync] Upsert user "${user.username}" notice:`, upsertErr.message);
+              }
+            }
+          }
+          lastSupabaseFetchTime = 0;
+        } catch (err: any) {
+          console.log('[Supabase System Users Sync] Operation details:', err?.message || err);
         }
       }
     }

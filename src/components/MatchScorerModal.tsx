@@ -305,6 +305,7 @@ export default function MatchScorerModal({
 
     setSuccessMessage('Scores updated successfully in Database!');
     setLoadingUpdate(false);
+    onClose();
 
     // Auto clear success message after 3 seconds
     setTimeout(() => {
