@@ -1102,12 +1102,75 @@ export default function RegistrationPortal({
                                   // Direct Supabase update for immediate, rock-solid consistency
                                   const supabase = getSupabase();
                                   if (supabase) {
+                                    // 1. Update profiles table status and seed
                                     supabase
                                       .from('profiles')
                                       .update({ status: 'approved', seed: finalSeed })
                                       .eq('id', app.id)
                                       .then(({ error: err }) => {
                                         if (err) console.log('[RegistrationPortal] Supabase direct status/seed update error:', err.message);
+                                      });
+
+                                    // 2. Insert or update the players table to guarantee they appear in Roster immediately
+                                    supabase
+                                      .from('players')
+                                      .select('id')
+                                      .eq('profile_id', app.id)
+                                      .maybeSingle()
+                                      .then(({ data: existingPlayer, error: checkErr }) => {
+                                        if (!checkErr && existingPlayer) {
+                                          // Update existing player row
+                                          supabase
+                                            .from('players')
+                                            .update({
+                                              player_name: app.fullName,
+                                              name: app.fullName,
+                                              nickname: app.nickname || null,
+                                              club: app.club || null,
+                                              seed: finalSeed,
+                                              photo_url: app.photoUrl || null,
+                                              status: 'active',
+                                              tournament_type: app.tournamentType || null
+                                            })
+                                            .eq('profile_id', app.id)
+                                            .then(({ error: updErr }) => {
+                                              if (updErr) console.log('[RegistrationPortal] Supabase direct player update error:', updErr.message);
+                                            });
+                                        } else {
+                                          // Insert new player row
+                                          supabase
+                                            .from('players')
+                                            .insert({
+                                              profile_id: app.id,
+                                              player_name: app.fullName,
+                                              name: app.fullName,
+                                              nickname: app.nickname || null,
+                                              club: app.club || null,
+                                              seed: finalSeed,
+                                              photo_url: app.photoUrl || null,
+                                              status: 'active',
+                                              tournament_type: app.tournamentType || null,
+                                              matches_played: 0,
+                                              matches_won: 0,
+                                              total_points: 0,
+                                              highest_break: 0
+                                            })
+                                            .then(({ error: insErr }) => {
+                                              if (insErr) {
+                                                console.log('[RegistrationPortal] Supabase direct player insert error:', insErr.message);
+                                                // Fallback attempt with subset of columns just in case
+                                                supabase
+                                                  .from('players')
+                                                  .insert({
+                                                    profile_id: app.id,
+                                                    name: app.fullName,
+                                                    player_name: app.fullName,
+                                                    seed: finalSeed,
+                                                    status: 'active'
+                                                  });
+                                              }
+                                            });
+                                        }
                                       });
                                   }
 

@@ -426,42 +426,70 @@ export default function App() {
 
               // Update players table
               try {
-                // Try to update with all possible variants of name, photo_url, and tournament_type
-                const { error: pError1 } = await supabase
+                // Check if they exist in the players table
+                const { data: existingPlayer } = await supabase
                   .from('players')
-                  .update({
-                    player_name: player.name,
-                    name: player.name,
-                    nickname: player.nickname || null,
-                    club: player.club || null,
-                    photo_url: currentPhotoUrl || null,
-                    photoUrl: currentPhotoUrl || null,
-                    tournament_type: player.tournamentType || null,
-                    tournamentType: player.tournamentType || null,
-                    status: player.status,
-                    seed: player.seed,
-                    matches_played: player.matchesPlayed,
-                    matches_won: player.matchesWon,
-                    total_points: player.totalPoints,
-                    highest_break: player.highestBreak,
-                  })
-                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
-                if (pError1) {
-                  // Fallback: try with a subset of common columns if there was a column error
+                  .select('id')
+                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`)
+                  .maybeSingle();
+
+                if (!existingPlayer) {
+                  // Insert
                   await supabase
+                    .from('players')
+                    .insert({
+                      profile_id: player.id,
+                      player_name: player.name,
+                      name: player.name,
+                      nickname: player.nickname || null,
+                      club: player.club || null,
+                      photo_url: currentPhotoUrl || null,
+                      tournament_type: player.tournamentType || null,
+                      status: player.status,
+                      seed: player.seed,
+                      matches_played: player.matchesPlayed,
+                      matches_won: player.matchesWon,
+                      total_points: player.totalPoints,
+                      highest_break: player.highestBreak,
+                    });
+                } else {
+                  // Update
+                  const { error: pError1 } = await supabase
                     .from('players')
                     .update({
                       player_name: player.name,
+                      name: player.name,
                       nickname: player.nickname || null,
                       club: player.club || null,
-                      seed: player.seed,
+                      photo_url: currentPhotoUrl || null,
+                      photoUrl: currentPhotoUrl || null,
+                      tournament_type: player.tournamentType || null,
+                      tournamentType: player.tournamentType || null,
                       status: player.status,
+                      seed: player.seed,
                       matches_played: player.matchesPlayed,
                       matches_won: player.matchesWon,
                       total_points: player.totalPoints,
                       highest_break: player.highestBreak,
                     })
                     .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                  if (pError1) {
+                    // Fallback: try with a subset of common columns if there was a column error
+                    await supabase
+                      .from('players')
+                      .update({
+                        player_name: player.name,
+                        nickname: player.nickname || null,
+                        club: player.club || null,
+                        seed: player.seed,
+                        status: player.status,
+                        matches_played: player.matchesPlayed,
+                        matches_won: player.matchesWon,
+                        total_points: player.totalPoints,
+                        highest_break: player.highestBreak,
+                      })
+                      .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                  }
                 }
               } catch (pe) {
                 console.log(`[Client Supabase] Update players table error:`, pe);
@@ -1155,7 +1183,11 @@ export default function App() {
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       try {
-        if (e.key === 'snooker_matches') {
+        if (e.key === 'snooker_players') {
+          if (e.newValue) {
+            setPlayers(JSON.parse(e.newValue));
+          }
+        } else if (e.key === 'snooker_matches') {
           if (e.newValue) {
             setMatches(JSON.parse(e.newValue));
           }
@@ -1192,6 +1224,7 @@ export default function App() {
             
             setPlayers((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.players)) {
+                safeStorage.setItem('snooker_players', JSON.stringify(data.players));
                 return data.players;
               }
               return prev;
@@ -1507,6 +1540,7 @@ export default function App() {
                     const demoPlayers = prev.filter((p) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
                     const mergedPlayers = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
                     if (JSON.stringify(prev) !== JSON.stringify(mergedPlayers)) {
+                      safeStorage.setItem('snooker_players', JSON.stringify(mergedPlayers));
                       return mergedPlayers;
                     }
                     return prev;
@@ -2137,6 +2171,7 @@ export default function App() {
     started: boolean,
     options?: { wipeBoard?: boolean }
   ) => {
+    safeStorage.setItem('snooker_players', JSON.stringify(newPlayers));
     safeStorage.setItem('snooker_matches', JSON.stringify(newMatches));
     safeStorage.setItem('snooker_started', JSON.stringify(started));
     saveStateToServer({ players: newPlayers, matches: newMatches, isTournamentStarted: started, wipeBoard: options?.wipeBoard });
