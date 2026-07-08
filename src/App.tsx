@@ -155,6 +155,8 @@ export default function App() {
     { id: 'u-player', username: 'player', role: 'Player', pin: '4444' }
   ]);
 
+  const [systemUsersTableMissing, setSystemUsersTableMissing] = useState<boolean>(false);
+
   // Dynamic role permissions matrix configuration state
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
     {
@@ -1179,6 +1181,10 @@ export default function App() {
               }
               return prev;
             });
+
+            if (data.systemUsersTableMissing !== undefined) {
+              setSystemUsersTableMissing(data.systemUsersTableMissing);
+            }
 
             setRolePermissions((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.rolePermissions)) {
@@ -3317,6 +3323,7 @@ export default function App() {
         setTheme={setTheme}
         systemLogo={systemLogo}
         onBackToHome={() => setShowMainLogin(false)}
+        systemUsersTableMissing={systemUsersTableMissing}
       />
     );
   }
@@ -3574,6 +3581,7 @@ export default function App() {
               }}
               systemLogo={systemLogo}
               onUpdateSystemLogo={handleUpdateSystemLogo}
+              systemUsersTableMissing={systemUsersTableMissing}
             />
           )}
         </div>

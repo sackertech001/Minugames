@@ -45,6 +45,7 @@ interface TournamentState {
   playerApplications: any[];
   publicRegistrationEnabled: boolean;
   systemLogo?: string;
+  systemUsersTableMissing?: boolean;
 }
 
 const DEFAULT_STATE: TournamentState = {
@@ -114,7 +115,8 @@ const DEFAULT_STATE: TournamentState = {
   ],
   playerApplications: [],
   publicRegistrationEnabled: true,
-  systemLogo: ""
+  systemLogo: "",
+  systemUsersTableMissing: false
 };
 
 function readState(): TournamentState {
@@ -1059,7 +1061,7 @@ async function startServer() {
               .from('system_users')
               .select('*');
 
-            if (!usersError && dbSystemUsers && dbSystemUsers.length > 0) {
+            if (!usersError && dbSystemUsers) {
               const mappedUsers = dbSystemUsers.map((u: any) => ({
                 id: u.id,
                 username: u.username,
@@ -1067,10 +1069,17 @@ async function startServer() {
                 pin: u.pin
               }));
               state.systemUsers = mappedUsers;
+              state.systemUsersTableMissing = false;
               console.log(`[Supabase DB Sync] System users synced. Total: ${mappedUsers.length}`);
+            } else if (usersError) {
+              console.log('[Supabase DB Sync] Error syncing system_users:', usersError.message);
+              if (usersError.code === '42P01' || usersError.message?.includes('does not exist')) {
+                state.systemUsersTableMissing = true;
+              }
             }
-          } catch (usersErr) {
+          } catch (usersErr: any) {
             console.log('[Supabase DB Sync] Error syncing system_users:', usersErr);
+            state.systemUsersTableMissing = true;
           }
 
           writeState(state);
@@ -1956,6 +1965,12 @@ async function startServer() {
               if (upsertErr) {
                 console.log(`[Supabase System Users Sync] Upsert user "${user.username}" notice:`, upsertErr.message);
               }
+            }
+            newState.systemUsersTableMissing = false;
+          } else if (selectErr) {
+            console.log('[Supabase System Users Sync] Fetch current users error:', selectErr.message);
+            if (selectErr.code === '42P01' || selectErr.message?.includes('does not exist')) {
+              newState.systemUsersTableMissing = true;
             }
           }
           lastSupabaseFetchTime = 0;
