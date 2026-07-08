@@ -1137,6 +1137,14 @@ export default function App() {
       if (savedLogo) {
         setSystemLogo(savedLogo);
       }
+      const savedCurrentUser = safeStorage.getItem('snooker_current_user');
+      if (savedCurrentUser) {
+        try {
+          setCurrentUser(JSON.parse(savedCurrentUser));
+        } catch (err) {
+          console.warn('Failed to parse saved current user', err);
+        }
+      }
     } catch (e) {
       console.log('Storage read notice:', e);
     }
@@ -1219,6 +1227,34 @@ export default function App() {
               }
               return prev;
             });
+
+            // Validate current logged-in session against live users
+            if (data.systemUsers && Array.isArray(data.systemUsers)) {
+              const savedUserStr = safeStorage.getItem('snooker_current_user');
+              if (savedUserStr) {
+                try {
+                  const savedUser = JSON.parse(savedUserStr);
+                  const matchedUser = data.systemUsers.find((u: any) => u.username.toLowerCase() === savedUser.username.toLowerCase());
+                  if (matchedUser && matchedUser.pin === savedUser.pin) {
+                    // Match found! Sync role if updated
+                    setCurrentUser((prev) => {
+                      if (!prev || prev.role !== matchedUser.role || prev.pin !== matchedUser.pin) {
+                        safeStorage.setItem('snooker_current_user', JSON.stringify(matchedUser));
+                        return matchedUser;
+                      }
+                      return prev;
+                    });
+                  } else {
+                    // PIN mismatch or user deleted, log out
+                    setCurrentUser(null);
+                    safeStorage.removeItem('snooker_current_user');
+                  }
+                } catch (e) {
+                  setCurrentUser(null);
+                  safeStorage.removeItem('snooker_current_user');
+                }
+              }
+            }
 
             if (data.systemUsersTableMissing !== undefined) {
               setSystemUsersTableMissing(data.systemUsersTableMissing);
@@ -1537,6 +1573,33 @@ export default function App() {
                       }
                       return prev;
                     });
+
+                    // Validate current logged-in session against live users
+                    const savedUserStr = safeStorage.getItem('snooker_current_user');
+                    if (savedUserStr) {
+                      try {
+                        const savedUser = JSON.parse(savedUserStr);
+                        const matchedUser = mappedUsers.find((u: any) => u.username.toLowerCase() === savedUser.username.toLowerCase());
+                        if (matchedUser && matchedUser.pin === savedUser.pin) {
+                          // Match found! Sync role if updated
+                          setCurrentUser((prev) => {
+                            if (!prev || prev.role !== matchedUser.role || prev.pin !== matchedUser.pin) {
+                              safeStorage.setItem('snooker_current_user', JSON.stringify(matchedUser));
+                              return matchedUser;
+                            }
+                            return prev;
+                          });
+                        } else {
+                          // PIN mismatch or user deleted, log out
+                          setCurrentUser(null);
+                          safeStorage.removeItem('snooker_current_user');
+                        }
+                      } catch (e) {
+                        setCurrentUser(null);
+                        safeStorage.removeItem('snooker_current_user');
+                      }
+                    }
+
                     setSystemUsersTableMissing(false);
                   } else if (usersError) {
                     console.log('[Client Supabase Sync] Fetch system_users error:', usersError.message);
@@ -2113,11 +2176,14 @@ export default function App() {
   const handleLogin = (user: SystemUser | null) => {
     setCurrentUser(user);
     if (user) {
+      safeStorage.setItem('snooker_current_user', JSON.stringify(user));
       const userPerm = rolePermissions.find(rp => rp.role === user.role);
       if (userPerm && userPerm.allowedTabs.length > 0) {
         // Auto navigate to the first allowed tab
         setActiveTab(userPerm.allowedTabs[0]);
       }
+    } else {
+      safeStorage.removeItem('snooker_current_user');
     }
   };
 
