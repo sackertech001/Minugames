@@ -1380,7 +1380,7 @@ async function startServer() {
                 club: player.club || null,
                 photo_url: currentPhotoUrl || null,
                 tournament_type: player.tournamentType || null,
-                status: player.status,
+                status: player.status === 'active' ? 'approved' : player.status,
                 seed: player.seed,
                 matches_played: player.matchesPlayed,
                 matches_won: player.matchesWon,
@@ -1394,43 +1394,82 @@ async function startServer() {
             }
 
             // Update players table
-            const { error: playerErr1 } = await supabase
-              .from('players')
-              .update({
-                status: player.status,
-                seed: player.seed,
-                matches_played: player.matchesPlayed,
-                matches_won: player.matchesWon,
-                total_points: player.totalPoints,
-                highest_break: player.highestBreak,
-                player_name: player.name,
-                name: player.name,
-                nickname: player.nickname,
-                club: player.club,
-                photo_url: currentPhotoUrl,
-                tournament_type: player.tournamentType
-              })
-              .eq('profile_id', player.id);
-
-            if (playerErr1) {
-              // Try updating by 'id' just in case
-              await supabase
+            try {
+              const { data: existingPlayerTable } = await supabase
                 .from('players')
-                .update({
-                  status: player.status,
-                  seed: player.seed,
-                  matches_played: player.matchesPlayed,
-                  matches_won: player.matchesWon,
-                  total_points: player.totalPoints,
-                  highest_break: player.highestBreak,
-                  player_name: player.name,
-                  name: player.name,
-                  nickname: player.nickname,
-                  club: player.club,
-                  photo_url: currentPhotoUrl,
-                  tournament_type: player.tournamentType
-                })
-                .eq('id', player.id);
+                .select('id')
+                .eq('profile_id', player.id)
+                .maybeSingle();
+
+              if (!existingPlayerTable) {
+                // Insert new player row since it doesn't exist
+                const { error: insertErr } = await supabase
+                  .from('players')
+                  .insert({
+                    profile_id: player.id,
+                    player_name: player.name,
+                    name: player.name,
+                    nickname: player.nickname || null,
+                    club: player.club || null,
+                    seed: player.seed || 1,
+                    photo_url: currentPhotoUrl || null,
+                    photoUrl: currentPhotoUrl || null,
+                    matches_played: player.matchesPlayed || 0,
+                    matches_won: player.matchesWon || 0,
+                    total_points: player.totalPoints || 0,
+                    highest_break: player.highestBreak || 0,
+                    status: player.status || 'active',
+                    tournament_type: player.tournamentType || null,
+                    tournamentType: player.tournamentType || null
+                  });
+                if (insertErr) {
+                  console.log(`[Supabase Players Sync Server] Insert failed for missing player ${player.id}:`, insertErr.message);
+                } else {
+                  console.log(`[Supabase Players Sync Server] Successfully inserted missing player row for ${player.name}`);
+                }
+              } else {
+                // Update players table
+                const { error: playerErr1 } = await supabase
+                  .from('players')
+                  .update({
+                    status: player.status,
+                    seed: player.seed,
+                    matches_played: player.matchesPlayed,
+                    matches_won: player.matchesWon,
+                    total_points: player.totalPoints,
+                    highest_break: player.highestBreak,
+                    player_name: player.name,
+                    name: player.name,
+                    nickname: player.nickname,
+                    club: player.club,
+                    photo_url: currentPhotoUrl,
+                    tournament_type: player.tournamentType
+                  })
+                  .eq('profile_id', player.id);
+
+                if (playerErr1) {
+                  // Try updating by 'id' just in case
+                  await supabase
+                    .from('players')
+                    .update({
+                      status: player.status,
+                      seed: player.seed,
+                      matches_played: player.matchesPlayed,
+                      matches_won: player.matchesWon,
+                      total_points: player.totalPoints,
+                      highest_break: player.highestBreak,
+                      player_name: player.name,
+                      name: player.name,
+                      nickname: player.nickname,
+                      club: player.club,
+                      photo_url: currentPhotoUrl,
+                      tournament_type: player.tournamentType
+                    })
+                    .eq('id', player.id);
+                }
+              }
+            } catch (err: any) {
+              console.log(`[Supabase Players Sync Server] Error handling player table update/insert for ${player.id}:`, err?.message || err);
             }
           });
 
