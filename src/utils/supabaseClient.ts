@@ -3,6 +3,40 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 let supabaseInstance: SupabaseClient | null = null;
 
 /**
+ * Dynamically sets the Supabase configuration from runtime keys.
+ */
+export function setSupabaseConfig(url: string, anonKey: string): SupabaseClient | null {
+  if (!url || !anonKey || url === 'YOUR_SUPABASE_URL' || anonKey === 'YOUR_SUPABASE_ANON_KEY') {
+    return null;
+  }
+  try {
+    supabaseInstance = createClient(url, anonKey);
+    console.log('[Supabase Client] Successfully initialized dynamically with runtime config.');
+    return supabaseInstance;
+  } catch (error) {
+    console.log('[Supabase Client] Dynamic initialization error:', error);
+    return null;
+  }
+}
+
+// Background auto-fetch of runtime configuration from backend to ensure support in serverless environments (Cloud Run)
+if (typeof window !== 'undefined') {
+  fetch('/api/config')
+    .then((res) => {
+      if (res.ok) return res.json();
+      throw new Error('API config endpoint returned non-ok status');
+    })
+    .then((data) => {
+      if (data && data.supabaseUrl && data.supabaseAnonKey) {
+        setSupabaseConfig(data.supabaseUrl, data.supabaseAnonKey);
+      }
+    })
+    .catch((err) => {
+      console.log('[Supabase Client] Runtime configuration fetch skipped or failed:', err.message);
+    });
+}
+
+/**
  * Returns the initialized Supabase client, or null if credentials are not configured.
  * This function uses lazy initialization to prevent application crashes during startup
  * if the environment variables are not yet provided.

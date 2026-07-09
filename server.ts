@@ -1355,6 +1355,13 @@ async function startServer() {
   }
 
   // API Endpoints
+  app.get("/api/config", (req, res) => {
+    res.json({
+      supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "",
+      supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ""
+    });
+  });
+
   app.get("/api/state", async (req, res) => {
     const now = Date.now();
     if (lastSupabaseFetchTime === 0) {
