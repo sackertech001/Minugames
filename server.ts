@@ -121,50 +121,89 @@ const ensureProfileExists = async (supabase: any, id: string, playerObj: any): P
   return false;
 };
 
+const activePlayerInserts = new Set<string>();
+
 const safeInsertPlayer = async (supabase: any, playerObj: any): Promise<boolean> => {
-  if (playerObj.profile_id) {
-    await ensureProfileExists(supabase, playerObj.profile_id, playerObj);
+  const profileId = playerObj.profile_id;
+  if (!profileId) return false;
+
+  if (activePlayerInserts.has(profileId)) {
+    console.log(`[safeInsertPlayer] Insert already in progress for profile_id: ${profileId}. Skipping duplicate insert.`);
+    return true;
   }
-  let attemptObj = { ...playerObj };
-  console.log(`[safeInsertPlayer] Attempting insert for profile_id: ${playerObj.profile_id}`);
-  for (let i = 0; i < 10; i++) {
-    const { error } = await supabase.from('players').insert(attemptObj);
-    if (!error) {
-      console.log(`[safeInsertPlayer] Successfully inserted player for profile_id ${playerObj.profile_id}`);
+
+  activePlayerInserts.add(profileId);
+
+  try {
+    // 1. Double check if a player row already exists in the database
+    const { data: existing } = await supabase
+      .from('players')
+      .select('id')
+      .eq('profile_id', profileId);
+
+    if (existing && existing.length > 0) {
+      console.log(`[safeInsertPlayer] Player row already exists in DB for profile_id: ${profileId}.`);
+      // If there are duplicate rows in the DB, clean them up!
+      if (existing.length > 1) {
+        console.log(`[safeInsertPlayer] Found ${existing.length} duplicates for profile_id: ${profileId}. Cleaning up duplicates...`);
+        const idsToDelete = existing.slice(1).map((r: any) => r.id);
+        await supabase.from('players').delete().in('id', idsToDelete);
+      }
       return true;
     }
-    
-    const errMsg = error.message || '';
-    const errDetails = error.details || '';
-    const errCode = error.code || '';
-    console.log(`[safeInsertPlayer] Iteration ${i + 1} mismatch. Code: ${errCode}, Msg: "${errMsg}", Details: "${errDetails}"`);
 
-    const match = errMsg.match(/Could not find the '([^']+)' column/) ||
-                  errMsg.match(/column "([^"]+)" does not exist/) ||
-                  errMsg.match(/column '([^']+)' does not exist/);
-                  
-    if (match) {
-      const missingColumn = match[1];
-      console.log(`[safeInsertPlayer Server] Removing missing column '${missingColumn}' and retrying...`);
-      delete attemptObj[missingColumn];
-      if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
-      if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
-      if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
-      if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
-    } else {
-      console.log(`[safeInsertPlayer Server] Safe insert fallback for profile_id: ${playerObj.profile_id}`);
-      const { error: fallbackErr } = await supabase.from('players').insert({
-        profile_id: playerObj.profile_id,
-        status: playerObj.status || 'active',
-        seed: playerObj.seed || 1
-      });
-      if (fallbackErr) {
-        console.log(`[safeInsertPlayer Server] Fallback insert unsuccessful too: ${fallbackErr.message}, code: ${fallbackErr.code}`);
-      } else {
-        console.log(`[safeInsertPlayer Server] Fallback insert succeeded!`);
-      }
-      return !fallbackErr;
+    if (profileId) {
+      await ensureProfileExists(supabase, profileId, playerObj);
     }
+
+    let attemptObj = { ...playerObj };
+    console.log(`[safeInsertPlayer] Attempting insert for profile_id: ${profileId}`);
+
+    for (let i = 0; i < 10; i++) {
+      const { error } = await supabase.from('players').insert(attemptObj);
+      if (!error) {
+        console.log(`[safeInsertPlayer] Successfully inserted player for profile_id ${profileId}`);
+        return true;
+      }
+
+      const errMsg = error.message || '';
+      const errDetails = error.details || '';
+      const errCode = error.code || '';
+      console.log(`[safeInsertPlayer] Iteration ${i + 1} mismatch. Code: ${errCode}, Msg: "${errMsg}", Details: "${errDetails}"`);
+
+      const match1 = errMsg.match(/Could not find the '([^']+)' column/);
+      const match2 = errMsg.match(/column "([^"]+)"/);
+      const match3 = errMsg.match(/column '([^']+)'/);
+      const missingColumn = match1 ? match1[1] : (match2 ? match2[1] : (match3 ? match3[1] : null));
+
+      if (missingColumn) {
+        console.log(`[safeInsertPlayer Server] Removing missing column '${missingColumn}' and retrying...`);
+        delete attemptObj[missingColumn];
+        if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
+        if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
+        if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
+        if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
+      } else {
+        console.log(`[safeInsertPlayer Server] Safe insert fallback for profile_id: ${profileId}`);
+        const { error: fallbackErr } = await supabase.from('players').insert({
+          profile_id: profileId,
+          name: playerObj.name || playerObj.player_name || 'Tournament Player',
+          player_name: playerObj.player_name || playerObj.name || 'Tournament Player',
+          status: playerObj.status || 'active',
+          seed: playerObj.seed || 1
+        });
+        if (fallbackErr) {
+          console.log(`[safeInsertPlayer Server] Fallback insert unsuccessful too: ${fallbackErr.message}, code: ${fallbackErr.code}`);
+        } else {
+          console.log(`[safeInsertPlayer Server] Fallback insert succeeded!`);
+        }
+        return !fallbackErr;
+      }
+    }
+  } catch (err: any) {
+    console.log(`[safeInsertPlayer Server] Exception during insert:`, err?.message || err);
+  } finally {
+    activePlayerInserts.delete(profileId);
   }
   return false;
 };
@@ -190,12 +229,12 @@ const safeUpdatePlayer = async (supabase: any, profileId: string, playerObj: any
     const errCode = error.code || '';
     console.log(`[safeUpdatePlayer] Iteration ${i + 1} mismatch. Code: ${errCode}, Msg: "${errMsg}", Details: "${errDetails}"`);
 
-    const match = errMsg.match(/Could not find the '([^']+)' column/) ||
-                  errMsg.match(/column "([^"]+)" does not exist/) ||
-                  errMsg.match(/column '([^']+)' does not exist/);
+    const match1 = errMsg.match(/Could not find the '([^']+)' column/);
+    const match2 = errMsg.match(/column "([^"]+)"/);
+    const match3 = errMsg.match(/column '([^']+)'/);
+    const missingColumn = match1 ? match1[1] : (match2 ? match2[1] : (match3 ? match3[1] : null));
                   
-    if (match) {
-      const missingColumn = match[1];
+    if (missingColumn) {
       console.log(`[safeUpdatePlayer Server] Removing missing column '${missingColumn}' and retrying...`);
       delete attemptObj[missingColumn];
       if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
@@ -207,6 +246,8 @@ const safeUpdatePlayer = async (supabase: any, profileId: string, playerObj: any
       const { error: fallbackErr } = await supabase
         .from('players')
         .update({
+          name: playerObj.name || playerObj.player_name || 'Tournament Player',
+          player_name: playerObj.player_name || playerObj.name || 'Tournament Player',
           status: playerObj.status || 'active',
           seed: playerObj.seed || 1
         })

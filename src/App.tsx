@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Player, Match, FrameScore, TournamentConfig, SystemUser, RolePermission, PlayerApplication, SoccerScore } from './types';
 import {
   createInitialMatches,
@@ -102,6 +102,7 @@ const safeStorage = {
 };
 
 export default function App() {
+  const resetPollTimerRef = useRef<() => void>(() => {});
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [rounds, setRounds] = useState<Array<{ stage: string; status: 'active' | 'not started' | 'ended' }>>([
@@ -206,6 +207,7 @@ export default function App() {
   };
 
   const saveStateToServer = async (patch: any) => {
+    resetPollTimerRef.current();
     let succeeded = false;
     try {
       const res = await fetch('/api/state', {
@@ -2137,17 +2139,35 @@ export default function App() {
       }
     };
 
+    let timeoutId: any = null;
+
+    const scheduleNextPoll = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(async () => {
+        await pollSync();
+        scheduleNextPoll();
+      }, 1500);
+    };
+
+    const resetPollTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      scheduleNextPoll();
+    };
+
+    resetPollTimerRef.current = resetPollTimer;
+
     window.addEventListener('storage', handleStorageChange);
     
     // Perform initial synchronization immediately
     pollSync();
     
-    // Poll storage and API every 1500ms for robust state synchronization
-    const interval = setInterval(pollSync, 1500);
+    // Start the recursive timeout cycle
+    scheduleNextPoll();
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
+      if (timeoutId) clearTimeout(timeoutId);
+      resetPollTimerRef.current = () => {};
     };
   }, []);
 
@@ -3210,6 +3230,7 @@ export default function App() {
     }
 
     const handleSubmitApplication = async (app: Omit<PlayerApplication, 'id' | 'status' | 'appliedAt'>) => {
+      resetPollTimerRef.current();
       let isSyncedWithSupabase = false;
       try {
         const res = await fetch('/api/applications', {
