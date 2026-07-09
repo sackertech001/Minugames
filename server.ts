@@ -637,10 +637,47 @@ async function startServer() {
           }
         });
 
-        console.log("[Supabase Background Sync] Fetching profiles...");
-        const { data: dbProfiles, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*');
+        const fetchProfiles = supabase.from('profiles').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchPlayers = supabase.from('players').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchTypes = supabase.from('tournament_types').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchRounds = supabase.from('rounds').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchR32 = supabase.from('round_of_32').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchR16 = supabase.from('round_of_16').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchQF = supabase.from('quarter_finals').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchSF = supabase.from('semi_finals').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchGF = supabase.from('grand_final').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchTP = supabase.from('third_place').select('*').then(r => r, e => ({ data: null, error: e }));
+        const fetchUsers = supabase.from('system_users').select('*').then(r => r, e => ({ data: null, error: e }));
+
+        console.log("[Supabase Background Sync] Fetching all tables in parallel...");
+        const [
+          resProfiles,
+          resPlayers,
+          resTypes,
+          resRounds,
+          resR32,
+          resR16,
+          resQF,
+          resSF,
+          resGF,
+          resTP,
+          resUsers
+        ] = await Promise.all([
+          fetchProfiles,
+          fetchPlayers,
+          fetchTypes,
+          fetchRounds,
+          fetchR32,
+          fetchR16,
+          fetchQF,
+          fetchSF,
+          fetchGF,
+          fetchTP,
+          fetchUsers
+        ]);
+
+        console.log("[Supabase Background Sync] Mapped database tables fetched in parallel.");
+        const { data: dbProfiles, error: fetchError } = resProfiles;
 
         if (fetchError) {
           console.log('[Supabase DB Sync] Fetch profiles notice:', fetchError.message);
@@ -666,10 +703,8 @@ async function startServer() {
           // Get players from players table in Supabase
           let dbPlayers: any[] = [];
           try {
-            console.log("[Supabase Background Sync] Fetching players table...");
-            const { data: dbPlayersTable, error: playersFetchError } = await supabase
-              .from('players')
-              .select('*');
+            console.log("[Supabase Background Sync] Processing pre-fetched players table...");
+            const { data: dbPlayersTable, error: playersFetchError } = resPlayers;
 
             if (playersFetchError) {
               console.log('[Supabase DB Sync] Fetch players table error, falling back to profiles:', playersFetchError.message);
@@ -794,9 +829,7 @@ async function startServer() {
           state.players = Array.from(finalUniquePlayersMap.values()).sort((a, b) => (a.seed || 0) - (b.seed || 0));
           state.playerApplications = mappedApps;
 
-          const { data: dbTypes, error: typesError } = await supabase
-            .from('tournament_types')
-            .select('*');
+          const { data: dbTypes, error: typesError } = resTypes;
 
           if (!typesError && dbTypes && dbTypes.length > 0) {
             const typesList = dbTypes.map((t: any) => t.name);
@@ -807,9 +840,7 @@ async function startServer() {
 
           // Fetch rounds from Supabase to sync tournament status and rounds state
           try {
-            const { data: dbRounds, error: roundsError } = await supabase
-              .from('rounds')
-              .select('*');
+            const { data: dbRounds, error: roundsError } = resRounds;
 
             if (!roundsError && dbRounds && dbRounds.length > 0) {
               const mappedRounds = dbRounds.map((r: any) => ({
@@ -830,9 +861,7 @@ async function startServer() {
 
           // Fetch round_of_32 from Supabase to sync Round of 32 matches
           try {
-            const { data: dbR32Matches, error: r32Error } = await supabase
-              .from('round_of_32')
-              .select('*');
+            const { data: dbR32Matches, error: r32Error } = resR32;
 
             if (!r32Error && dbR32Matches && dbR32Matches.length > 0) {
               const mappedMatches = dbR32Matches.map((m: any) => {
@@ -906,9 +935,7 @@ async function startServer() {
 
           // Fetch round_of_16 from Supabase to sync Round of 16 matches
           try {
-            const { data: dbR16Matches, error: r16Error } = await supabase
-              .from('round_of_16')
-              .select('*');
+            const { data: dbR16Matches, error: r16Error } = resR16;
 
             if (!r16Error && dbR16Matches && dbR16Matches.length > 0) {
               const mappedR16Matches = dbR16Matches.map((m: any) => {
@@ -989,9 +1016,7 @@ async function startServer() {
 
           // Fetch quarter_finals from Supabase to sync Quarter Finals matches
           try {
-            const { data: dbQFMatches, error: qfError } = await supabase
-              .from('quarter_finals')
-              .select('*');
+            const { data: dbQFMatches, error: qfError } = resQF;
 
             if (!qfError && dbQFMatches && dbQFMatches.length > 0) {
               const mappedQFMatches = dbQFMatches.map((m: any) => {
@@ -1072,9 +1097,7 @@ async function startServer() {
 
           // Fetch semi_finals from Supabase to sync Semi Finals matches
           try {
-            const { data: dbSFMatches, error: sfError } = await supabase
-              .from('semi_finals')
-              .select('*');
+            const { data: dbSFMatches, error: sfError } = resSF;
 
             if (!sfError && dbSFMatches && dbSFMatches.length > 0) {
               const mappedSFMatches = dbSFMatches.map((m: any) => {
@@ -1155,9 +1178,7 @@ async function startServer() {
 
           // Fetch grand_final from Supabase to sync Grand Final matches
           try {
-            const { data: dbGFMatches, error: gfError } = await supabase
-              .from('grand_final')
-              .select('*');
+            const { data: dbGFMatches, error: gfError } = resGF;
 
             if (!gfError && dbGFMatches && dbGFMatches.length > 0) {
               const mappedGFMatches = dbGFMatches.map((m: any) => {
@@ -1237,9 +1258,7 @@ async function startServer() {
 
           // Fetch third_place from Supabase to sync 3rd Place matches
           try {
-            const { data: dbTPMatches, error: tpError } = await supabase
-              .from('third_place')
-              .select('*');
+            const { data: dbTPMatches, error: tpError } = resTP;
 
             if (!tpError && dbTPMatches && dbTPMatches.length > 0) {
               const mappedTPMatches = dbTPMatches.map((m: any) => {
@@ -1319,9 +1338,7 @@ async function startServer() {
 
           // Fetch system_users from Supabase to sync RBAC users
           try {
-            const { data: dbSystemUsers, error: usersError } = await supabase
-              .from('system_users')
-              .select('*');
+            const { data: dbSystemUsers, error: usersError } = resUsers;
 
             if (!usersError && dbSystemUsers) {
               const mappedUsers = dbSystemUsers.map((u: any) => ({
@@ -1370,7 +1387,7 @@ async function startServer() {
       } catch (err: any) {
         console.log("[Supabase First Sync] Error during boot sync:", err?.message || err);
       }
-    } else if (now - lastSupabaseFetchTime > 30000) {
+    } else if (now - lastSupabaseFetchTime > 3000) {
       syncWithSupabase().catch(err => {
         console.log("[Supabase Background Sync] Sync notice:", err?.message || err);
       });
@@ -1594,8 +1611,28 @@ async function startServer() {
             }
           });
 
-          // Update stats in parallel using Promise.all on both profiles and players tables (only for valid UUIDs)
-          const validPlayers = req.body.players.filter((player: any) => isUUID(player.id));
+          // Only update players whose stats or details have actually changed from the current cached state
+          const currentStateForPlayers = readState();
+          const validPlayers = req.body.players.filter((player: any) => {
+            if (!isUUID(player.id)) return false;
+            const existingPlayer = currentStateForPlayers.players?.find((p: any) => p.id === player.id);
+            if (!existingPlayer) return true;
+
+            const isChanged =
+              existingPlayer.name !== player.name ||
+              existingPlayer.nickname !== player.nickname ||
+              existingPlayer.club !== player.club ||
+              existingPlayer.photoUrl !== player.photoUrl ||
+              existingPlayer.seed !== player.seed ||
+              existingPlayer.matchesPlayed !== player.matchesPlayed ||
+              existingPlayer.matchesWon !== player.matchesWon ||
+              existingPlayer.totalPoints !== player.totalPoints ||
+              existingPlayer.highestBreak !== player.highestBreak ||
+              existingPlayer.status !== player.status ||
+              existingPlayer.tournamentType !== player.tournamentType;
+
+            return isChanged;
+          });
           const updatePromises = validPlayers.map(async (player: any) => {
             let currentPhotoUrl = player.photoUrl;
 
@@ -1825,6 +1862,42 @@ async function startServer() {
 
           const currentPlayers = req.body.players || readState().players || [];
 
+          // Differential matches filter: only update matches in Supabase whose score, status, or details changed
+          const currentStateForMatches = readState();
+          const changedMatches = req.body.matches.filter((m: any) => {
+            const existingMatch = currentStateForMatches.matches?.find((em: any) => em.id === m.id);
+            if (!existingMatch) return true;
+
+            if (
+              existingMatch.player1Id !== m.player1Id ||
+              existingMatch.player2Id !== m.player2Id ||
+              existingMatch.score1 !== m.score1 ||
+              existingMatch.score2 !== m.score2 ||
+              existingMatch.break1 !== m.break1 ||
+              existingMatch.break2 !== m.break2 ||
+              existingMatch.winnerId !== m.winnerId ||
+              existingMatch.status !== m.status ||
+              existingMatch.scheduledTime !== m.scheduledTime ||
+              existingMatch.day !== m.day
+            ) {
+              return true;
+            }
+
+            const frames1 = existingMatch.frames || [];
+            const frames2 = m.frames || [];
+            if (frames1.length !== frames2.length) return true;
+            for (let i = 0; i < frames1.length; i++) {
+              if (
+                frames1[i]?.player1Points !== frames2[i]?.player1Points ||
+                frames1[i]?.player2Points !== frames2[i]?.player2Points
+              ) {
+                return true;
+              }
+            }
+
+            return false;
+          });
+
           const safeIsoString = (timeStr: any, dayNum?: number): string => {
             if (!timeStr) return new Date().toISOString();
             const parsed = new Date(timeStr);
@@ -1851,7 +1924,7 @@ async function startServer() {
 
           // Sync Round of 32
           try {
-            const r32Matches = req.body.matches.filter((m: any) => m.round === 'R32' || m.id.startsWith('M'));
+            const r32Matches = changedMatches.filter((m: any) => m.round === 'R32' || m.id.startsWith('M'));
             if (r32Matches.length > 0) {
               const rowsToUpsert = r32Matches.map((m: any) => {
                 const matchNumStr = m.id.replace(/\D/g, ''); // Extract digits
@@ -1907,7 +1980,7 @@ async function startServer() {
 
           // Sync Round of 16
           try {
-            const r16Matches = req.body.matches.filter((m: any) => m.round === 'R16' || m.id.startsWith('R16-'));
+            const r16Matches = changedMatches.filter((m: any) => m.round === 'R16' || m.id.startsWith('R16-'));
             if (r16Matches.length > 0) {
               const rowsToUpsertR16 = r16Matches.map((m: any) => {
                 const matchNumber = m.id.includes('-') 
@@ -1964,7 +2037,7 @@ async function startServer() {
 
           // Sync Quarter Finals
           try {
-            const qfMatches = req.body.matches.filter((m: any) => m.round === 'QF' || m.id.startsWith('QF-'));
+            const qfMatches = changedMatches.filter((m: any) => m.round === 'QF' || m.id.startsWith('QF-'));
             if (qfMatches.length > 0) {
               const rowsToUpsertQF = qfMatches.map((m: any) => {
                 const matchNumber = m.id.includes('-') 
@@ -2021,7 +2094,7 @@ async function startServer() {
 
           // Sync Semi Finals
           try {
-            const sfMatches = req.body.matches.filter((m: any) => m.round === 'SF' || m.id.startsWith('SF-'));
+            const sfMatches = changedMatches.filter((m: any) => m.round === 'SF' || m.id.startsWith('SF-'));
             if (sfMatches.length > 0) {
               const rowsToUpsertSF = sfMatches.map((m: any) => {
                 const matchNumber = m.id.includes('-') 
@@ -2078,7 +2151,7 @@ async function startServer() {
 
           // Sync Grand Final
           try {
-            const gfMatches = req.body.matches.filter((m: any) => m.id === 'FINAL' || m.round === 'F');
+            const gfMatches = changedMatches.filter((m: any) => m.id === 'FINAL' || m.round === 'F');
             if (gfMatches.length > 0) {
               const rowsToUpsertGF = gfMatches.map((m: any) => {
                 const p1 = currentPlayers.find((p: any) => p.id === m.player1Id);
@@ -2128,7 +2201,7 @@ async function startServer() {
 
           // Sync 3rd Place Match
           try {
-            const tpMatches = req.body.matches.filter((m: any) => m.id === '3RD-1' || m.round === '3RD');
+            const tpMatches = changedMatches.filter((m: any) => m.id === '3RD-1' || m.round === '3RD');
             if (tpMatches.length > 0) {
               const rowsToUpsertTP = tpMatches.map((m: any) => {
                 const p1 = currentPlayers.find((p: any) => p.id === m.player1Id);
