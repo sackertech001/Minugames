@@ -40,8 +40,6 @@ const safeInsertProfile = async (supabase: any, id: string, profileObj: any): Pr
       if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
       if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
       if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
-      if (missingColumn === 'full_name') delete attemptObj['name'];
-      if (missingColumn === 'name') delete attemptObj['full_name'];
     } else if (
       errMsg.includes('violates foreign key constraint') || 
       errMsg.includes('foreign key') || 
@@ -153,8 +151,6 @@ const safeInsertPlayer = async (supabase: any, playerObj: any): Promise<boolean>
       if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
       if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
       if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
-      if (missingColumn === 'player_name') delete attemptObj['name'];
-      if (missingColumn === 'name') delete attemptObj['player_name'];
     } else {
       console.log(`[safeInsertPlayer Server] Safe insert fallback for profile_id: ${playerObj.profile_id}`);
       const { error: fallbackErr } = await supabase.from('players').insert({
@@ -206,8 +202,6 @@ const safeUpdatePlayer = async (supabase: any, profileId: string, playerObj: any
       if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
       if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
       if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
-      if (missingColumn === 'player_name') delete attemptObj['name'];
-      if (missingColumn === 'name') delete attemptObj['player_name'];
     } else {
       console.log(`[safeUpdatePlayer Server] Safe update fallback for profileId: ${profileId}`);
       const { error: fallbackErr } = await supabase
