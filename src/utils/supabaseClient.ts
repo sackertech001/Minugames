@@ -64,6 +64,8 @@ export async function safeInsertPlayer(supabase: any, playerObj: any): Promise<b
       console.log(`[safeInsertPlayer] Safe insert fallback for profile_id: ${playerObj.profile_id}`);
       const { error: fallbackErr } = await supabase.from('players').insert({
         profile_id: playerObj.profile_id,
+        name: playerObj.name || playerObj.player_name || 'Tournament Player',
+        player_name: playerObj.player_name || playerObj.name || 'Tournament Player',
         status: playerObj.status || 'active',
         seed: playerObj.seed || 1
       });
@@ -103,6 +105,8 @@ export async function safeUpdatePlayer(supabase: any, profileId: string, playerO
       const { error: fallbackErr } = await supabase
         .from('players')
         .update({
+          name: playerObj.name || playerObj.player_name || 'Tournament Player',
+          player_name: playerObj.player_name || playerObj.name || 'Tournament Player',
           status: playerObj.status || 'active',
           seed: playerObj.seed || 1
         })

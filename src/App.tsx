@@ -222,9 +222,9 @@ export default function App() {
       console.warn('Could not sync state to server:', e);
     }
 
-    // Direct Client-side Supabase updates - Unconditional if Supabase is configured
+    // Direct Client-side Supabase updates - ONLY if server-side endpoint failed (to prevent race conditions & duplicate insertions)
     const supabase = getSupabase();
-    if (supabase) {
+    if (supabase && !succeeded) {
       if (patch.playerApplications && Array.isArray(patch.playerApplications)) {
         try {
           for (const app of patch.playerApplications) {
@@ -1434,40 +1434,8 @@ export default function App() {
                           tournamentType: p.tournament_type || ''
                         }));
                     } else {
-                      // Auto-heal: insert any approved profile that is missing from players table
-                      const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
-                      const approvedProfiles = dbProfiles.filter((p: any) => approvedStatuses.includes(p.status));
-                      
-                      for (const profile of approvedProfiles) {
-                        const exists = dbPlayersTable && dbPlayersTable.some((pt: any) => pt.profile_id === profile.id || pt.id === profile.id);
-                        if (!exists) {
-                          console.log(`[Client Supabase Sync] Auto-inserting missing player for profile ${profile.id} into players table`);
-                          try {
-                            await safeInsertPlayer(supabase, {
-                              profile_id: profile.id,
-                              player_name: profile.full_name,
-                              name: profile.full_name,
-                              nickname: profile.nickname,
-                              club: profile.club,
-                              seed: profile.seed || 1,
-                              status: profile.status === 'approved' ? 'active' : profile.status,
-                              matches_played: profile.matches_played || 0,
-                              matches_won: profile.matches_won || 0,
-                              total_points: profile.total_points || 0,
-                              highest_break: profile.highest_break || 0
-                            });
-                          } catch (e) {
-                            console.log(`[Client Supabase Sync] Auto-healing insert error:`, e);
-                          }
-                        }
-                      }
-
-                      // Re-fetch players table to get a complete list
-                      const { data: dbPlayersTableUpdated } = await supabase
-                        .from('players')
-                        .select('*');
-
-                      const finalPlayersTable = dbPlayersTableUpdated || dbPlayersTable || [];
+                      // Server-side background sync centrally handles the auto-healing; the client remains read-only during periodic background polls to prevent race conditions.
+                      const finalPlayersTable = dbPlayersTable || [];
 
                       dbPlayers = finalPlayersTable.map((pt: any) => {
                         const matchingProfile = dbProfiles.find((profile: any) => profile.id === pt.profile_id || profile.id === pt.id);
