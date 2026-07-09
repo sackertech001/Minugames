@@ -158,6 +158,7 @@ const safeInsertPlayer = async (supabase: any, playerObj: any): Promise<boolean>
 
     let attemptObj = { ...playerObj };
     console.log(`[safeInsertPlayer] Attempting insert for profile_id: ${profileId}`);
+    const missingColumns = new Set<string>();
 
     for (let i = 0; i < 10; i++) {
       const { error } = await supabase.from('players').insert(attemptObj);
@@ -178,6 +179,7 @@ const safeInsertPlayer = async (supabase: any, playerObj: any): Promise<boolean>
 
       if (missingColumn) {
         console.log(`[safeInsertPlayer Server] Removing missing column '${missingColumn}' and retrying...`);
+        missingColumns.add(missingColumn);
         delete attemptObj[missingColumn];
         if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
         if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
@@ -185,13 +187,20 @@ const safeInsertPlayer = async (supabase: any, playerObj: any): Promise<boolean>
         if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
       } else {
         console.log(`[safeInsertPlayer Server] Safe insert fallback for profile_id: ${profileId}`);
-        const { error: fallbackErr } = await supabase.from('players').insert({
+        const fallbackObj: any = {
           profile_id: profileId,
-          name: playerObj.name || playerObj.player_name || 'Tournament Player',
-          player_name: playerObj.player_name || playerObj.name || 'Tournament Player',
           status: playerObj.status || 'active',
           seed: playerObj.seed || 1
-        });
+        };
+
+        if (!missingColumns.has('name')) {
+          fallbackObj.name = playerObj.name || playerObj.player_name || 'Tournament Player';
+        }
+        if (!missingColumns.has('player_name')) {
+          fallbackObj.player_name = playerObj.player_name || playerObj.name || 'Tournament Player';
+        }
+
+        const { error: fallbackErr } = await supabase.from('players').insert(fallbackObj);
         if (fallbackErr) {
           console.log(`[safeInsertPlayer Server] Fallback insert unsuccessful too: ${fallbackErr.message}, code: ${fallbackErr.code}`);
         } else {
@@ -214,6 +223,8 @@ const safeUpdatePlayer = async (supabase: any, profileId: string, playerObj: any
   }
   let attemptObj = { ...playerObj };
   console.log(`[safeUpdatePlayer] Attempting update for profileId: ${profileId}`);
+  const missingColumns = new Set<string>();
+
   for (let i = 0; i < 10; i++) {
     const { error } = await supabase
       .from('players')
@@ -236,6 +247,7 @@ const safeUpdatePlayer = async (supabase: any, profileId: string, playerObj: any
                   
     if (missingColumn) {
       console.log(`[safeUpdatePlayer Server] Removing missing column '${missingColumn}' and retrying...`);
+      missingColumns.add(missingColumn);
       delete attemptObj[missingColumn];
       if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
       if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
@@ -243,14 +255,21 @@ const safeUpdatePlayer = async (supabase: any, profileId: string, playerObj: any
       if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
     } else {
       console.log(`[safeUpdatePlayer Server] Safe update fallback for profileId: ${profileId}`);
+      const fallbackObj: any = {
+        status: playerObj.status || 'active',
+        seed: playerObj.seed || 1
+      };
+
+      if (!missingColumns.has('name')) {
+        fallbackObj.name = playerObj.name || playerObj.player_name || 'Tournament Player';
+      }
+      if (!missingColumns.has('player_name')) {
+        fallbackObj.player_name = playerObj.player_name || playerObj.name || 'Tournament Player';
+      }
+
       const { error: fallbackErr } = await supabase
         .from('players')
-        .update({
-          name: playerObj.name || playerObj.player_name || 'Tournament Player',
-          player_name: playerObj.player_name || playerObj.name || 'Tournament Player',
-          status: playerObj.status || 'active',
-          seed: playerObj.seed || 1
-        })
+        .update(fallbackObj)
         .or(`profile_id.eq.${profileId},id.eq.${profileId}`);
       if (fallbackErr) {
         console.log(`[safeUpdatePlayer Server] Fallback update unsuccessful too: ${fallbackErr.message}, code: ${fallbackErr.code}`);

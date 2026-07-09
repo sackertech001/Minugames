@@ -240,66 +240,11 @@ export default function App() {
 
             if (app.status === 'approved') {
               try {
-                const { data: existingPlayer } = await supabase
-                  .from('players')
-                  .select('id')
-                  .eq('profile_id', app.id)
-                  .maybeSingle();
-
-                if (!existingPlayer) {
-                  let inserted = false;
-                  
-                  // Try 1: insert with player_name
-                  try {
-                    const { error: err1 } = await supabase
-                      .from('players')
-                      .insert({
-                        profile_id: app.id,
-                        player_name: app.fullName
-                      });
-                    if (!err1) {
-                      inserted = true;
-                      console.log(`[Client Supabase Player Sync] Created player row with player_name for ${app.fullName}`);
-                    } else {
-                      console.log(`[Client Supabase Player Sync] player_name insert failed: ${err1.message}. Trying name...`);
-                    }
-                  } catch (e) {}
-
-                  // Try 2: insert with name
-                  if (!inserted) {
-                    try {
-                      const { error: err2 } = await supabase
-                        .from('players')
-                        .insert({
-                          profile_id: app.id,
-                          name: app.fullName
-                        });
-                      if (!err2) {
-                        inserted = true;
-                        console.log(`[Client Supabase Player Sync] Created player row with name for ${app.fullName}`);
-                      } else {
-                        console.log(`[Client Supabase Player Sync] name insert failed: ${err2.message}. Trying profile_id only...`);
-                      }
-                    } catch (e) {}
-                  }
-
-                  // Try 3: insert with profile_id only
-                  if (!inserted) {
-                    try {
-                      const { error: err3 } = await supabase
-                        .from('players')
-                        .insert({
-                          profile_id: app.id
-                        });
-                      if (!err3) {
-                        inserted = true;
-                        console.log(`[Client Supabase Player Sync] Created player row with profile_id only for ${app.fullName}`);
-                      } else {
-                        console.log(`[Client Supabase Player Sync] profile_id only insert failed: ${err3.message}`);
-                      }
-                    } catch (e) {}
-                  }
-                }
+                await safeInsertPlayer(supabase, {
+                  profile_id: app.id,
+                  player_name: app.fullName,
+                  name: app.fullName
+                });
               } catch (pErr: any) {
                 console.log(`[Client Supabase Player Sync] Check error for ${app.id}:`, pErr?.message || pErr);
               }
