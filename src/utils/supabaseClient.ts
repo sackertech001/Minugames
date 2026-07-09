@@ -36,3 +36,79 @@ export function getSupabase(): SupabaseClient | null {
 export function isSupabaseConfigured(): boolean {
   return getSupabase() !== null;
 }
+
+export async function safeInsertPlayer(supabase: any, playerObj: any): Promise<boolean> {
+  let attemptObj = { ...playerObj };
+  for (let i = 0; i < 10; i++) {
+    const { error } = await supabase.from('players').insert(attemptObj);
+    if (!error) {
+      return true;
+    }
+    
+    const errMsg = error.message || '';
+    const match = errMsg.match(/Could not find the '([^']+)' column/) ||
+                  errMsg.match(/column "([^"]+)" does not exist/) ||
+                  errMsg.match(/column '([^']+)' does not exist/);
+                  
+    if (match) {
+      const missingColumn = match[1];
+      console.log(`[safeInsertPlayer] Removing missing column '${missingColumn}' and retrying...`);
+      delete attemptObj[missingColumn];
+      if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
+      if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
+      if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
+      if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
+      if (missingColumn === 'player_name') delete attemptObj['name'];
+      if (missingColumn === 'name') delete attemptObj['player_name'];
+    } else {
+      console.log(`[safeInsertPlayer] Safe insert fallback for profile_id: ${playerObj.profile_id}`);
+      const { error: fallbackErr } = await supabase.from('players').insert({
+        profile_id: playerObj.profile_id,
+        status: playerObj.status || 'active',
+        seed: playerObj.seed || 1
+      });
+      return !fallbackErr;
+    }
+  }
+  return false;
+}
+
+export async function safeUpdatePlayer(supabase: any, profileId: string, playerObj: any): Promise<boolean> {
+  let attemptObj = { ...playerObj };
+  for (let i = 0; i < 10; i++) {
+    const { error } = await supabase
+      .from('players')
+      .update(attemptObj)
+      .or(`profile_id.eq.${profileId},id.eq.${profileId}`);
+    if (!error) {
+      return true;
+    }
+    
+    const errMsg = error.message || '';
+    const match = errMsg.match(/Could not find the '([^']+)' column/) ||
+                  errMsg.match(/column "([^"]+)" does not exist/) ||
+                  errMsg.match(/column '([^']+)' does not exist/);
+                  
+    if (match) {
+      const missingColumn = match[1];
+      console.log(`[safeUpdatePlayer] Removing missing column '${missingColumn}' and retrying...`);
+      delete attemptObj[missingColumn];
+      if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
+      if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
+      if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
+      if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
+      if (missingColumn === 'player_name') delete attemptObj['name'];
+      if (missingColumn === 'name') delete attemptObj['player_name'];
+    } else {
+      const { error: fallbackErr } = await supabase
+        .from('players')
+        .update({
+          status: playerObj.status || 'active',
+          seed: playerObj.seed || 1
+        })
+        .or(`profile_id.eq.${profileId},id.eq.${profileId}`);
+      return !fallbackErr;
+    }
+  }
+  return false;
+}

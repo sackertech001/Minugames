@@ -39,7 +39,7 @@ import SettingsTab from './components/SettingsTab';
 import LoginPage from './components/LoginPage';
 import MainLandingPage from './components/MainLandingPage';
 import PlayerApplicationForm from './components/PlayerApplicationForm';
-import { getSupabase } from './utils/supabaseClient';
+import { getSupabase, safeInsertPlayer, safeUpdatePlayer } from './utils/supabaseClient';
 import Sidebar from './components/Sidebar';
 
 const isUUID = (id: any): boolean => {
@@ -433,90 +433,28 @@ export default function App() {
                   .or(`profile_id.eq.${player.id},id.eq.${player.id}`)
                   .maybeSingle();
 
-                if (!existingPlayerTable) {
-                  let inserted = false;
-                  try {
-                    const { error: insertErr } = await supabase
-                      .from('players')
-                      .insert({
-                        profile_id: player.id,
-                        player_name: player.name,
-                        name: player.name,
-                        nickname: player.nickname || null,
-                        club: player.club || null,
-                        seed: player.seed || 1,
-                        photo_url: currentPhotoUrl || null,
-                        photoUrl: currentPhotoUrl || null,
-                        matches_played: player.matchesPlayed || 0,
-                        matches_won: player.matchesWon || 0,
-                        total_points: player.totalPoints || 0,
-                        highest_break: player.highestBreak || 0,
-                        status: player.status || 'active',
-                        tournament_type: player.tournamentType || null,
-                        tournamentType: player.tournamentType || null
-                      });
-                    if (!insertErr) {
-                      inserted = true;
-                      console.log(`[Client Supabase Player Sync] Created missing player row for ${player.name}`);
-                    }
-                  } catch (e) {}
+                const playerObj = {
+                  profile_id: player.id,
+                  player_name: player.name,
+                  name: player.name,
+                  nickname: player.nickname || null,
+                  club: player.club || null,
+                  seed: player.seed || 1,
+                  photo_url: currentPhotoUrl || null,
+                  photoUrl: currentPhotoUrl || null,
+                  matches_played: player.matchesPlayed || 0,
+                  matches_won: player.matchesWon || 0,
+                  total_points: player.totalPoints || 0,
+                  highest_break: player.highestBreak || 0,
+                  status: player.status || 'active',
+                  tournament_type: player.tournamentType || null,
+                  tournamentType: player.tournamentType || null
+                };
 
-                  if (!inserted) {
-                    try {
-                      await supabase
-                        .from('players')
-                        .insert({
-                          profile_id: player.id,
-                          player_name: player.name,
-                          nickname: player.nickname || null,
-                          club: player.club || null,
-                          seed: player.seed || 1,
-                          status: player.status || 'active',
-                          matches_played: player.matchesPlayed || 0,
-                          matches_won: player.matchesWon || 0,
-                          total_points: player.totalPoints || 0,
-                          highest_break: player.highestBreak || 0
-                        });
-                    } catch (e) {}
-                  }
+                if (!existingPlayerTable) {
+                  await safeInsertPlayer(supabase, playerObj);
                 } else {
-                  // Try to update with all possible variants of name, photo_url, and tournament_type
-                  const { error: pError1 } = await supabase
-                    .from('players')
-                    .update({
-                      player_name: player.name,
-                      name: player.name,
-                      nickname: player.nickname || null,
-                      club: player.club || null,
-                      photo_url: currentPhotoUrl || null,
-                      photoUrl: currentPhotoUrl || null,
-                      tournament_type: player.tournamentType || null,
-                      tournamentType: player.tournamentType || null,
-                      status: player.status,
-                      seed: player.seed,
-                      matches_played: player.matchesPlayed,
-                      matches_won: player.matchesWon,
-                      total_points: player.totalPoints,
-                      highest_break: player.highestBreak,
-                    })
-                    .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
-                  if (pError1) {
-                    // Fallback: try with a subset of common columns if there was a column error
-                    await supabase
-                      .from('players')
-                      .update({
-                        player_name: player.name,
-                        nickname: player.nickname || null,
-                        club: player.club || null,
-                        seed: player.seed,
-                        status: player.status,
-                        matches_played: player.matchesPlayed,
-                        matches_won: player.matchesWon,
-                        total_points: player.totalPoints,
-                        highest_break: player.highestBreak,
-                      })
-                      .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
-                  }
+                  await safeUpdatePlayer(supabase, player.id, playerObj);
                 }
               } catch (pe) {
                 console.log(`[Client Supabase] Update players table error:`, pe);
@@ -1268,8 +1206,16 @@ export default function App() {
             const data = await res.json();
             
             setPlayers((prev) => {
-              if (JSON.stringify(prev) !== JSON.stringify(data.players)) {
-                return data.players;
+              const incoming = data.players || [];
+              const finalUniquePlayersMap = new Map();
+              for (const player of incoming) {
+                if (player.id && !finalUniquePlayersMap.has(player.id)) {
+                  finalUniquePlayersMap.set(player.id, player);
+                }
+              }
+              const uniqueIncoming = Array.from(finalUniquePlayersMap.values());
+              if (JSON.stringify(prev) !== JSON.stringify(uniqueIncoming)) {
+                return uniqueIncoming;
               }
               return prev;
             });
@@ -1495,36 +1441,19 @@ export default function App() {
                         if (!exists) {
                           console.log(`[Client Supabase Sync] Auto-inserting missing player for profile ${profile.id} into players table`);
                           try {
-                            const { error: insertErr } = await supabase
-                              .from('players')
-                              .insert({
-                                profile_id: profile.id,
-                                player_name: profile.full_name,
-                                nickname: profile.nickname,
-                                club: profile.club,
-                                seed: profile.seed || 1,
-                                status: profile.status === 'approved' ? 'active' : profile.status,
-                                matches_played: profile.matches_played || 0,
-                                matches_won: profile.matches_won || 0,
-                                total_points: profile.total_points || 0,
-                                highest_break: profile.highest_break || 0
-                              });
-                            if (insertErr) {
-                              await supabase
-                                .from('players')
-                                .insert({
-                                  profile_id: profile.id,
-                                  name: profile.full_name,
-                                  nickname: profile.nickname,
-                                  club: profile.club,
-                                  seed: profile.seed || 1,
-                                  status: profile.status === 'approved' ? 'active' : profile.status,
-                                  matches_played: profile.matches_played || 0,
-                                  matches_won: profile.matches_won || 0,
-                                  total_points: profile.total_points || 0,
-                                  highest_break: profile.highest_break || 0
-                                });
-                            }
+                            await safeInsertPlayer(supabase, {
+                              profile_id: profile.id,
+                              player_name: profile.full_name,
+                              name: profile.full_name,
+                              nickname: profile.nickname,
+                              club: profile.club,
+                              seed: profile.seed || 1,
+                              status: profile.status === 'approved' ? 'active' : profile.status,
+                              matches_played: profile.matches_played || 0,
+                              matches_won: profile.matches_won || 0,
+                              total_points: profile.total_points || 0,
+                              highest_break: profile.highest_break || 0
+                            });
                           } catch (e) {
                             console.log(`[Client Supabase Sync] Auto-healing insert error:`, e);
                           }
@@ -1578,11 +1507,26 @@ export default function App() {
                       }));
                   }
 
+                  // Deduplicate dbPlayers by ID
+                  const uniquePlayersMap = new Map();
+                  for (const player of dbPlayers) {
+                    if (player.id && !uniquePlayersMap.has(player.id)) {
+                      uniquePlayersMap.set(player.id, player);
+                    }
+                  }
+                  dbPlayers = Array.from(uniquePlayersMap.values());
                   dbPlayers.sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
                   setPlayers((prev) => {
                     const demoPlayers = prev.filter((p) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
-                    const mergedPlayers = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
+                    const combinedPlayers = [...dbPlayers, ...demoPlayers];
+                    const finalUniquePlayersMap = new Map();
+                    for (const player of combinedPlayers) {
+                      if (player.id && !finalUniquePlayersMap.has(player.id)) {
+                        finalUniquePlayersMap.set(player.id, player);
+                      }
+                    }
+                    const mergedPlayers = Array.from(finalUniquePlayersMap.values()).sort((a, b) => (a.seed || 0) - (b.seed || 0));
                     if (JSON.stringify(prev) !== JSON.stringify(mergedPlayers)) {
                       return mergedPlayers;
                     }

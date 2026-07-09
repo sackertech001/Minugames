@@ -7,7 +7,7 @@ import {
 import { getDemoPlayers } from '../utils/demoData';
 import { generateSnookerAvatar } from '../utils/avatar';
 import ConfirmModal from './ConfirmModal';
-import { getSupabase } from '../utils/supabaseClient';
+import { getSupabase, safeInsertPlayer } from '../utils/supabaseClient';
 
 interface RegistrationPortalProps {
   players: Player[];
@@ -1111,41 +1111,23 @@ export default function RegistrationPortal({
                                       });
 
                                     // Direct insert to the players table to ensure it always exists immediately
-                                    supabase
-                                      .from('players')
-                                      .insert({
-                                        profile_id: app.id,
-                                        player_name: app.fullName,
-                                        name: app.fullName,
-                                        nickname: app.nickname || null,
-                                        club: app.club || null,
-                                        seed: finalSeed,
-                                        photo_url: app.photoUrl || null,
-                                        photoUrl: app.photoUrl || null,
-                                        matches_played: 0,
-                                        matches_won: 0,
-                                        total_points: 0,
-                                        highest_break: 0,
-                                        status: 'active',
-                                        tournament_type: app.tournamentType || null,
-                                        tournamentType: app.tournamentType || null
-                                      })
-                                      .then(({ error: err }) => {
-                                        if (err) {
-                                          console.log('[RegistrationPortal] Supabase direct players table insert notice:', err.message);
-                                          // Fallback insert with fewer columns
-                                          supabase
-                                            .from('players')
-                                            .insert({
-                                              profile_id: app.id,
-                                              player_name: app.fullName,
-                                              nickname: app.nickname || null,
-                                              club: app.club || null,
-                                              seed: finalSeed,
-                                              status: 'active'
-                                            });
-                                        }
-                                      });
+                                    safeInsertPlayer(supabase, {
+                                      profile_id: app.id,
+                                      player_name: app.fullName,
+                                      name: app.fullName,
+                                      nickname: app.nickname || null,
+                                      club: app.club || null,
+                                      seed: finalSeed,
+                                      photo_url: app.photoUrl || null,
+                                      photoUrl: app.photoUrl || null,
+                                      matches_played: 0,
+                                      matches_won: 0,
+                                      total_points: 0,
+                                      highest_break: 0,
+                                      status: 'active',
+                                      tournament_type: app.tournamentType || null,
+                                      tournamentType: app.tournamentType || null
+                                    });
                                   }
 
                                   onPlayersChange([...players, newPlayer].sort((a, b) => a.seed - b.seed));

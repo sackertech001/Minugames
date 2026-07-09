@@ -12,6 +12,222 @@ const isUUID = (id: any): boolean => {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 };
 
+const safeInsertProfile = async (supabase: any, id: string, profileObj: any): Promise<boolean> => {
+  let attemptObj = { ...profileObj };
+  console.log(`[safeInsertProfile] Attempting to insert profile for ID: ${id}`);
+  for (let i = 0; i < 10; i++) {
+    const { error } = await supabase.from('profiles').insert(attemptObj);
+    if (!error) {
+      console.log(`[safeInsertProfile] Successfully inserted profile for ID ${id}`);
+      return true;
+    }
+    
+    const errMsg = error.message || '';
+    const errDetails = error.details || '';
+    const errHint = error.hint || '';
+    const errCode = error.code || '';
+    console.log(`[safeInsertProfile] Iteration ${i + 1} mismatch. Code: ${errCode}, Msg: "${errMsg}", Details: "${errDetails}", Hint: "${errHint}"`);
+
+    const match = errMsg.match(/Could not find the '([^']+)' column/) ||
+                  errMsg.match(/column "([^"]+)" does not exist/) ||
+                  errMsg.match(/column '([^']+)' does not exist/);
+                  
+    if (match) {
+      const missingColumn = match[1];
+      console.log(`[safeInsertProfile] Removing missing column '${missingColumn}' and retrying...`);
+      delete attemptObj[missingColumn];
+      if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
+      if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
+      if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
+      if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
+      if (missingColumn === 'full_name') delete attemptObj['name'];
+      if (missingColumn === 'name') delete attemptObj['full_name'];
+    } else if (
+      errMsg.includes('violates foreign key constraint') || 
+      errMsg.includes('foreign key') || 
+      errMsg.includes('profiles_id_fkey') || 
+      errMsg.includes('fkey') ||
+      errCode === '23503'
+    ) {
+      console.log(`[safeInsertProfile] Foreign key violation on profiles.id. Attempting to create auth.user for ID ${id}...`);
+      const nameVal = attemptObj.full_name || 'Unknown Player';
+      const dummyEmail = `player_${id.substring(0, 8)}@example.com`;
+      const dummyPassword = `Pass_${id.substring(0, 8)}!`;
+      try {
+        const { error: createAuthErr } = await supabase.auth.admin.createUser({
+          id: id,
+          email: dummyEmail,
+          password: dummyPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: nameVal
+          }
+        });
+        if (createAuthErr) {
+          console.log(`[safeInsertProfile] auth.admin.createUser skipped or user already exists: ${createAuthErr.message}`);
+        } else {
+          console.log(`[safeInsertProfile] Created auth.user successfully.`);
+        }
+      } catch (authEx: any) {
+        console.log(`[safeInsertProfile] admin createUser exception:`, authEx?.message || authEx);
+      }
+      // Continue loop - next iteration will retry inserting the profile now that auth.user exists
+    } else {
+      console.log(`[safeInsertProfile] Profiles insert non-column, non-fkey status. Trying fallback with only id and full_name...`);
+      const { error: fallbackErr } = await supabase.from('profiles').insert({
+        id: id,
+        full_name: attemptObj.full_name || 'Unknown Player'
+      });
+      if (fallbackErr) {
+        console.log(`[safeInsertProfile] Fallback insert unsuccessful too:`, fallbackErr.message);
+      }
+      return !fallbackErr;
+    }
+  }
+  return false;
+};
+
+const ensureProfileExists = async (supabase: any, id: string, playerObj: any): Promise<boolean> => {
+  if (!id || !isUUID(id)) return false;
+  try {
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return true;
+    }
+
+    const nameVal = playerObj.player_name || playerObj.name || playerObj.fullName || 'Unknown Player';
+    const profileData = {
+      id: id,
+      full_name: nameVal,
+      nickname: playerObj.nickname || null,
+      club: playerObj.club || null,
+      status: playerObj.status === 'active' ? 'approved' : (playerObj.status || 'approved'),
+      seed: playerObj.seed || null,
+      photo_url: playerObj.photo_url || playerObj.photoUrl || null,
+      tournament_type: playerObj.tournament_type || playerObj.tournamentType || null,
+      matches_played: playerObj.matches_played || playerObj.matchesPlayed || 0,
+      matches_won: playerObj.matches_won || playerObj.matchesWon || 0,
+      total_points: playerObj.total_points || playerObj.totalPoints || 0,
+      highest_break: playerObj.highest_break || playerObj.highestBreak || 0
+    };
+
+    return await safeInsertProfile(supabase, id, profileData);
+  } catch (err: any) {
+    console.log(`[ensureProfileExists] Status:`, err?.message || err);
+  }
+  return false;
+};
+
+const safeInsertPlayer = async (supabase: any, playerObj: any): Promise<boolean> => {
+  if (playerObj.profile_id) {
+    await ensureProfileExists(supabase, playerObj.profile_id, playerObj);
+  }
+  let attemptObj = { ...playerObj };
+  console.log(`[safeInsertPlayer] Attempting insert for profile_id: ${playerObj.profile_id}`);
+  for (let i = 0; i < 10; i++) {
+    const { error } = await supabase.from('players').insert(attemptObj);
+    if (!error) {
+      console.log(`[safeInsertPlayer] Successfully inserted player for profile_id ${playerObj.profile_id}`);
+      return true;
+    }
+    
+    const errMsg = error.message || '';
+    const errDetails = error.details || '';
+    const errCode = error.code || '';
+    console.log(`[safeInsertPlayer] Iteration ${i + 1} mismatch. Code: ${errCode}, Msg: "${errMsg}", Details: "${errDetails}"`);
+
+    const match = errMsg.match(/Could not find the '([^']+)' column/) ||
+                  errMsg.match(/column "([^"]+)" does not exist/) ||
+                  errMsg.match(/column '([^']+)' does not exist/);
+                  
+    if (match) {
+      const missingColumn = match[1];
+      console.log(`[safeInsertPlayer Server] Removing missing column '${missingColumn}' and retrying...`);
+      delete attemptObj[missingColumn];
+      if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
+      if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
+      if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
+      if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
+      if (missingColumn === 'player_name') delete attemptObj['name'];
+      if (missingColumn === 'name') delete attemptObj['player_name'];
+    } else {
+      console.log(`[safeInsertPlayer Server] Safe insert fallback for profile_id: ${playerObj.profile_id}`);
+      const { error: fallbackErr } = await supabase.from('players').insert({
+        profile_id: playerObj.profile_id,
+        status: playerObj.status || 'active',
+        seed: playerObj.seed || 1
+      });
+      if (fallbackErr) {
+        console.log(`[safeInsertPlayer Server] Fallback insert unsuccessful too: ${fallbackErr.message}, code: ${fallbackErr.code}`);
+      } else {
+        console.log(`[safeInsertPlayer Server] Fallback insert succeeded!`);
+      }
+      return !fallbackErr;
+    }
+  }
+  return false;
+};
+
+const safeUpdatePlayer = async (supabase: any, profileId: string, playerObj: any): Promise<boolean> => {
+  if (profileId) {
+    await ensureProfileExists(supabase, profileId, playerObj);
+  }
+  let attemptObj = { ...playerObj };
+  console.log(`[safeUpdatePlayer] Attempting update for profileId: ${profileId}`);
+  for (let i = 0; i < 10; i++) {
+    const { error } = await supabase
+      .from('players')
+      .update(attemptObj)
+      .or(`profile_id.eq.${profileId},id.eq.${profileId}`);
+    if (!error) {
+      console.log(`[safeUpdatePlayer] Successfully updated player for profileId: ${profileId}`);
+      return true;
+    }
+    
+    const errMsg = error.message || '';
+    const errDetails = error.details || '';
+    const errCode = error.code || '';
+    console.log(`[safeUpdatePlayer] Iteration ${i + 1} mismatch. Code: ${errCode}, Msg: "${errMsg}", Details: "${errDetails}"`);
+
+    const match = errMsg.match(/Could not find the '([^']+)' column/) ||
+                  errMsg.match(/column "([^"]+)" does not exist/) ||
+                  errMsg.match(/column '([^']+)' does not exist/);
+                  
+    if (match) {
+      const missingColumn = match[1];
+      console.log(`[safeUpdatePlayer Server] Removing missing column '${missingColumn}' and retrying...`);
+      delete attemptObj[missingColumn];
+      if (missingColumn === 'photo_url') delete attemptObj['photoUrl'];
+      if (missingColumn === 'photoUrl') delete attemptObj['photo_url'];
+      if (missingColumn === 'tournament_type') delete attemptObj['tournamentType'];
+      if (missingColumn === 'tournamentType') delete attemptObj['tournament_type'];
+      if (missingColumn === 'player_name') delete attemptObj['name'];
+      if (missingColumn === 'name') delete attemptObj['player_name'];
+    } else {
+      console.log(`[safeUpdatePlayer Server] Safe update fallback for profileId: ${profileId}`);
+      const { error: fallbackErr } = await supabase
+        .from('players')
+        .update({
+          status: playerObj.status || 'active',
+          seed: playerObj.seed || 1
+        })
+        .or(`profile_id.eq.${profileId},id.eq.${profileId}`);
+      if (fallbackErr) {
+        console.log(`[safeUpdatePlayer Server] Fallback update unsuccessful too: ${fallbackErr.message}, code: ${fallbackErr.code}`);
+      } else {
+        console.log(`[safeUpdatePlayer Server] Fallback update succeeded!`);
+      }
+      return !fallbackErr;
+    }
+  }
+  return false;
+};
+
 const PORT = 3000;
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
@@ -431,36 +647,19 @@ async function startServer() {
                 if (!exists) {
                   console.log(`[Supabase DB Sync] Auto-inserting missing player for profile ${profile.id} into players table`);
                   try {
-                    const { error: insertErr } = await supabase
-                      .from('players')
-                      .insert({
-                        profile_id: profile.id,
-                        player_name: profile.full_name,
-                        nickname: profile.nickname,
-                        club: profile.club,
-                        seed: profile.seed || 1,
-                        status: profile.status === 'approved' ? 'active' : profile.status,
-                        matches_played: profile.matches_played || 0,
-                        matches_won: profile.matches_won || 0,
-                        total_points: profile.total_points || 0,
-                        highest_break: profile.highest_break || 0
-                      });
-                    if (insertErr) {
-                      await supabase
-                        .from('players')
-                        .insert({
-                          profile_id: profile.id,
-                          name: profile.full_name,
-                          nickname: profile.nickname,
-                          club: profile.club,
-                          seed: profile.seed || 1,
-                          status: profile.status === 'approved' ? 'active' : profile.status,
-                          matches_played: profile.matches_played || 0,
-                          matches_won: profile.matches_won || 0,
-                          total_points: profile.total_points || 0,
-                          highest_break: profile.highest_break || 0
-                        });
-                    }
+                    await safeInsertPlayer(supabase, {
+                      profile_id: profile.id,
+                      player_name: profile.full_name,
+                      name: profile.full_name,
+                      nickname: profile.nickname,
+                      club: profile.club,
+                      seed: profile.seed || 1,
+                      status: profile.status === 'approved' ? 'active' : profile.status,
+                      matches_played: profile.matches_played || 0,
+                      matches_won: profile.matches_won || 0,
+                      total_points: profile.total_points || 0,
+                      highest_break: profile.highest_break || 0
+                    });
                   } catch (e) {
                     console.log(`[Supabase DB Sync] Auto-healing insert error:`, e);
                   }
@@ -514,6 +713,14 @@ async function startServer() {
               }));
           }
 
+          // Deduplicate dbPlayers by ID
+          const uniquePlayersMap = new Map();
+          for (const player of dbPlayers) {
+            if (player.id && !uniquePlayersMap.has(player.id)) {
+              uniquePlayersMap.set(player.id, player);
+            }
+          }
+          dbPlayers = Array.from(uniquePlayersMap.values());
           dbPlayers.sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
           cachedPlayers = dbPlayers;
@@ -522,7 +729,15 @@ async function startServer() {
           const state = readState();
           // Retain local/demo players who do not have a valid UUID or have a demo prefix
           const demoPlayers = (state.players || []).filter((p: any) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
-          state.players = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
+          
+          const combinedPlayers = [...dbPlayers, ...demoPlayers];
+          const finalUniquePlayersMap = new Map();
+          for (const player of combinedPlayers) {
+            if (player.id && !finalUniquePlayersMap.has(player.id)) {
+              finalUniquePlayersMap.set(player.id, player);
+            }
+          }
+          state.players = Array.from(finalUniquePlayersMap.values()).sort((a, b) => (a.seed || 0) - (b.seed || 0));
           state.playerApplications = mappedApps;
 
           const { data: dbTypes, error: typesError } = await supabase
@@ -1276,15 +1491,13 @@ async function startServer() {
                   .maybeSingle();
 
                 if (!existingPlayer) {
-                  const { error: insertErr } = await supabase
-                    .from('players')
-                    .insert({
-                      profile_id: app.id,
-                      name: app.fullName,
-                      player_name: app.fullName
-                    });
-                  if (insertErr) {
-                    console.log(`[Supabase Player Table Sync] Insert details for user ${app.id}:`, insertErr.message);
+                  const inserted = await safeInsertPlayer(supabase, {
+                    profile_id: app.id,
+                    name: app.fullName,
+                    player_name: app.fullName
+                  });
+                  if (!inserted) {
+                    console.log(`[Supabase Player Table Sync] Insert details for user ${app.id} unsuccessful after safe insert attempts.`);
                   } else {
                     console.log(`[Supabase Player Table Sync] Successfully created player row for ${app.fullName}`);
                   }
@@ -1403,73 +1616,50 @@ async function startServer() {
 
               if (!existingPlayerTable) {
                 // Insert new player row since it doesn't exist
-                const { error: insertErr } = await supabase
-                  .from('players')
-                  .insert({
-                    profile_id: player.id,
-                    player_name: player.name,
-                    name: player.name,
-                    nickname: player.nickname || null,
-                    club: player.club || null,
-                    seed: player.seed || 1,
-                    photo_url: currentPhotoUrl || null,
-                    photoUrl: currentPhotoUrl || null,
-                    matches_played: player.matchesPlayed || 0,
-                    matches_won: player.matchesWon || 0,
-                    total_points: player.totalPoints || 0,
-                    highest_break: player.highestBreak || 0,
-                    status: player.status || 'active',
-                    tournament_type: player.tournamentType || null,
-                    tournamentType: player.tournamentType || null
-                  });
-                if (insertErr) {
-                  console.log(`[Supabase Players Sync Server] Insert failed for missing player ${player.id}:`, insertErr.message);
+                const inserted = await safeInsertPlayer(supabase, {
+                  profile_id: player.id,
+                  player_name: player.name,
+                  name: player.name,
+                  nickname: player.nickname || null,
+                  club: player.club || null,
+                  seed: player.seed || 1,
+                  photo_url: currentPhotoUrl || null,
+                  photoUrl: currentPhotoUrl || null,
+                  matches_played: player.matchesPlayed || 0,
+                  matches_won: player.matchesWon || 0,
+                  total_points: player.totalPoints || 0,
+                  highest_break: player.highestBreak || 0,
+                  status: player.status || 'active',
+                  tournament_type: player.tournamentType || null,
+                  tournamentType: player.tournamentType || null
+                });
+                if (!inserted) {
+                  console.log(`[Supabase Players Sync Server] Insert unsuccessful for missing player ${player.id} after safe insert attempts.`);
                 } else {
                   console.log(`[Supabase Players Sync Server] Successfully inserted missing player row for ${player.name}`);
                 }
               } else {
                 // Update players table
-                const { error: playerErr1 } = await supabase
-                  .from('players')
-                  .update({
-                    status: player.status,
-                    seed: player.seed,
-                    matches_played: player.matchesPlayed,
-                    matches_won: player.matchesWon,
-                    total_points: player.totalPoints,
-                    highest_break: player.highestBreak,
-                    player_name: player.name,
-                    name: player.name,
-                    nickname: player.nickname,
-                    club: player.club,
-                    photo_url: currentPhotoUrl,
-                    tournament_type: player.tournamentType
-                  })
-                  .eq('profile_id', player.id);
-
-                if (playerErr1) {
-                  // Try updating by 'id' just in case
-                  await supabase
-                    .from('players')
-                    .update({
-                      status: player.status,
-                      seed: player.seed,
-                      matches_played: player.matchesPlayed,
-                      matches_won: player.matchesWon,
-                      total_points: player.totalPoints,
-                      highest_break: player.highestBreak,
-                      player_name: player.name,
-                      name: player.name,
-                      nickname: player.nickname,
-                      club: player.club,
-                      photo_url: currentPhotoUrl,
-                      tournament_type: player.tournamentType
-                    })
-                    .eq('id', player.id);
+                const updated = await safeUpdatePlayer(supabase, player.id, {
+                  status: player.status,
+                  seed: player.seed,
+                  matches_played: player.matchesPlayed,
+                  matches_won: player.matchesWon,
+                  total_points: player.totalPoints,
+                  highest_break: player.highestBreak,
+                  player_name: player.name,
+                  name: player.name,
+                  nickname: player.nickname,
+                  club: player.club,
+                  photo_url: currentPhotoUrl,
+                  tournament_type: player.tournamentType
+                });
+                if (!updated) {
+                  console.log(`[Supabase Players Sync Server] Update unsuccessful for player ${player.id} after safe update attempts.`);
                 }
               }
             } catch (err: any) {
-              console.log(`[Supabase Players Sync Server] Error handling player table update/insert for ${player.id}:`, err?.message || err);
+              console.log(`[Supabase Players Sync Server] Status handling player table update/insert for ${player.id}:`, err?.message || err);
             }
           });
 
