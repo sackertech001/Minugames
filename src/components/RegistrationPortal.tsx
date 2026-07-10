@@ -7,7 +7,7 @@ import {
 import { getDemoPlayers } from '../utils/demoData';
 import { generateSnookerAvatar } from '../utils/avatar';
 import ConfirmModal from './ConfirmModal';
-import { getSupabase, safeInsertPlayer } from '../utils/supabaseClient';
+import { getSupabase } from '../utils/supabaseClient';
 
 interface RegistrationPortalProps {
   players: Player[];
@@ -1109,25 +1109,6 @@ export default function RegistrationPortal({
                                       .then(({ error: err }) => {
                                         if (err) console.log('[RegistrationPortal] Supabase direct status/seed update error:', err.message);
                                       });
-
-                                    // Direct insert to the players table to ensure it always exists immediately
-                                    safeInsertPlayer(supabase, {
-                                      profile_id: app.id,
-                                      player_name: app.fullName,
-                                      name: app.fullName,
-                                      nickname: app.nickname || null,
-                                      club: app.club || null,
-                                      seed: finalSeed,
-                                      photo_url: app.photoUrl || null,
-                                      photoUrl: app.photoUrl || null,
-                                      matches_played: 0,
-                                      matches_won: 0,
-                                      total_points: 0,
-                                      highest_break: 0,
-                                      status: 'active',
-                                      tournament_type: app.tournamentType || null,
-                                      tournamentType: app.tournamentType || null
-                                    });
                                   }
 
                                   onPlayersChange([...players, newPlayer].sort((a, b) => a.seed - b.seed));

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Player, Match, FrameScore, TournamentConfig, SystemUser, RolePermission, PlayerApplication, SoccerScore } from './types';
 import {
   createInitialMatches,
@@ -39,7 +39,7 @@ import SettingsTab from './components/SettingsTab';
 import LoginPage from './components/LoginPage';
 import MainLandingPage from './components/MainLandingPage';
 import PlayerApplicationForm from './components/PlayerApplicationForm';
-import { getSupabase, safeInsertPlayer, safeUpdatePlayer } from './utils/supabaseClient';
+import { getSupabase } from './utils/supabaseClient';
 import Sidebar from './components/Sidebar';
 
 const isUUID = (id: any): boolean => {
@@ -102,7 +102,6 @@ const safeStorage = {
 };
 
 export default function App() {
-  const resetPollTimerRef = useRef<() => void>(() => {});
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [rounds, setRounds] = useState<Array<{ stage: string; status: 'active' | 'not started' | 'ended' }>>([
@@ -147,9 +146,14 @@ export default function App() {
   });
 
   // Role-Based Access Control users state with rich defaults
-  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
-
-  const [systemUsersTableMissing, setSystemUsersTableMissing] = useState<boolean>(false);
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([
+    { id: 'u-admin', username: 'admin', role: 'Admin', pin: '1234' },
+    { id: 'u-owner', username: 'owner', role: 'Owner', pin: '5555' },
+    { id: 'u-gameadmin', username: 'game_admin', role: 'Game Admin', pin: '7777' },
+    { id: 'u-referee', username: 'referee', role: 'Referee', pin: '2222' },
+    { id: 'u-scorer', username: 'scorer', role: 'Scorer', pin: '3333' },
+    { id: 'u-player', username: 'player', role: 'Player', pin: '4444' }
+  ]);
 
   // Dynamic role permissions matrix configuration state
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
@@ -207,7 +211,6 @@ export default function App() {
   };
 
   const saveStateToServer = async (patch: any) => {
-    resetPollTimerRef.current();
     let succeeded = false;
     try {
       const res = await fetch('/api/state', {
@@ -222,9 +225,9 @@ export default function App() {
       console.warn('Could not sync state to server:', e);
     }
 
-    // Direct Client-side Supabase updates - ONLY if server-side endpoint failed (to prevent race conditions & duplicate insertions)
+    // Direct Client-side Supabase updates - Unconditional if Supabase is configured
     const supabase = getSupabase();
-    if (supabase && !succeeded) {
+    if (supabase) {
       if (patch.playerApplications && Array.isArray(patch.playerApplications)) {
         try {
           for (const app of patch.playerApplications) {
@@ -240,11 +243,66 @@ export default function App() {
 
             if (app.status === 'approved') {
               try {
-                await safeInsertPlayer(supabase, {
-                  profile_id: app.id,
-                  player_name: app.fullName,
-                  name: app.fullName
-                });
+                const { data: existingPlayer } = await supabase
+                  .from('players')
+                  .select('id')
+                  .eq('profile_id', app.id)
+                  .maybeSingle();
+
+                if (!existingPlayer) {
+                  let inserted = false;
+                  
+                  // Try 1: insert with player_name
+                  try {
+                    const { error: err1 } = await supabase
+                      .from('players')
+                      .insert({
+                        profile_id: app.id,
+                        player_name: app.fullName
+                      });
+                    if (!err1) {
+                      inserted = true;
+                      console.log(`[Client Supabase Player Sync] Created player row with player_name for ${app.fullName}`);
+                    } else {
+                      console.log(`[Client Supabase Player Sync] player_name insert failed: ${err1.message}. Trying name...`);
+                    }
+                  } catch (e) {}
+
+                  // Try 2: insert with name
+                  if (!inserted) {
+                    try {
+                      const { error: err2 } = await supabase
+                        .from('players')
+                        .insert({
+                          profile_id: app.id,
+                          name: app.fullName
+                        });
+                      if (!err2) {
+                        inserted = true;
+                        console.log(`[Client Supabase Player Sync] Created player row with name for ${app.fullName}`);
+                      } else {
+                        console.log(`[Client Supabase Player Sync] name insert failed: ${err2.message}. Trying profile_id only...`);
+                      }
+                    } catch (e) {}
+                  }
+
+                  // Try 3: insert with profile_id only
+                  if (!inserted) {
+                    try {
+                      const { error: err3 } = await supabase
+                        .from('players')
+                        .insert({
+                          profile_id: app.id
+                        });
+                      if (!err3) {
+                        inserted = true;
+                        console.log(`[Client Supabase Player Sync] Created player row with profile_id only for ${app.fullName}`);
+                      } else {
+                        console.log(`[Client Supabase Player Sync] profile_id only insert failed: ${err3.message}`);
+                      }
+                    } catch (e) {}
+                  }
+                }
               } catch (pErr: any) {
                 console.log(`[Client Supabase Player Sync] Check error for ${app.id}:`, pErr?.message || pErr);
               }
@@ -359,7 +417,7 @@ export default function App() {
                   club: player.club || null,
                   photo_url: currentPhotoUrl || null,
                   tournament_type: player.tournamentType || null,
-                  status: player.status === 'active' ? 'approved' : player.status,
+                  status: player.status,
                   seed: player.seed,
                   matches_played: player.matchesPlayed,
                   matches_won: player.matchesWon,
@@ -373,35 +431,42 @@ export default function App() {
 
               // Update players table
               try {
-                // Check if player exists in players table
-                const { data: existingPlayerTable } = await supabase
+                // Try to update with all possible variants of name, photo_url, and tournament_type
+                const { error: pError1 } = await supabase
                   .from('players')
-                  .select('id')
-                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`)
-                  .maybeSingle();
-
-                const playerObj = {
-                  profile_id: player.id,
-                  player_name: player.name,
-                  name: player.name,
-                  nickname: player.nickname || null,
-                  club: player.club || null,
-                  seed: player.seed || 1,
-                  photo_url: currentPhotoUrl || null,
-                  photoUrl: currentPhotoUrl || null,
-                  matches_played: player.matchesPlayed || 0,
-                  matches_won: player.matchesWon || 0,
-                  total_points: player.totalPoints || 0,
-                  highest_break: player.highestBreak || 0,
-                  status: player.status || 'active',
-                  tournament_type: player.tournamentType || null,
-                  tournamentType: player.tournamentType || null
-                };
-
-                if (!existingPlayerTable) {
-                  await safeInsertPlayer(supabase, playerObj);
-                } else {
-                  await safeUpdatePlayer(supabase, player.id, playerObj);
+                  .update({
+                    player_name: player.name,
+                    name: player.name,
+                    nickname: player.nickname || null,
+                    club: player.club || null,
+                    photo_url: currentPhotoUrl || null,
+                    photoUrl: currentPhotoUrl || null,
+                    tournament_type: player.tournamentType || null,
+                    tournamentType: player.tournamentType || null,
+                    status: player.status,
+                    seed: player.seed,
+                    matches_played: player.matchesPlayed,
+                    matches_won: player.matchesWon,
+                    total_points: player.totalPoints,
+                    highest_break: player.highestBreak,
+                  })
+                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                if (pError1) {
+                  // Fallback: try with a subset of common columns if there was a column error
+                  await supabase
+                    .from('players')
+                    .update({
+                      player_name: player.name,
+                      nickname: player.nickname || null,
+                      club: player.club || null,
+                      seed: player.seed,
+                      status: player.status,
+                      matches_played: player.matchesPlayed,
+                      matches_won: player.matchesWon,
+                      total_points: player.totalPoints,
+                      highest_break: player.highestBreak,
+                    })
+                    .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
                 }
               } catch (pe) {
                 console.log(`[Client Supabase] Update players table error:`, pe);
@@ -414,7 +479,7 @@ export default function App() {
 
         if (patch.wipeBoard) {
           try {
-            console.log('[Client Supabase] Wipe Board action. Deleting players, resetting profiles, rounds, and clearing all round matches...');
+            console.log('[Client Supabase] Wipe Board action. Deleting players and resetting profiles status and seed...');
             
             // 1. Delete all rows from players table
             const { error: deletePlayersErr } = await supabase
@@ -436,25 +501,6 @@ export default function App() {
             if (resetProfilesErr) {
               console.log('[Client Supabase] Wipe Board reset profiles notice:', resetProfilesErr.message);
             }
-
-            // 3. Reset all tournament rounds back to 'not started'
-            const { error: resetRoundsErr } = await supabase
-              .from('rounds')
-              .update({ status: 'not started' })
-              .neq('stage', '');
-            if (resetRoundsErr) {
-              console.log('[Client Supabase] Wipe Board reset rounds notice:', resetRoundsErr.message);
-            } else {
-              setRounds(prev => prev.map(r => ({ ...r, status: 'not started' })));
-            }
-
-            // 4. Clear matches from all round tables
-            await supabase.from('round_of_32').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-            await supabase.from('round_of_16').delete().gt('match_number', 0);
-            await supabase.from('quarter_finals').delete().gt('match_number', 0);
-            await supabase.from('semi_finals').delete().gt('match_number', 0);
-            await supabase.from('grand_final').delete().gt('match_number', 0);
-            await supabase.from('third_place').delete().gt('match_number', 0);
           } catch (err: any) {
             console.log('[Client Supabase] Wipe Board error:', err?.message || err);
           }
@@ -887,93 +933,36 @@ export default function App() {
             console.log('[Client Supabase third_place Sync] General error:', err?.message || err);
           }
 
-          // Sync rounds table status to active when a match in that round is playing or ongoing, ONLY if the tournament has actually started!
-          const tournamentStarted = patch.isTournamentStarted !== undefined ? patch.isTournamentStarted : isTournamentStarted;
-          if (tournamentStarted) {
-            try {
-              const hasActiveR32 = patch.matches.some((m: any) => (m.round === 'R32' || m.id.startsWith('M')) && (m.status === 'playing' || m.status === 'ongoing'));
-              const hasActiveR16 = patch.matches.some((m: any) => (m.round === 'R16' || m.id.startsWith('R16-')) && (m.status === 'playing' || m.status === 'ongoing'));
-              const hasActiveQF = patch.matches.some((m: any) => (m.round === 'QF' || m.id.startsWith('QF-')) && (m.status === 'playing' || m.status === 'ongoing'));
-              const hasActiveSF = patch.matches.some((m: any) => (m.round === 'SF' || m.id.startsWith('SF-')) && (m.status === 'playing' || m.status === 'ongoing'));
-              const hasActiveGF = patch.matches.some((m: any) => (m.id === 'FINAL' || m.round === 'F') && (m.status === 'playing' || m.status === 'ongoing'));
-
-              if (hasActiveR32) {
-                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 32');
-                setRounds(prev => prev.map(r => r.stage === 'Round of 32' ? { ...r, status: 'active' } : r));
-              }
-              if (hasActiveR16) {
-                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 16');
-                setRounds(prev => prev.map(r => r.stage === 'Round of 16' ? { ...r, status: 'active' } : r));
-              }
-              if (hasActiveQF) {
-                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Quarter finals');
-                setRounds(prev => prev.map(r => r.stage === 'Quarter finals' ? { ...r, status: 'active' } : r));
-              }
-              if (hasActiveSF) {
-                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Semi finals');
-                setRounds(prev => prev.map(r => r.stage === 'Semi finals' ? { ...r, status: 'active' } : r));
-              }
-              if (hasActiveGF) {
-                await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Final');
-                setRounds(prev => prev.map(r => r.stage === 'Final' ? { ...r, status: 'active' } : r));
-              }
-            } catch (err: any) {
-              console.log('[Client Supabase rounds active update] General error:', err?.message || err);
-            }
-          }
-        }
-
-        if (patch.systemUsers && Array.isArray(patch.systemUsers)) {
+          // Sync rounds table status to active when a match in that round is playing or ongoing
           try {
-            const { data: dbCurrentUsers, error: selectErr } = await supabase
-              .from('system_users')
-              .select('id, username');
+            const hasActiveR32 = patch.matches.some((m: any) => (m.round === 'R32' || m.id.startsWith('M')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveR16 = patch.matches.some((m: any) => (m.round === 'R16' || m.id.startsWith('R16-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveQF = patch.matches.some((m: any) => (m.round === 'QF' || m.id.startsWith('QF-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveSF = patch.matches.some((m: any) => (m.round === 'SF' || m.id.startsWith('SF-')) && (m.status === 'playing' || m.status === 'ongoing'));
+            const hasActiveGF = patch.matches.some((m: any) => (m.id === 'FINAL' || m.round === 'F') && (m.status === 'playing' || m.status === 'ongoing'));
 
-            if (!selectErr && dbCurrentUsers) {
-              const incomingUsernames = patch.systemUsers.map((u: any) => u.username);
-
-              // Delete users no longer present
-              const toDelete = dbCurrentUsers.filter((u: any) => !incomingUsernames.includes(u.username));
-              if (toDelete.length > 0) {
-                const toDeleteIds = toDelete.map((u: any) => u.id);
-                const { error: delErr } = await supabase
-                  .from('system_users')
-                  .delete()
-                  .in('id', toDeleteIds);
-                if (delErr) {
-                  console.log('[Client Supabase System Users Sync] Delete user notice:', delErr.message);
-                }
-              }
-
-              // Upsert incoming users
-              for (const user of patch.systemUsers) {
-                const isUuidVal = isUUID(user.id);
-                const payload: any = {
-                  username: user.username,
-                  role: user.role,
-                  pin: user.pin
-                };
-                if (isUuidVal) {
-                  payload.id = user.id;
-                }
-
-                const { error: upsertErr } = await supabase
-                  .from('system_users')
-                  .upsert(payload, { onConflict: 'username' });
-
-                if (upsertErr) {
-                  console.log(`[Client Supabase System Users Sync] Upsert user "${user.username}" notice:`, upsertErr.message);
-                }
-              }
-              setSystemUsersTableMissing(false);
-            } else if (selectErr) {
-              console.log('[Client Supabase System Users Sync] Fetch current users error:', selectErr.message);
-              if (selectErr.code === '42P01' || selectErr.message?.includes('does not exist')) {
-                setSystemUsersTableMissing(true);
-              }
+            if (hasActiveR32) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 32');
+              setRounds(prev => prev.map(r => r.stage === 'Round of 32' ? { ...r, status: 'active' } : r));
+            }
+            if (hasActiveR16) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Round of 16');
+              setRounds(prev => prev.map(r => r.stage === 'Round of 16' ? { ...r, status: 'active' } : r));
+            }
+            if (hasActiveQF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Quarter finals');
+              setRounds(prev => prev.map(r => r.stage === 'Quarter finals' ? { ...r, status: 'active' } : r));
+            }
+            if (hasActiveSF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Semi finals');
+              setRounds(prev => prev.map(r => r.stage === 'Semi finals' ? { ...r, status: 'active' } : r));
+            }
+            if (hasActiveGF) {
+              await supabase.from('rounds').update({ status: 'active' }).eq('stage', 'Final');
+              setRounds(prev => prev.map(r => r.stage === 'Final' ? { ...r, status: 'active' } : r));
             }
           } catch (err: any) {
-            console.log('[Client Supabase System Users Sync] General error:', err?.message || err);
+            console.log('[Client Supabase rounds active update] General error:', err?.message || err);
           }
         }
       }
@@ -1040,7 +1029,9 @@ export default function App() {
       const savedMatches = safeStorage.getItem('snooker_matches');
       const savedStarted = safeStorage.getItem('snooker_started');
       const savedConfig = safeStorage.getItem('snooker_config');
+      const savedUsers = safeStorage.getItem('snooker_users');
       const savedPermissions = safeStorage.getItem('snooker_role_permissions');
+      const savedCurrentUser = safeStorage.getItem('snooker_current_user');
       const savedApplications = safeStorage.getItem('snooker_player_applications');
       const savedLogo = safeStorage.getItem('snooker_system_logo');
 
@@ -1085,6 +1076,9 @@ export default function App() {
           safeStorage.setItem('snooker_config', JSON.stringify(parsed));
         }
       }
+      if (savedUsers) {
+        setSystemUsers(JSON.parse(savedUsers));
+      }
       if (savedPermissions) {
         const parsedPermissions = JSON.parse(savedPermissions);
         // Ensure dashboard is included, especially for Admin
@@ -1096,16 +1090,11 @@ export default function App() {
         setRolePermissions(parsedPermissions);
         safeStorage.setItem('snooker_role_permissions', JSON.stringify(parsedPermissions));
       }
+      if (savedCurrentUser) {
+        setCurrentUser(JSON.parse(savedCurrentUser));
+      }
       if (savedLogo) {
         setSystemLogo(savedLogo);
-      }
-      const savedCurrentUser = safeStorage.getItem('snooker_current_user');
-      if (savedCurrentUser) {
-        try {
-          setCurrentUser(JSON.parse(savedCurrentUser));
-        } catch (err) {
-          console.warn('Failed to parse saved current user', err);
-        }
       }
     } catch (e) {
       console.log('Storage read notice:', e);
@@ -1153,16 +1142,8 @@ export default function App() {
             const data = await res.json();
             
             setPlayers((prev) => {
-              const incoming = data.players || [];
-              const finalUniquePlayersMap = new Map();
-              for (const player of incoming) {
-                if (player.id && !finalUniquePlayersMap.has(player.id)) {
-                  finalUniquePlayersMap.set(player.id, player);
-                }
-              }
-              const uniqueIncoming = Array.from(finalUniquePlayersMap.values());
-              if (JSON.stringify(prev) !== JSON.stringify(uniqueIncoming)) {
-                return uniqueIncoming;
+              if (JSON.stringify(prev) !== JSON.stringify(data.players)) {
+                return data.players;
               }
               return prev;
             });
@@ -1193,42 +1174,11 @@ export default function App() {
 
             setSystemUsers((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.systemUsers)) {
+                safeStorage.setItem('snooker_users', JSON.stringify(data.systemUsers));
                 return data.systemUsers;
               }
               return prev;
             });
-
-            // Validate current logged-in session against live users
-            if (data.systemUsers && Array.isArray(data.systemUsers)) {
-              const savedUserStr = safeStorage.getItem('snooker_current_user');
-              if (savedUserStr) {
-                try {
-                  const savedUser = JSON.parse(savedUserStr);
-                  const matchedUser = data.systemUsers.find((u: any) => u.username.toLowerCase() === savedUser.username.toLowerCase());
-                  if (matchedUser && matchedUser.pin === savedUser.pin) {
-                    // Match found! Sync role if updated
-                    setCurrentUser((prev) => {
-                      if (!prev || prev.role !== matchedUser.role || prev.pin !== matchedUser.pin) {
-                        safeStorage.setItem('snooker_current_user', JSON.stringify(matchedUser));
-                        return matchedUser;
-                      }
-                      return prev;
-                    });
-                  } else {
-                    // PIN mismatch or user deleted, log out
-                    setCurrentUser(null);
-                    safeStorage.removeItem('snooker_current_user');
-                  }
-                } catch (e) {
-                  setCurrentUser(null);
-                  safeStorage.removeItem('snooker_current_user');
-                }
-              }
-            }
-
-            if (data.systemUsersTableMissing !== undefined) {
-              setSystemUsersTableMissing(data.systemUsersTableMissing);
-            }
 
             setRolePermissions((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.rolePermissions)) {
@@ -1379,8 +1329,57 @@ export default function App() {
                           tournamentType: p.tournament_type || ''
                         }));
                     } else {
-                      // Server-side background sync centrally handles the auto-healing; the client remains read-only during periodic background polls to prevent race conditions.
-                      const finalPlayersTable = dbPlayersTable || [];
+                      // Auto-heal: insert any approved profile that is missing from players table
+                      const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
+                      const approvedProfiles = dbProfiles.filter((p: any) => approvedStatuses.includes(p.status));
+                      
+                      for (const profile of approvedProfiles) {
+                        const exists = dbPlayersTable && dbPlayersTable.some((pt: any) => pt.profile_id === profile.id || pt.id === profile.id);
+                        if (!exists) {
+                          console.log(`[Client Supabase Sync] Auto-inserting missing player for profile ${profile.id} into players table`);
+                          try {
+                            const { error: insertErr } = await supabase
+                              .from('players')
+                              .insert({
+                                profile_id: profile.id,
+                                player_name: profile.full_name,
+                                nickname: profile.nickname,
+                                club: profile.club,
+                                seed: profile.seed || 1,
+                                status: profile.status === 'approved' ? 'active' : profile.status,
+                                matches_played: profile.matches_played || 0,
+                                matches_won: profile.matches_won || 0,
+                                total_points: profile.total_points || 0,
+                                highest_break: profile.highest_break || 0
+                              });
+                            if (insertErr) {
+                              await supabase
+                                .from('players')
+                                .insert({
+                                  profile_id: profile.id,
+                                  name: profile.full_name,
+                                  nickname: profile.nickname,
+                                  club: profile.club,
+                                  seed: profile.seed || 1,
+                                  status: profile.status === 'approved' ? 'active' : profile.status,
+                                  matches_played: profile.matches_played || 0,
+                                  matches_won: profile.matches_won || 0,
+                                  total_points: profile.total_points || 0,
+                                  highest_break: profile.highest_break || 0
+                                });
+                            }
+                          } catch (e) {
+                            console.log(`[Client Supabase Sync] Auto-healing insert error:`, e);
+                          }
+                        }
+                      }
+
+                      // Re-fetch players table to get a complete list
+                      const { data: dbPlayersTableUpdated } = await supabase
+                        .from('players')
+                        .select('*');
+
+                      const finalPlayersTable = dbPlayersTableUpdated || dbPlayersTable || [];
 
                       dbPlayers = finalPlayersTable.map((pt: any) => {
                         const matchingProfile = dbProfiles.find((profile: any) => profile.id === pt.profile_id || profile.id === pt.id);
@@ -1422,26 +1421,11 @@ export default function App() {
                       }));
                   }
 
-                  // Deduplicate dbPlayers by ID
-                  const uniquePlayersMap = new Map();
-                  for (const player of dbPlayers) {
-                    if (player.id && !uniquePlayersMap.has(player.id)) {
-                      uniquePlayersMap.set(player.id, player);
-                    }
-                  }
-                  dbPlayers = Array.from(uniquePlayersMap.values());
                   dbPlayers.sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
                   setPlayers((prev) => {
                     const demoPlayers = prev.filter((p) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
-                    const combinedPlayers = [...dbPlayers, ...demoPlayers];
-                    const finalUniquePlayersMap = new Map();
-                    for (const player of combinedPlayers) {
-                      if (player.id && !finalUniquePlayersMap.has(player.id)) {
-                        finalUniquePlayersMap.set(player.id, player);
-                      }
-                    }
-                    const mergedPlayers = Array.from(finalUniquePlayersMap.values()).sort((a, b) => (a.seed || 0) - (b.seed || 0));
+                    const mergedPlayers = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
                     if (JSON.stringify(prev) !== JSON.stringify(mergedPlayers)) {
                       return mergedPlayers;
                     }
@@ -1487,65 +1471,6 @@ export default function App() {
                     }
                     return prev;
                   });
-                }
-
-                // Direct Client-side system_users table sync
-                try {
-                  const { data: dbSystemUsers, error: usersError } = await supabase
-                    .from('system_users')
-                    .select('*');
-
-                  if (!usersError && dbSystemUsers) {
-                    const mappedUsers = dbSystemUsers.map((u: any) => ({
-                      id: u.id,
-                      username: u.username,
-                      role: u.role,
-                      pin: u.pin
-                    }));
-                    
-                    setSystemUsers((prev) => {
-                      if (JSON.stringify(prev) !== JSON.stringify(mappedUsers)) {
-                        return mappedUsers;
-                      }
-                      return prev;
-                    });
-
-                    // Validate current logged-in session against live users
-                    const savedUserStr = safeStorage.getItem('snooker_current_user');
-                    if (savedUserStr) {
-                      try {
-                        const savedUser = JSON.parse(savedUserStr);
-                        const matchedUser = mappedUsers.find((u: any) => u.username.toLowerCase() === savedUser.username.toLowerCase());
-                        if (matchedUser && matchedUser.pin === savedUser.pin) {
-                          // Match found! Sync role if updated
-                          setCurrentUser((prev) => {
-                            if (!prev || prev.role !== matchedUser.role || prev.pin !== matchedUser.pin) {
-                              safeStorage.setItem('snooker_current_user', JSON.stringify(matchedUser));
-                              return matchedUser;
-                            }
-                            return prev;
-                          });
-                        } else {
-                          // PIN mismatch or user deleted, log out
-                          setCurrentUser(null);
-                          safeStorage.removeItem('snooker_current_user');
-                        }
-                      } catch (e) {
-                        setCurrentUser(null);
-                        safeStorage.removeItem('snooker_current_user');
-                      }
-                    }
-
-                    setSystemUsersTableMissing(false);
-                  } else if (usersError) {
-                    console.log('[Client Supabase Sync] Fetch system_users error:', usersError.message);
-                    if (usersError.code === '42P01' || usersError.message?.includes('does not exist')) {
-                      setSystemUsersTableMissing(true);
-                    }
-                  }
-                } catch (usersErr: any) {
-                  console.log('[Client Supabase Sync] Fetch system_users exception:', usersErr);
-                  setSystemUsersTableMissing(true);
                 }
 
                 // Fetch round_of_32, round_of_16, quarter_finals, semi_finals, grand_final, and third_place in parallel to sync matches
@@ -2052,35 +1977,17 @@ export default function App() {
       }
     };
 
-    let timeoutId: any = null;
-
-    const scheduleNextPoll = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(async () => {
-        await pollSync();
-        scheduleNextPoll();
-      }, 1500);
-    };
-
-    const resetPollTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      scheduleNextPoll();
-    };
-
-    resetPollTimerRef.current = resetPollTimer;
-
     window.addEventListener('storage', handleStorageChange);
     
     // Perform initial synchronization immediately
     pollSync();
     
-    // Start the recursive timeout cycle
-    scheduleNextPoll();
+    // Poll storage and API every 1500ms for robust state synchronization
+    const interval = setInterval(pollSync, 1500);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      if (timeoutId) clearTimeout(timeoutId);
-      resetPollTimerRef.current = () => {};
+      clearInterval(interval);
     };
   }, []);
 
@@ -2105,6 +2012,7 @@ export default function App() {
 
   const handleUpdateUsers = (newUsers: SystemUser[]) => {
     setSystemUsers(newUsers);
+    safeStorage.setItem('snooker_users', JSON.stringify(newUsers));
     saveStateToServer({ systemUsers: newUsers });
   };
 
@@ -2989,7 +2897,14 @@ export default function App() {
     };
     setTournamentConfig(defaultConfig);
     
-    const defaultUsers: SystemUser[] = [];
+    const defaultUsers: SystemUser[] = [
+      { id: 'u-admin', username: 'admin', role: 'Admin', pin: '1234' },
+      { id: 'u-owner', username: 'owner', role: 'Owner', pin: '5555' },
+      { id: 'u-gameadmin', username: 'game_admin', role: 'Game Admin', pin: '7777' },
+      { id: 'u-referee', username: 'referee', role: 'Referee', pin: '2222' },
+      { id: 'u-scorer', username: 'scorer', role: 'Scorer', pin: '3333' },
+      { id: 'u-player', username: 'player', role: 'Player', pin: '4444' }
+    ];
     setSystemUsers(defaultUsers);
 
     const defaultPermissions: RolePermission[] = [
@@ -3143,7 +3058,6 @@ export default function App() {
     }
 
     const handleSubmitApplication = async (app: Omit<PlayerApplication, 'id' | 'status' | 'appliedAt'>) => {
-      resetPollTimerRef.current();
       let isSyncedWithSupabase = false;
       try {
         const res = await fetch('/api/applications', {
@@ -3403,7 +3317,6 @@ export default function App() {
         setTheme={setTheme}
         systemLogo={systemLogo}
         onBackToHome={() => setShowMainLogin(false)}
-        systemUsersTableMissing={systemUsersTableMissing}
       />
     );
   }
@@ -3661,7 +3574,6 @@ export default function App() {
               }}
               systemLogo={systemLogo}
               onUpdateSystemLogo={handleUpdateSystemLogo}
-              systemUsersTableMissing={systemUsersTableMissing}
             />
           )}
         </div>
