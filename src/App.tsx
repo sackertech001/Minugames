@@ -2071,11 +2071,11 @@ export default function App() {
     newPlayers: Player[],
     newMatches: Match[],
     started: boolean,
-    options?: { wipeBoard?: boolean }
+    options?: { wipeBoard?: boolean; endTournament?: boolean }
   ) => {
     safeStorage.setItem('snooker_matches', JSON.stringify(newMatches));
     safeStorage.setItem('snooker_started', JSON.stringify(started));
-    saveStateToServer({ players: newPlayers, matches: newMatches, isTournamentStarted: started, wipeBoard: options?.wipeBoard });
+    saveStateToServer({ players: newPlayers, matches: newMatches, isTournamentStarted: started, wipeBoard: options?.wipeBoard, endTournament: options?.endTournament });
   };
 
   // RBAC Action handlers
@@ -2260,7 +2260,7 @@ export default function App() {
           if (rowsToInsert.length > 0) {
             const { error: insertErr } = await supabase
               .from('round_of_32')
-              .insert(rowsToInsert);
+              .upsert(rowsToInsert, { onConflict: 'match_number' });
 
             if (insertErr) {
               console.error('[Supabase round_of_32 Initial Sync] Insert error:', insertErr.message);
@@ -2322,7 +2322,7 @@ export default function App() {
           if (r16RowsToInsert.length > 0) {
             const { error: insertR16Err } = await supabase
               .from('round_of_16')
-              .insert(r16RowsToInsert);
+              .upsert(r16RowsToInsert, { onConflict: 'match_number' });
 
             if (insertR16Err) {
               console.error('[Supabase round_of_16 Initial Sync] Insert error:', insertR16Err.message);
@@ -2383,7 +2383,7 @@ export default function App() {
           if (qfRowsToInsert.length > 0) {
             const { error: insertQFErr } = await supabase
               .from('quarter_finals')
-              .insert(qfRowsToInsert);
+              .upsert(qfRowsToInsert, { onConflict: 'match_number' });
 
             if (insertQFErr) {
               console.error('[Supabase quarter_finals Initial Sync] Insert error:', insertQFErr.message);
@@ -2444,7 +2444,7 @@ export default function App() {
           if (sfRowsToInsert.length > 0) {
             const { error: insertSFErr } = await supabase
               .from('semi_finals')
-              .insert(sfRowsToInsert);
+              .upsert(sfRowsToInsert, { onConflict: 'match_number' });
 
             if (insertSFErr) {
               console.error('[Supabase semi_finals Initial Sync] Insert error:', insertSFErr.message);
@@ -2497,7 +2497,7 @@ export default function App() {
           if (gfRowsToInsert.length > 0) {
             const { error: insertGFErr } = await supabase
               .from('grand_final')
-              .insert(gfRowsToInsert);
+              .upsert(gfRowsToInsert, { onConflict: 'match_number' });
 
             if (insertGFErr) {
               console.error('[Supabase grand_final Initial Sync] Insert error:', insertGFErr.message);
@@ -2550,7 +2550,7 @@ export default function App() {
           if (tpRowsToInsert.length > 0) {
             const { error: insertTPErr } = await supabase
               .from('third_place')
-              .insert(tpRowsToInsert);
+              .upsert(tpRowsToInsert, { onConflict: 'match_number' });
 
             if (insertTPErr) {
               console.error('[Supabase third_place Initial Sync] Insert error:', insertTPErr.message);
@@ -2912,6 +2912,19 @@ export default function App() {
             setRounds(prev => prev.map(r => ({ ...r, status: 'not started' })));
           }
         });
+
+      // Reset all profiles whose status is not pending back to pending, and set seed to NULL
+      supabase
+        .from('profiles')
+        .update({ status: 'pending', seed: null })
+        .neq('status', 'pending')
+        .then(({ error }) => {
+          if (error) {
+            console.error('[Supabase profiles termination] Update error:', error.message);
+          } else {
+            console.log('[Supabase profiles termination] Reset all non-pending profiles to pending with NULL seed');
+          }
+        });
     }
     setRounds(prev => prev.map(r => ({ ...r, status: 'not started' })));
 
@@ -2930,7 +2943,7 @@ export default function App() {
     setIsTournamentStarted(false);
     setActiveTab('info');
 
-    saveStateToStorage(resetPlayers, [], false);
+    saveStateToStorage(resetPlayers, [], false, { endTournament: true });
     showToast('The tournament has been ended. All active games are ended, and fixtures have been reverted to empty.', 'success');
   };
 

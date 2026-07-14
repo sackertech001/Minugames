@@ -1214,6 +1214,45 @@ async function startServer() {
       }
     }
 
+    // If endTournament is true, reset all non-pending profiles to pending and seed = null
+    if (req.body.endTournament) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY") {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+
+          // Update profiles to status = 'pending' and seed = null where status is not 'pending'
+          const { error: profilesUpdateErr } = await supabase
+            .from('profiles')
+            .update({
+              status: 'pending',
+              seed: null
+            })
+            .neq('status', 'pending');
+
+          if (profilesUpdateErr) {
+            console.log('[Supabase End Tournament] Reset profiles error:', profilesUpdateErr.message);
+          } else {
+            console.log('[Supabase End Tournament] All non-pending profiles reset to pending with NULL seed.');
+          }
+
+          lastSupabaseFetchTime = 0;
+        } catch (err: any) {
+          console.log('[Supabase End Tournament Status] Error details:', err?.message || err);
+        }
+      }
+    }
+
     // If wipePlayersAndAuthUsers is true, wipe profiles and delete their corresponding auth.users
     if (req.body.wipePlayersAndAuthUsers) {
       const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
