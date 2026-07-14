@@ -1373,11 +1373,12 @@ async function startServer() {
   // API Endpoints
   app.get("/api/state", async (req, res) => {
     const now = Date.now();
-    if (lastSupabaseFetchTime === 0) {
+    const forceRefresh = req.query.refresh === "true";
+    if (lastSupabaseFetchTime === 0 || forceRefresh) {
       try {
         await syncWithSupabase();
       } catch (err: any) {
-        console.log("[Supabase First Sync] Error during boot sync:", err?.message || err);
+        console.log("[Supabase Sync] Error during state sync:", err?.message || err);
       }
     } else if (now - lastSupabaseFetchTime > 30000) {
       syncWithSupabase().catch(err => {

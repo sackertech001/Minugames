@@ -1364,12 +1364,13 @@ export default function App() {
     let apiPermanentlyUnavailable = false;
     let lastSupabaseFetchTime = 0;
 
-    const pollSync = async () => {
+    const pollSync = async (forceRefresh = false) => {
       const now = Date.now();
       let apiSucceeded = false;
       if (!apiPermanentlyUnavailable) {
         try {
-          const res = await fetch('/api/state');
+          const url = forceRefresh ? '/api/state?refresh=true' : '/api/state';
+          const res = await fetch(url);
           if (res.ok) {
             apiSucceeded = true;
             const data = await res.json();
@@ -2219,12 +2220,45 @@ export default function App() {
     // Perform initial synchronization immediately
     pollSync();
     
-    // Poll storage and API every 1500ms for robust state synchronization
-    const interval = setInterval(pollSync, 1500);
+    const supabase = getSupabase();
+    let realtimeChannel: any = null;
+
+    if (supabase) {
+      console.log('[Supabase Realtime] Subscribing to public schema changes...');
+      realtimeChannel = supabase
+        .channel('public-db-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public'
+          },
+          (payload) => {
+            console.log('[Supabase Realtime] Database change detected:', payload.table, payload.eventType);
+            // Trigger an immediate, forced sync from the database
+            pollSync(true);
+          }
+        )
+        .subscribe((status) => {
+          console.log('[Supabase Realtime] Channel subscription status:', status);
+        });
+    }
+
+    // Set a much safer, lower-frequency fallback poll interval to save egress quota
+    // If Supabase is available, we rely on realtime and can poll very infrequently (every 30 seconds as safety net)
+    // If Supabase is not available (offline/local mode), we can poll every 5 seconds
+    const pollIntervalTime = supabase ? 30000 : 5000;
+    const interval = setInterval(() => {
+      pollSync();
+    }, pollIntervalTime);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
+      if (realtimeChannel) {
+        console.log('[Supabase Realtime] Unsubscribing from realtime changes...');
+        realtimeChannel.unsubscribe();
+      }
     };
   }, []);
 
