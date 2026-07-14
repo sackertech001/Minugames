@@ -12,6 +12,29 @@ const isUUID = (id: any): boolean => {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 };
 
+let isSupabaseSuspended = false;
+let supabaseSuspendedReason = "";
+
+function handleSupabaseError(error: any, context: string) {
+  if (!error) return;
+  const msg = error.message || String(error);
+  if (
+    msg.includes("exceed_egress_quota") ||
+    msg.includes("restricted") ||
+    msg.includes("quota") ||
+    msg.includes("spend caps") ||
+    msg.includes("payment required")
+  ) {
+    if (!isSupabaseSuspended) {
+      isSupabaseSuspended = true;
+      supabaseSuspendedReason = msg;
+      console.log(`[Supabase Status] Gracefully suspending all Supabase operations due to project restriction: ${msg}`);
+    }
+  } else {
+    console.log(`[Supabase DB Notice - ${context}]:`, msg);
+  }
+}
+
 const PORT = 3000;
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
@@ -47,6 +70,17 @@ interface TournamentState {
   systemLogo?: string;
 }
 
+const DEFAULT_SYSTEM_USERS = [
+  { id: "11111111-1111-1111-1111-111111111111", username: "admin", role: "Admin", pin: "1234" },
+  { id: "22222222-2222-2222-2222-222222222222", username: "owner", role: "Owner", pin: "5555" },
+  { id: "33333333-3333-3333-3333-333333333333", username: "game_admin", role: "Game Admin", pin: "7777" },
+  { id: "44444444-4444-4444-4444-444444444444", username: "referee", role: "Referee", pin: "2222" },
+  { id: "55555555-5555-5555-5555-555555555555", username: "scorer", role: "Scorer", pin: "3333" },
+  { id: "66666666-6666-6666-6666-666666666666", username: "player", role: "Player", pin: "4444" }
+];
+
+let cachedSystemUsers: any[] = [];
+
 const DEFAULT_STATE: TournamentState = {
   players: [],
   matches: [],
@@ -72,14 +106,7 @@ const DEFAULT_STATE: TournamentState = {
       second: "₦150,000"
     }
   },
-  systemUsers: [
-    { id: "u-admin", username: "admin", role: "Admin", pin: "1234" },
-    { id: "u-owner", username: "owner", role: "Owner", pin: "5555" },
-    { id: "u-gameadmin", username: "game_admin", role: "Game Admin", pin: "7777" },
-    { id: "u-referee", username: "referee", role: "Referee", pin: "2222" },
-    { id: "u-scorer", username: "scorer", role: "Scorer", pin: "3333" },
-    { id: "u-player", username: "player", role: "Player", pin: "4444" }
-  ],
+  systemUsers: [],
   rolePermissions: [
     {
       role: "Admin",
@@ -122,6 +149,10 @@ function readState(): TournamentState {
     if (fs.existsSync(DATA_FILE)) {
       const content = fs.readFileSync(DATA_FILE, "utf-8");
       const state = JSON.parse(content);
+      
+      // Ensure systemUsers is strictly loaded from the cached database records, or falls back to defaults if empty/restricted
+      state.systemUsers = (cachedSystemUsers && cachedSystemUsers.length > 0) ? cachedSystemUsers : DEFAULT_SYSTEM_USERS;
+      
       let changed = false;
       if (state.tournamentConfig && state.tournamentConfig.prizes) {
         if (state.tournamentConfig.prizes.first === "₦350,000 + Certificate" || state.tournamentConfig.prizes.first === "₦500,000 + Certificate") {
@@ -152,12 +183,14 @@ function readState(): TournamentState {
   } catch (e) {
     console.error("Error reading data file, using defaults:", e);
   }
-  return { ...DEFAULT_STATE };
+  return { ...DEFAULT_STATE, systemUsers: (cachedSystemUsers && cachedSystemUsers.length > 0) ? cachedSystemUsers : DEFAULT_SYSTEM_USERS };
 }
 
 function writeState(state: TournamentState) {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2), "utf-8");
+    // Strip systemUsers so that it is never persisted to the data.json file storage
+    const stateToSave = { ...state, systemUsers: [] };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(stateToSave, null, 2), "utf-8");
   } catch (e) {
     console.error("Error writing data file:", e);
   }
@@ -350,6 +383,7 @@ async function startServer() {
   let isSyncing = false;
 
   async function syncWithSupabase() {
+    if (isSupabaseSuspended) return;
     if (isSyncing) return;
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
@@ -372,31 +406,35 @@ async function startServer() {
           }
         });
 
-        console.log("[Supabase Background Sync] Fetching profiles...");
-        const { data: dbProfiles, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*');
+        const state = readState();
 
-        if (fetchError) {
-          console.log('[Supabase DB Sync] Fetch profiles notice:', fetchError.message);
-        } else if (dbProfiles) {
-          console.log(`[Supabase DB Sync Success] Fetched ${dbProfiles.length} profiles from database.`);
-          const mappedApps = dbProfiles.map((p: any) => ({
-            id: p.id,
-            fullName: p.full_name || '',
-            nickname: p.nickname || '',
-            club: p.club || '',
-            phoneNumber: p.phone_number || '',
-            whatsappNumber: p.whatsapp_number || '',
-            socialMediaPage: p.social_media_page || '',
-            photoUrl: p.photo_url || '',
-            documentUrl: p.document_url || '',
-            documentName: p.document_name || '',
-            status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
-            appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
-            tournamentType: p.tournament_type || ''
-          }));
-          cachedProfiles = mappedApps;
+        // 1. Sync Profiles & Players
+        try {
+          console.log("[Supabase Background Sync] Fetching profiles...");
+          const { data: dbProfiles, error: fetchError } = await supabase
+            .from('profiles')
+            .select('*');
+
+          if (fetchError) {
+            handleSupabaseError(fetchError, "Fetch profiles");
+          } else if (dbProfiles) {
+            console.log(`[Supabase DB Sync Success] Fetched ${dbProfiles.length} profiles from database.`);
+            const mappedApps = dbProfiles.map((p: any) => ({
+              id: p.id,
+              fullName: p.full_name || '',
+              nickname: p.nickname || '',
+              club: p.club || '',
+              phoneNumber: p.phone_number || '',
+              whatsappNumber: p.whatsapp_number || '',
+              socialMediaPage: p.social_media_page || '',
+              photoUrl: p.photo_url || '',
+              documentUrl: p.document_url || '',
+              documentName: p.document_name || '',
+              status: (p.status || 'pending') as 'pending' | 'approved' | 'rejected',
+              appliedAt: p.created_at || p.applied_at || new Date().toISOString(),
+              tournamentType: p.tournament_type || ''
+            }));
+            cachedProfiles = mappedApps;
 
           // Get players from players table in Supabase
           let dbPlayers: any[] = [];
@@ -407,7 +445,7 @@ async function startServer() {
               .select('*');
 
             if (playersFetchError) {
-              console.log('[Supabase DB Sync] Fetch players table error, falling back to profiles:', playersFetchError.message);
+              handleSupabaseError(playersFetchError, "Fetch players table");
               // Fallback to approved profiles
               const approvedStatuses = ['approved', 'active', 'eliminated', 'champion', 'runner_up', 'third_place', 'fourth_place'];
               dbPlayers = dbProfiles
@@ -522,23 +560,61 @@ async function startServer() {
           dbPlayers.sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
           cachedPlayers = dbPlayers;
-          lastSupabaseFetchTime = Date.now();
+            // Retain local/demo players who do not have a valid UUID or have a demo prefix
+            const demoPlayers = (state.players || []).filter((p: any) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
+            state.players = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
+            state.playerApplications = mappedApps;
+          }
+        } catch (profilesErr: any) {
+          console.log('[Supabase DB Sync] Profiles sync error:', profilesErr?.message || profilesErr);
+        }
 
-          const state = readState();
-          // Retain local/demo players who do not have a valid UUID or have a demo prefix
-          const demoPlayers = (state.players || []).filter((p: any) => !isUUID(p.id) || p.id.startsWith('p-') || p.id.startsWith('P-'));
-          state.players = [...dbPlayers, ...demoPlayers].sort((a, b) => (a.seed || 0) - (b.seed || 0));
-          state.playerApplications = mappedApps;
-
+        // 2. Sync Tournament Types
+        try {
           const { data: dbTypes, error: typesError } = await supabase
             .from('tournament_types')
             .select('*');
 
-          if (!typesError && dbTypes && dbTypes.length > 0) {
+          if (typesError) {
+            handleSupabaseError(typesError, "Fetch tournament types");
+          } else if (dbTypes && dbTypes.length > 0) {
             const typesList = dbTypes.map((t: any) => t.name);
             const activeType = dbTypes.find((t: any) => t.is_active)?.name || typesList[0] || 'Snooker';
             state.tournamentConfig.tournamentTypes = typesList;
             state.tournamentConfig.selectedTournamentType = activeType;
+          }
+        } catch (typesErr: any) {
+          handleSupabaseError(typesErr, "Fetch tournament types exception");
+        }
+
+          // Fetch system_users from Supabase to sync RBAC users state
+          try {
+            console.log("[Supabase Background Sync] Fetching system_users table...");
+            const { data: dbSystemUsers, error: usersError } = await supabase
+              .from('system_users')
+              .select('*');
+
+            if (!usersError && dbSystemUsers) {
+              const mappedUsers = dbSystemUsers.map((u: any) => ({
+                id: u.id,
+                username: u.username,
+                role: u.role,
+                pin: u.pin
+              }));
+              cachedSystemUsers = mappedUsers;
+              state.systemUsers = mappedUsers;
+              console.log(`[Supabase DB Sync] System users successfully synced. Total: ${mappedUsers.length}`);
+            } else {
+              if (usersError) {
+                handleSupabaseError(usersError, "Fetch system users");
+              }
+              cachedSystemUsers = [];
+              state.systemUsers = [];
+            }
+          } catch (usersErr: any) {
+            handleSupabaseError(usersErr, "Fetch system users exception");
+            cachedSystemUsers = [];
+            state.systemUsers = [];
           }
 
           // Fetch rounds from Supabase to sync tournament status and rounds state
@@ -1054,7 +1130,6 @@ async function startServer() {
           }
 
           writeState(state);
-        }
       })(), 12000, "Supabase connection timed out");
     } catch (err: any) {
       console.log('[Supabase DB Sync] Fetch profiles notice (deferred):', err?.message || err);
@@ -1079,6 +1154,7 @@ async function startServer() {
     }
 
     const state = readState();
+    (state as any).isSupabaseSuspended = isSupabaseSuspended;
     res.json(state);
   });
 
@@ -1185,6 +1261,79 @@ async function startServer() {
           lastSupabaseFetchTime = 0;
         } catch (err: any) {
           console.log('[Supabase Wipe Status] Players wipe details:', err?.message || err);
+        }
+      }
+    }
+
+    // If systemUsers are changed, sync back to Supabase system_users table
+    if (req.body.systemUsers && Array.isArray(req.body.systemUsers)) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+      const useServiceRole = !!(supabaseUrl && serviceRoleKey && serviceRoleKey !== "YOUR_SUPABASE_SERVICE_ROLE_KEY");
+      const activeKey = useServiceRole ? serviceRoleKey : supabaseAnonKey;
+
+      if (supabaseUrl && activeKey && supabaseUrl !== "YOUR_SUPABASE_URL" && activeKey !== "YOUR_SUPABASE_ANON_KEY" && !isSupabaseSuspended) {
+        try {
+          const supabase = createClient(supabaseUrl, activeKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+            }
+          });
+
+          const currentUsers = req.body.systemUsers;
+          cachedSystemUsers = currentUsers; // Immediately update in-memory cache
+          const usernames = currentUsers.map((u: any) => u.username);
+
+          // 1. Fetch current database system_users to determine who to delete
+          const { data: dbUsers, error: fetchErr } = await supabase
+            .from('system_users')
+            .select('id, username');
+
+          if (fetchErr) {
+            handleSupabaseError(fetchErr, 'system_users fetch');
+          } else if (dbUsers) {
+            const usernamesToDelete = dbUsers
+              .filter((du: any) => !usernames.includes(du.username))
+              .map((du: any) => du.username);
+
+            if (usernamesToDelete.length > 0) {
+              const { error: deleteErr } = await supabase
+                .from('system_users')
+                .delete()
+                .in('username', usernamesToDelete);
+              if (deleteErr) {
+                handleSupabaseError(deleteErr, 'system_users delete old users');
+              } else {
+                console.log('[Supabase system_users Sync] Deleted removed system users:', usernamesToDelete);
+              }
+            }
+          }
+
+          // 2. Upsert each user
+          for (const user of currentUsers) {
+            const payload: any = {
+              username: user.username,
+              role: user.role,
+              pin: user.pin,
+            };
+            if (isUUID(user.id)) {
+              payload.id = user.id;
+            }
+
+            const { error: upsertErr } = await supabase
+              .from('system_users')
+              .upsert(payload, { onConflict: 'username' });
+
+            if (upsertErr) {
+              handleSupabaseError(upsertErr, `system_users upsert for ${user.username}`);
+            }
+          }
+
+          lastSupabaseFetchTime = 0; // Force fresh fetch on next GET request
+        } catch (err: any) {
+          handleSupabaseError(err, 'system_users general sync exception');
         }
       }
     }
@@ -1879,6 +2028,7 @@ async function startServer() {
       }
     }
 
+    (newState as any).isSupabaseSuspended = isSupabaseSuspended;
     res.json({ success: true, state: newState });
   });
 

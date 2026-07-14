@@ -8,6 +8,10 @@ let supabaseInstance: SupabaseClient | null = null;
  * if the environment variables are not yet provided.
  */
 export function getSupabase(): SupabaseClient | null {
+  if (typeof window !== 'undefined' && ((window as any).__supabase_suspended || localStorage.getItem('supabase_suspended') === 'true')) {
+    return null;
+  }
+
   if (supabaseInstance) {
     return supabaseInstance;
   }
@@ -35,4 +39,25 @@ export function getSupabase(): SupabaseClient | null {
  */
 export function isSupabaseConfigured(): boolean {
   return getSupabase() !== null;
+}
+
+/**
+ * Handle client-side Supabase errors and dynamically suspend queries if project limits are exceeded.
+ */
+export function handleClientSupabaseError(error: any) {
+  if (!error) return;
+  const msg = error.message || String(error);
+  if (
+    msg.includes("exceed_egress_quota") ||
+    msg.includes("restricted") ||
+    msg.includes("quota") ||
+    msg.includes("spend caps") ||
+    msg.includes("payment required")
+  ) {
+    if (typeof window !== 'undefined') {
+      (window as any).__supabase_suspended = true;
+      localStorage.setItem('supabase_suspended', 'true');
+      console.log(`[Supabase Status] Client suspended Supabase queries due to project restriction: ${msg}`);
+    }
+  }
 }

@@ -39,7 +39,7 @@ import SettingsTab from './components/SettingsTab';
 import LoginPage from './components/LoginPage';
 import MainLandingPage from './components/MainLandingPage';
 import PlayerApplicationForm from './components/PlayerApplicationForm';
-import { getSupabase } from './utils/supabaseClient';
+import { getSupabase, handleClientSupabaseError } from './utils/supabaseClient';
 import Sidebar from './components/Sidebar';
 
 const isUUID = (id: any): boolean => {
@@ -145,15 +145,13 @@ export default function App() {
     selectedTournamentType: 'Snooker'
   });
 
-  // Role-Based Access Control users state with rich defaults
-  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([
-    { id: 'u-admin', username: 'admin', role: 'Admin', pin: '1234' },
-    { id: 'u-owner', username: 'owner', role: 'Owner', pin: '5555' },
-    { id: 'u-gameadmin', username: 'game_admin', role: 'Game Admin', pin: '7777' },
-    { id: 'u-referee', username: 'referee', role: 'Referee', pin: '2222' },
-    { id: 'u-scorer', username: 'scorer', role: 'Scorer', pin: '3333' },
-    { id: 'u-player', username: 'player', role: 'Player', pin: '4444' }
-  ]);
+  // Role-Based Access Control users state loaded purely from Supabase system_users table
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
+
+  // State to track if Supabase service is suspended/restricted (e.g. egress quota exceeded)
+  const [isSupabaseSuspended, setIsSupabaseSuspended] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('supabase_suspended') === 'true';
+  });
 
   // Dynamic role permissions matrix configuration state
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
@@ -529,6 +527,49 @@ export default function App() {
             }
           } catch (err: any) {
             console.log('[Client Supabase] Wipe notice:', err?.message || err);
+          }
+        }
+
+        if (patch.systemUsers && Array.isArray(patch.systemUsers)) {
+          try {
+            const currentUsers = patch.systemUsers;
+            const usernames = currentUsers.map((u: any) => u.username);
+
+            // 1. Fetch current database system_users to determine who to delete
+            const { data: dbUsers, error: fetchErr } = await supabase
+              .from('system_users')
+              .select('id, username');
+
+            if (!fetchErr && dbUsers) {
+              const usernamesToDelete = dbUsers
+                .filter((du: any) => !usernames.includes(du.username))
+                .map((du: any) => du.username);
+
+              if (usernamesToDelete.length > 0) {
+                await supabase
+                  .from('system_users')
+                  .delete()
+                  .in('username', usernamesToDelete);
+              }
+            }
+
+            // 2. Upsert each user
+            for (const user of currentUsers) {
+              const payload: any = {
+                username: user.username,
+                role: user.role,
+                pin: user.pin,
+              };
+              if (isUUID(user.id)) {
+                payload.id = user.id;
+              }
+
+              await supabase
+                .from('system_users')
+                .upsert(payload, { onConflict: 'username' });
+            }
+          } catch (err: any) {
+            console.log('[Client Supabase] system_users sync notice:', err?.message || err);
           }
         }
 
@@ -1076,9 +1117,6 @@ export default function App() {
           safeStorage.setItem('snooker_config', JSON.stringify(parsed));
         }
       }
-      if (savedUsers) {
-        setSystemUsers(JSON.parse(savedUsers));
-      }
       if (savedPermissions) {
         const parsedPermissions = JSON.parse(savedPermissions);
         // Ensure dashboard is included, especially for Admin
@@ -1140,6 +1178,18 @@ export default function App() {
           if (res.ok) {
             apiSucceeded = true;
             const data = await res.json();
+
+            if (data && data.isSupabaseSuspended) {
+              setIsSupabaseSuspended(true);
+              (window as any).__supabase_suspended = true;
+              localStorage.setItem('supabase_suspended', 'true');
+            } else {
+              setIsSupabaseSuspended(false);
+              if (typeof window !== 'undefined') {
+                delete (window as any).__supabase_suspended;
+              }
+              localStorage.removeItem('supabase_suspended');
+            }
             
             setPlayers((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.players)) {
@@ -1174,7 +1224,6 @@ export default function App() {
 
             setSystemUsers((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(data.systemUsers)) {
-                safeStorage.setItem('snooker_users', JSON.stringify(data.systemUsers));
                 return data.systemUsers;
               }
               return prev;
@@ -1471,6 +1520,32 @@ export default function App() {
                     }
                     return prev;
                   });
+                }
+
+                // Fetch system_users directly from Supabase
+                try {
+                  const { data: dbSystemUsers, error: usersFetchError } = await supabase
+                    .from('system_users')
+                    .select('*');
+
+                  if (usersFetchError) {
+                    handleClientSupabaseError(usersFetchError);
+                  } else if (dbSystemUsers && dbSystemUsers.length > 0) {
+                    const mappedUsers = dbSystemUsers.map((u: any) => ({
+                      id: u.id,
+                      username: u.username,
+                      role: u.role,
+                      pin: u.pin
+                    }));
+                    setSystemUsers((prev) => {
+                      if (JSON.stringify(prev) !== JSON.stringify(mappedUsers)) {
+                        return mappedUsers;
+                      }
+                      return prev;
+                    });
+                  }
+                } catch (userErr) {
+                  console.log('[Client Supabase Sync] system_users fetch error:', userErr);
                 }
 
                 // Fetch round_of_32, round_of_16, quarter_finals, semi_finals, grand_final, and third_place in parallel to sync matches
@@ -2012,7 +2087,6 @@ export default function App() {
 
   const handleUpdateUsers = (newUsers: SystemUser[]) => {
     setSystemUsers(newUsers);
-    safeStorage.setItem('snooker_users', JSON.stringify(newUsers));
     saveStateToServer({ systemUsers: newUsers });
   };
 
@@ -2897,14 +2971,7 @@ export default function App() {
     };
     setTournamentConfig(defaultConfig);
     
-    const defaultUsers: SystemUser[] = [
-      { id: 'u-admin', username: 'admin', role: 'Admin', pin: '1234' },
-      { id: 'u-owner', username: 'owner', role: 'Owner', pin: '5555' },
-      { id: 'u-gameadmin', username: 'game_admin', role: 'Game Admin', pin: '7777' },
-      { id: 'u-referee', username: 'referee', role: 'Referee', pin: '2222' },
-      { id: 'u-scorer', username: 'scorer', role: 'Scorer', pin: '3333' },
-      { id: 'u-player', username: 'player', role: 'Player', pin: '4444' }
-    ];
+    const defaultUsers: SystemUser[] = [];
     setSystemUsers(defaultUsers);
 
     const defaultPermissions: RolePermission[] = [
@@ -2947,7 +3014,6 @@ export default function App() {
     safeStorage.removeItem('snooker_matches');
     safeStorage.removeItem('snooker_started');
     safeStorage.removeItem('snooker_config');
-    safeStorage.removeItem('snooker_users');
     safeStorage.removeItem('snooker_role_permissions');
     safeStorage.removeItem('snooker_current_user');
     safeStorage.removeItem('snooker_player_applications');
@@ -3317,6 +3383,7 @@ export default function App() {
         setTheme={setTheme}
         systemLogo={systemLogo}
         onBackToHome={() => setShowMainLogin(false)}
+        isSupabaseSuspended={isSupabaseSuspended}
       />
     );
   }
@@ -3428,14 +3495,14 @@ export default function App() {
 
             <button
               onClick={handleEndTournament}
-              disabled={!isEndActive}
+              disabled={!effectiveTournamentStarted}
               id="btn-end-tournament"
               className={`flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 rounded-xl transition-colors uppercase tracking-wider ${
-                isEndActive
+                effectiveTournamentStarted
                   ? "text-amber-500 hover:text-amber-400 bg-amber-500/10 border border-amber-500/20 cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.05)]"
                   : "text-amber-500/40 bg-amber-500/5 border border-amber-500/10 cursor-not-allowed opacity-50"
               }`}
-              title={isEndActive ? "End all active games and revert fixtures to empty" : "No active tournament to end"}
+              title={effectiveTournamentStarted ? "End all active games and revert fixtures to empty" : "No active tournament to end"}
             >
               <StopCircle className="w-3.5 h-3.5" /> End Tournament
             </button>
@@ -3574,6 +3641,7 @@ export default function App() {
               }}
               systemLogo={systemLogo}
               onUpdateSystemLogo={handleUpdateSystemLogo}
+              isSupabaseSuspended={isSupabaseSuspended}
             />
           )}
         </div>

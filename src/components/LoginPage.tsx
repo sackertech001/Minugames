@@ -10,6 +10,7 @@ interface LoginPageProps {
   setTheme: (theme: string) => void;
   systemLogo?: string;
   onBackToHome?: () => void;
+  isSupabaseSuspended?: boolean;
 }
 
 export default function LoginPage({
@@ -20,6 +21,7 @@ export default function LoginPage({
   setTheme,
   systemLogo = '',
   onBackToHome,
+  isSupabaseSuspended = false,
 }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
@@ -136,6 +138,19 @@ export default function LoginPage({
             <div className="mb-6 bg-[#EF4444]/10 border border-[#EF4444]/25 rounded-2xl p-4 flex items-start gap-3 text-[#EF4444] text-xs font-black uppercase tracking-wide">
               <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-[#EF4444]" />
               <p className="leading-relaxed text-left">{error}</p>
+            </div>
+          )}
+
+          {/* Supabase Suspended Status Alert */}
+          {isSupabaseSuspended && (
+            <div className="mb-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3 text-amber-400 text-[11px] leading-relaxed">
+              <ShieldAlert className="w-4.5 h-4.5 shrink-0 mt-0.5 text-amber-500" />
+              <div className="text-left">
+                <p className="font-bold uppercase tracking-wider mb-1 text-amber-500">Database Offline (Quota Exceeded)</p>
+                <p>
+                  Your Supabase service is currently restricted due to exceeding free tier egress limits. The system has automatically loaded local default accounts to prevent lockout. Log in using default credentials (e.g. <b>admin</b> / <b>1234</b>).
+                </p>
+              </div>
             </div>
           )}
 

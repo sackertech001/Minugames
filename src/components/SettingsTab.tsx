@@ -18,6 +18,7 @@ interface SettingsTabProps {
   onPublicRegistrationEnabledChange?: (enabled: boolean) => void;
   systemLogo?: string;
   onUpdateSystemLogo?: (newLogo: string) => void;
+  isSupabaseSuspended?: boolean;
 }
 
 export default function SettingsTab({
@@ -35,6 +36,7 @@ export default function SettingsTab({
   onPublicRegistrationEnabledChange,
   systemLogo = '',
   onUpdateSystemLogo,
+  isSupabaseSuspended = false,
 }: SettingsTabProps) {
   // Logo upload states
   const [logoUrl, setLogoUrl] = useState(systemLogo);
@@ -1075,6 +1077,20 @@ export default function SettingsTab({
               {/* Active Users Table list */}
               <div className="space-y-2.5">
                 <span className="text-[10px] font-sans font-black text-text-muted uppercase tracking-widest">Registered Accounts list</span>
+
+                {isSupabaseSuspended && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-left text-xs text-amber-400">
+                    <div className="flex gap-3">
+                      <AlertCircle className="w-4.5 h-4.5 shrink-0 text-amber-500 mt-0.5" />
+                      <div>
+                        <span className="font-bold block text-[13px] mb-1 uppercase tracking-wide">Database Connection Restricted (Egress Quota Exceeded)</span>
+                        <p className="leading-relaxed">
+                          Your Supabase project is currently restricted due to reaching its free tier egress quota limits. The system has safely loaded local default administrator/staff accounts to prevent lockout. Your custom accounts will remain offline until the spending caps or quotas are adjusted in your Supabase dashboard.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="border border-rose-500/15 rounded-xl overflow-hidden bg-bg-primary">
                   <div className="overflow-x-auto">
