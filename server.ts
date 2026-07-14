@@ -35,6 +35,272 @@ function handleSupabaseError(error: any, context: string) {
   }
 }
 
+let cachedPlayersColumns: string[] | null = null;
+let lastColumnFetchTime = 0;
+
+async function getPlayersTableColumns(supabase: any): Promise<string[]> {
+  const now = Date.now();
+  if (cachedPlayersColumns && (now - lastColumnFetchTime < 300000)) {
+    return cachedPlayersColumns;
+  }
+
+  const url = supabase.supabaseUrl || (supabase as any).url;
+  const key = supabase.supabaseKey || (supabase as any).key;
+
+  if (!url || !key) {
+    return ['id', 'profile_id', 'created_at', 'name'];
+  }
+
+  try {
+    const res = await fetch(`${url}/rest/v1/`, {
+      headers: {
+        'apikey': key,
+        'Accept': 'application/openapi+json'
+      }
+    });
+    if (res.ok) {
+      const schema = await res.json();
+      const properties = schema.definitions?.players?.properties;
+      if (properties) {
+        cachedPlayersColumns = Object.keys(properties);
+        lastColumnFetchTime = now;
+        console.log(`[Supabase Schema Detector] Detected valid columns for 'players':`, cachedPlayersColumns);
+        return cachedPlayersColumns;
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[Supabase Schema Detector] Failed to fetch OpenAPI columns:`, err?.message || err);
+  }
+
+  return ['id', 'profile_id', 'created_at', 'name'];
+}
+
+async function insertPlayerToSupabase(supabase: any, playerOrProfile: any) {
+  const pid = playerOrProfile.id || playerOrProfile.profile_id;
+  if (!pid) return false;
+
+  const fullName = playerOrProfile.name || playerOrProfile.player_name || playerOrProfile.fullName || playerOrProfile.full_name || 'Tournament Player';
+  const nickname = playerOrProfile.nickname || null;
+  const club = playerOrProfile.club || null;
+  const seed = playerOrProfile.seed || 1;
+  const status = playerOrProfile.status === 'approved' ? 'active' : (playerOrProfile.status || 'active');
+  const photoUrl = playerOrProfile.photoUrl || playerOrProfile.photo_url || null;
+  const matches_played = playerOrProfile.matchesPlayed ?? playerOrProfile.matches_played ?? 0;
+  const matches_won = playerOrProfile.matchesWon ?? playerOrProfile.matches_won ?? 0;
+  const total_points = playerOrProfile.totalPoints ?? playerOrProfile.total_points ?? 0;
+  const highest_break = playerOrProfile.highestBreak ?? playerOrProfile.highest_break ?? 0;
+  const tournament_type = playerOrProfile.tournamentType ?? playerOrProfile.tournament_type ?? null;
+
+  let possiblePayload: Record<string, any> = {
+    id: pid,
+    profile_id: pid,
+    player_name: fullName,
+    name: fullName,
+    nickname,
+    club,
+    seed,
+    status,
+    photo_url: photoUrl,
+    photoUrl: photoUrl,
+    matches_played,
+    matches_won,
+    total_points,
+    highest_break,
+    tournament_type,
+    tournamentType: tournament_type
+  };
+
+  const validColumns = await getPlayersTableColumns(supabase);
+  let payload: Record<string, any> = {};
+  for (const [key, val] of Object.entries(possiblePayload)) {
+    if (validColumns.includes(key)) {
+      payload[key] = val;
+    }
+  }
+
+  const attemptInsert = async (currentPayload: Record<string, any>, attemptCount: number): Promise<boolean> => {
+    if (attemptCount > 15) {
+      console.error("[Supabase DB Sync] Exceeded maximum self-healing attempts.");
+      return false;
+    }
+
+    console.log(`[Supabase DB Sync] Attempt ${attemptCount}: Inserting with keys [${Object.keys(currentPayload).join(', ')}]`);
+
+    try {
+      const { error } = await supabase.from('players').insert(currentPayload);
+      if (!error) {
+        console.log(`[Supabase DB Sync] Successfully inserted player ${fullName} with ${Object.keys(currentPayload).length} columns!`);
+        return true;
+      }
+
+      const errMsg = error.message || '';
+      const errDetails = error.details || '';
+      const fullErrorText = `${errMsg} ${errDetails}`;
+      console.warn(`[Supabase DB Sync] Attempt ${attemptCount} failed: "${fullErrorText}"`);
+
+      let missingColumn: string | null = null;
+      const match1 = fullErrorText.match(/Could not find the '([^']+)' column/i);
+      if (match1) {
+        missingColumn = match1[1];
+      }
+
+      if (!missingColumn) {
+        const match2 = fullErrorText.match(/column "([^"]+)" of relation/i);
+        if (match2) {
+          missingColumn = match2[1];
+        }
+      }
+
+      if (!missingColumn) {
+        const match3 = fullErrorText.match(/column "([^"]+)" does not exist/i);
+        if (match3) {
+          missingColumn = match3[1];
+        }
+      }
+
+      if (missingColumn) {
+        console.log(`[Supabase DB Sync] Detected missing column: '${missingColumn}'. Removing and retrying...`);
+        const nextPayload = { ...currentPayload };
+        delete nextPayload[missingColumn];
+        
+        if (missingColumn === 'photo_url') delete nextPayload['photoUrl'];
+        if (missingColumn === 'photoUrl') delete nextPayload['photo_url'];
+        if (missingColumn === 'tournament_type') delete nextPayload['tournamentType'];
+        if (missingColumn === 'tournamentType') delete nextPayload['tournament_type'];
+
+        if (Object.keys(nextPayload).length === 0) {
+          console.error(`[Supabase DB Sync] Payload is empty.`);
+          return false;
+        }
+
+        return await attemptInsert(nextPayload, attemptCount + 1);
+      }
+
+      console.error(`[Supabase DB Sync] Terminal error:`, error);
+      return false;
+    } catch (err: any) {
+      console.error(`[Supabase DB Sync] Catch block error:`, err?.message || err);
+      return false;
+    }
+  };
+
+  return await attemptInsert(payload, 1);
+}
+
+async function updatePlayerInSupabase(supabase: any, player: any, currentPhotoUrl: string | null) {
+  const pid = player.id || player.profile_id;
+  if (!pid) return false;
+
+  const fullName = player.name || player.player_name || player.fullName || player.full_name || 'Tournament Player';
+  const nickname = player.nickname || null;
+  const club = player.club || null;
+  const seed = player.seed || 1;
+  const status = player.status || 'active';
+  const photoUrl = currentPhotoUrl || player.photoUrl || player.photo_url || null;
+  const matches_played = player.matchesPlayed ?? player.matches_played ?? 0;
+  const matches_won = player.matchesWon ?? player.matches_won ?? 0;
+  const total_points = player.totalPoints ?? player.total_points ?? 0;
+  const highest_break = player.highestBreak ?? player.highest_break ?? 0;
+  const tournament_type = player.tournamentType ?? player.tournament_type ?? null;
+
+  let possiblePayload: Record<string, any> = {
+    player_name: fullName,
+    name: fullName,
+    nickname,
+    club,
+    seed,
+    status,
+    photo_url: photoUrl,
+    photoUrl: photoUrl,
+    matches_played,
+    matches_won,
+    total_points,
+    highest_break,
+    tournament_type,
+    tournamentType: tournament_type
+  };
+
+  const validColumns = await getPlayersTableColumns(supabase);
+  let payload: Record<string, any> = {};
+  for (const [key, val] of Object.entries(possiblePayload)) {
+    if (validColumns.includes(key)) {
+      payload[key] = val;
+    }
+  }
+
+  const attemptUpdate = async (currentPayload: Record<string, any>, attemptCount: number): Promise<boolean> => {
+    if (attemptCount > 15) {
+      console.error("[Supabase DB Sync] Exceeded maximum self-healing attempts.");
+      return false;
+    }
+
+    console.log(`[Supabase DB Sync] Attempt ${attemptCount}: Updating with keys [${Object.keys(currentPayload).join(', ')}]`);
+
+    try {
+      const { error } = await supabase
+        .from('players')
+        .update(currentPayload)
+        .or(`profile_id.eq.${pid},id.eq.${pid}`);
+
+      if (!error) {
+        console.log(`[Supabase DB Sync] Successfully updated player ${fullName} with ${Object.keys(currentPayload).length} columns!`);
+        return true;
+      }
+
+      const errMsg = error.message || '';
+      const errDetails = error.details || '';
+      const fullErrorText = `${errMsg} ${errDetails}`;
+      console.warn(`[Supabase DB Sync] Attempt ${attemptCount} failed: "${fullErrorText}"`);
+
+      let missingColumn: string | null = null;
+      const match1 = fullErrorText.match(/Could not find the '([^']+)' column/i);
+      if (match1) {
+        missingColumn = match1[1];
+      }
+
+      if (!missingColumn) {
+        const match2 = fullErrorText.match(/column "([^"]+)" of relation/i);
+        if (match2) {
+          missingColumn = match2[1];
+        }
+      }
+
+      if (!missingColumn) {
+        const match3 = fullErrorText.match(/column "([^"]+)" does not exist/i);
+        if (match3) {
+          missingColumn = match3[1];
+        }
+      }
+
+      if (missingColumn) {
+        console.log(`[Supabase DB Sync] Detected missing column: '${missingColumn}'. Removing and retrying...`);
+        const nextPayload = { ...currentPayload };
+        delete nextPayload[missingColumn];
+        
+        if (missingColumn === 'photo_url') delete nextPayload['photoUrl'];
+        if (missingColumn === 'photoUrl') delete nextPayload['photo_url'];
+        if (missingColumn === 'tournament_type') delete nextPayload['tournamentType'];
+        if (missingColumn === 'tournamentType') delete nextPayload['tournament_type'];
+
+        if (Object.keys(nextPayload).length === 0) {
+          console.error(`[Supabase DB Sync] Payload is empty.`);
+          return false;
+        }
+
+        return await attemptUpdate(nextPayload, attemptCount + 1);
+      }
+
+      console.error(`[Supabase DB Sync] Terminal error:`, error);
+      return false;
+    } catch (err: any) {
+      console.error(`[Supabase DB Sync] Catch block error:`, err?.message || err);
+      return false;
+    }
+  };
+
+  return await attemptUpdate(payload, 1);
+}
+
 const PORT = 3000;
 const DATA_FILE = path.join(process.cwd(), "data.json");
 
@@ -472,41 +738,7 @@ async function startServer() {
               for (const profile of approvedProfiles) {
                 const exists = dbPlayersTable && dbPlayersTable.some((pt: any) => pt.profile_id === profile.id || pt.id === profile.id);
                 if (!exists) {
-                  console.log(`[Supabase DB Sync] Auto-inserting missing player for profile ${profile.id} into players table`);
-                  try {
-                    const { error: insertErr } = await supabase
-                      .from('players')
-                      .insert({
-                        profile_id: profile.id,
-                        player_name: profile.full_name,
-                        nickname: profile.nickname,
-                        club: profile.club,
-                        seed: profile.seed || 1,
-                        status: profile.status === 'approved' ? 'active' : profile.status,
-                        matches_played: profile.matches_played || 0,
-                        matches_won: profile.matches_won || 0,
-                        total_points: profile.total_points || 0,
-                        highest_break: profile.highest_break || 0
-                      });
-                    if (insertErr) {
-                      await supabase
-                        .from('players')
-                        .insert({
-                          profile_id: profile.id,
-                          name: profile.full_name,
-                          nickname: profile.nickname,
-                          club: profile.club,
-                          seed: profile.seed || 1,
-                          status: profile.status === 'approved' ? 'active' : profile.status,
-                          matches_played: profile.matches_played || 0,
-                          matches_won: profile.matches_won || 0,
-                          total_points: profile.total_points || 0,
-                          highest_break: profile.highest_break || 0
-                        });
-                    }
-                  } catch (e) {
-                    console.log(`[Supabase DB Sync] Auto-healing insert error:`, e);
-                  }
+                  await insertPlayerToSupabase(supabase, profile);
                 }
               }
 
@@ -1423,18 +1655,7 @@ async function startServer() {
                   .maybeSingle();
 
                 if (!existingPlayer) {
-                  const { error: insertErr } = await supabase
-                    .from('players')
-                    .insert({
-                      profile_id: app.id,
-                      name: app.fullName,
-                      player_name: app.fullName
-                    });
-                  if (insertErr) {
-                    console.log(`[Supabase Player Table Sync] Insert details for user ${app.id}:`, insertErr.message);
-                  } else {
-                    console.log(`[Supabase Player Table Sync] Successfully created player row for ${app.fullName}`);
-                  }
+                  await insertPlayerToSupabase(supabase, app);
                 }
               } catch (err: any) {
                 console.log(`[Supabase Player Table Sync] Error checking/inserting user ${app.id}:`, err?.message || err);
@@ -1541,44 +1762,7 @@ async function startServer() {
             }
 
             // Update players table
-            const { error: playerErr1 } = await supabase
-              .from('players')
-              .update({
-                status: player.status,
-                seed: player.seed,
-                matches_played: player.matchesPlayed,
-                matches_won: player.matchesWon,
-                total_points: player.totalPoints,
-                highest_break: player.highestBreak,
-                player_name: player.name,
-                name: player.name,
-                nickname: player.nickname,
-                club: player.club,
-                photo_url: currentPhotoUrl,
-                tournament_type: player.tournamentType
-              })
-              .eq('profile_id', player.id);
-
-            if (playerErr1) {
-              // Try updating by 'id' just in case
-              await supabase
-                .from('players')
-                .update({
-                  status: player.status,
-                  seed: player.seed,
-                  matches_played: player.matchesPlayed,
-                  matches_won: player.matchesWon,
-                  total_points: player.totalPoints,
-                  highest_break: player.highestBreak,
-                  player_name: player.name,
-                  name: player.name,
-                  nickname: player.nickname,
-                  club: player.club,
-                  photo_url: currentPhotoUrl,
-                  tournament_type: player.tournamentType
-                })
-                .eq('id', player.id);
-            }
+            await updatePlayerInSupabase(supabase, player, currentPhotoUrl);
           });
 
           await Promise.all(updatePromises);
