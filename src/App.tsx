@@ -429,45 +429,98 @@ export default function App() {
 
               // Update players table
               try {
-                // Try to update with all possible variants of name, photo_url, and tournament_type
-                const { error: pError1 } = await supabase
+                // Check if player exists in the players table
+                const { data: existingPlayer } = await supabase
                   .from('players')
-                  .update({
-                    player_name: player.name,
-                    name: player.name,
-                    nickname: player.nickname || null,
-                    club: player.club || null,
-                    photo_url: currentPhotoUrl || null,
-                    photoUrl: currentPhotoUrl || null,
-                    tournament_type: player.tournamentType || null,
-                    tournamentType: player.tournamentType || null,
-                    status: player.status,
-                    seed: player.seed,
-                    matches_played: player.matchesPlayed,
-                    matches_won: player.matchesWon,
-                    total_points: player.totalPoints,
-                    highest_break: player.highestBreak,
-                  })
-                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
-                if (pError1) {
-                  // Fallback: try with a subset of common columns if there was a column error
-                  await supabase
+                  .select('id')
+                  .or(`profile_id.eq.${player.id},id.eq.${player.id}`)
+                  .maybeSingle();
+
+                if (existingPlayer) {
+                  // Try to update with all possible variants of name, photo_url, and tournament_type
+                  const { error: pError1 } = await supabase
                     .from('players')
                     .update({
                       player_name: player.name,
+                      name: player.name,
                       nickname: player.nickname || null,
                       club: player.club || null,
-                      seed: player.seed,
+                      photo_url: currentPhotoUrl || null,
+                      photoUrl: currentPhotoUrl || null,
+                      tournament_type: player.tournamentType || null,
+                      tournamentType: player.tournamentType || null,
                       status: player.status,
+                      seed: player.seed,
                       matches_played: player.matchesPlayed,
                       matches_won: player.matchesWon,
                       total_points: player.totalPoints,
                       highest_break: player.highestBreak,
                     })
                     .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                  if (pError1) {
+                    // Fallback: try with a subset of common columns if there was a column error
+                    await supabase
+                      .from('players')
+                      .update({
+                        player_name: player.name,
+                        nickname: player.nickname || null,
+                        club: player.club || null,
+                        seed: player.seed,
+                        status: player.status,
+                        matches_played: player.matchesPlayed,
+                        matches_won: player.matchesWon,
+                        total_points: player.totalPoints,
+                        highest_break: player.highestBreak,
+                      })
+                      .or(`profile_id.eq.${player.id},id.eq.${player.id}`);
+                  }
+                } else {
+                  // Player does not exist, let's insert them!
+                  // Try 1: insert with all possible variants of name, photo_url, and tournament_type
+                  const { error: pInsertError1 } = await supabase
+                    .from('players')
+                    .insert({
+                      id: player.id,
+                      profile_id: player.id,
+                      player_name: player.name,
+                      name: player.name,
+                      nickname: player.nickname || null,
+                      club: player.club || null,
+                      photo_url: currentPhotoUrl || null,
+                      photoUrl: currentPhotoUrl || null,
+                      tournament_type: player.tournamentType || null,
+                      tournamentType: player.tournamentType || null,
+                      status: player.status,
+                      seed: player.seed,
+                      matches_played: player.matchesPlayed,
+                      matches_won: player.matchesWon,
+                      total_points: player.totalPoints,
+                      highest_break: player.highestBreak,
+                    });
+                  if (pInsertError1) {
+                    console.log('[Client Supabase Player Sync] Insert with full columns failed, trying fallback insert:', pInsertError1.message);
+                    // Fallback: try inserting with a subset of common columns
+                    await supabase
+                      .from('players')
+                      .insert({
+                        id: player.id,
+                        profile_id: player.id,
+                        player_name: player.name,
+                        nickname: player.nickname || null,
+                        club: player.club || null,
+                        seed: player.seed,
+                        status: player.status,
+                        matches_played: player.matchesPlayed,
+                        matches_won: player.matchesWon,
+                        total_points: player.totalPoints,
+                        highest_break: player.highestBreak,
+                      });
+                  } else {
+                    console.log(`[Client Supabase Player Sync] Successfully inserted new player ${player.name} to players table`);
+                  }
                 }
               } catch (pe) {
-                console.log(`[Client Supabase] Update players table error:`, pe);
+                console.log(`[Client Supabase] Update/Insert players table error:`, pe);
               }
             }
           } catch (err: any) {
