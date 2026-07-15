@@ -118,6 +118,20 @@ async function insertPlayerToSupabase(supabase: any, playerOrProfile: any) {
     }
   }
 
+  try {
+    const { data: existing, error: findError } = await supabase
+      .from('players')
+      .select('id')
+      .eq('id', pid)
+      .maybeSingle();
+    if (!findError && existing) {
+      console.log(`[Supabase DB Sync] Player ${fullName} (${pid}) already exists. Pre-empting insert to avoid unique constraint violations.`);
+      return await updatePlayerInSupabase(supabase, playerOrProfile, photoUrl);
+    }
+  } catch (err: any) {
+    console.warn(`[Supabase DB Sync] Pre-emptive exist check failed:`, err?.message || err);
+  }
+
   const attemptInsert = async (currentPayload: Record<string, any>, attemptCount: number): Promise<boolean> => {
     if (attemptCount > 15) {
       console.error("[Supabase DB Sync] Exceeded maximum self-healing attempts.");
