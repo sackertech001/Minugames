@@ -2171,19 +2171,39 @@ export default function App() {
                       let updated = [...prev];
                       if (fetchedR32Mapped.length > 0) {
                         updated = updated.filter((m: any) => m.round !== 'R32' && !m.id.startsWith('M'));
-                        updated = [...fetchedR32Mapped, ...updated];
+                        const sortedR32 = [...fetchedR32Mapped].sort((a: any, b: any) => {
+                          const numA = parseInt((a.id.match(/\d+$/) || ['0'])[0], 10);
+                          const numB = parseInt((b.id.match(/\d+$/) || ['0'])[0], 10);
+                          return numA - numB;
+                        });
+                        updated = [...sortedR32, ...updated];
                       }
                       if (fetchedR16Mapped.length > 0) {
                         updated = updated.filter((m: any) => m.round !== 'R16' && !m.id.startsWith('R16-'));
-                        updated = [...fetchedR16Mapped, ...updated];
+                        const sortedR16 = [...fetchedR16Mapped].sort((a: any, b: any) => {
+                          const numA = parseInt((a.id.match(/\d+$/) || ['0'])[0], 10);
+                          const numB = parseInt((b.id.match(/\d+$/) || ['0'])[0], 10);
+                          return numA - numB;
+                        });
+                        updated = [...sortedR16, ...updated];
                       }
                       if (fetchedQFMapped.length > 0) {
                         updated = updated.filter((m: any) => m.round !== 'QF' && !m.id.startsWith('QF-'));
-                        updated = [...fetchedQFMapped, ...updated];
+                        const sortedQF = [...fetchedQFMapped].sort((a: any, b: any) => {
+                          const numA = parseInt((a.id.match(/\d+$/) || ['0'])[0], 10);
+                          const numB = parseInt((b.id.match(/\d+$/) || ['0'])[0], 10);
+                          return numA - numB;
+                        });
+                        updated = [...sortedQF, ...updated];
                       }
                       if (fetchedSFMapped.length > 0) {
                         updated = updated.filter((m: any) => m.round !== 'SF' && !m.id.startsWith('SF-'));
-                        updated = [...fetchedSFMapped, ...updated];
+                        const sortedSF = [...fetchedSFMapped].sort((a: any, b: any) => {
+                          const numA = parseInt((a.id.match(/\d+$/) || ['0'])[0], 10);
+                          const numB = parseInt((b.id.match(/\d+$/) || ['0'])[0], 10);
+                          return numA - numB;
+                        });
+                        updated = [...sortedSF, ...updated];
                       }
                       if (fetchedGFMapped.length > 0) {
                         updated = updated.filter((m: any) => m.id !== 'FINAL' && m.round !== 'F');

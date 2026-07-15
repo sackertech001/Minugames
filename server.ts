@@ -941,7 +941,12 @@ async function startServer() {
               // Merge mapped R32 matches into existing matches
               const existingMatches = state.matches || [];
               const nonR32Matches = existingMatches.filter((m: any) => m.round !== 'R32' && !m.id.startsWith('M'));
-              state.matches = [...mappedMatches, ...nonR32Matches];
+              const sortedMatches = [...mappedMatches].sort((a: any, b: any) => {
+                const numA = parseInt((a.id.match(/\d+$/) || ['0'])[0], 10);
+                const numB = parseInt((b.id.match(/\d+$/) || ['0'])[0], 10);
+                return numA - numB;
+              });
+              state.matches = [...sortedMatches, ...nonR32Matches];
               console.log(`[Supabase DB Sync] Round of 32 synced. Total R32 matches merged: ${mappedMatches.length}`);
             }
           } catch (r32Err) {
@@ -1024,7 +1029,12 @@ async function startServer() {
               // Merge mapped R16 matches into existing matches
               const existingMatches = state.matches || [];
               const nonR16Matches = existingMatches.filter((m: any) => m.round !== 'R16' && !m.id.startsWith('R16-'));
-              state.matches = [...mappedR16Matches, ...nonR16Matches];
+              const sortedR16 = [...mappedR16Matches].sort((a: any, b: any) => {
+                const numA = parseInt((a.id.match(/\d+$/) || ['0'])[0], 10);
+                const numB = parseInt((b.id.match(/\d+$/) || ['0'])[0], 10);
+                return numA - numB;
+              });
+              state.matches = [...sortedR16, ...nonR16Matches];
               console.log(`[Supabase DB Sync] Round of 16 synced. Total R16 matches merged: ${mappedR16Matches.length}`);
             }
           } catch (r16Err) {
@@ -1107,7 +1117,12 @@ async function startServer() {
               // Merge mapped QF matches into existing matches
               const existingMatchesQF = state.matches || [];
               const nonQFMatches = existingMatchesQF.filter((m: any) => m.round !== 'QF' && !m.id.startsWith('QF-'));
-              state.matches = [...mappedQFMatches, ...nonQFMatches];
+              const sortedQF = [...mappedQFMatches].sort((a: any, b: any) => {
+                const numA = parseInt((a.id.match(/\d+$/) || ['0'])[0], 10);
+                const numB = parseInt((b.id.match(/\d+$/) || ['0'])[0], 10);
+                return numA - numB;
+              });
+              state.matches = [...sortedQF, ...nonQFMatches];
               console.log(`[Supabase DB Sync] Quarter Finals synced. Total QF matches merged: ${mappedQFMatches.length}`);
             }
           } catch (qfErr) {
@@ -1190,7 +1205,12 @@ async function startServer() {
               // Merge mapped SF matches into existing matches
               const existingMatchesSF = state.matches || [];
               const nonSFMatches = existingMatchesSF.filter((m: any) => m.round !== 'SF' && !m.id.startsWith('SF-'));
-              state.matches = [...mappedSFMatches, ...nonSFMatches];
+              const sortedSF = [...mappedSFMatches].sort((a: any, b: any) => {
+                const numA = parseInt((a.id.match(/\d+$/) || ['0'])[0], 10);
+                const numB = parseInt((b.id.match(/\d+$/) || ['0'])[0], 10);
+                return numA - numB;
+              });
+              state.matches = [...sortedSF, ...nonSFMatches];
               console.log(`[Supabase DB Sync] Semi Finals synced. Total SF matches merged: ${mappedSFMatches.length}`);
             }
           } catch (sfErr) {

@@ -269,7 +269,15 @@ export default function TournamentBracket({
 
   // Filter matches by round grouping
   const getMatchesByRound = (round: string) => {
-    return matches.filter((m) => m.round === round);
+    return matches
+      .filter((m) => m.round === round)
+      .sort((a, b) => {
+        const matchA = a.id.match(/\d+$/);
+        const matchB = b.id.match(/\d+$/);
+        const numA = matchA ? parseInt(matchA[0], 10) : 0;
+        const numB = matchB ? parseInt(matchB[0], 10) : 0;
+        return numA - numB;
+      });
   };
 
   // Calculate dates for each day
