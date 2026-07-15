@@ -3643,7 +3643,8 @@ export default function App() {
   }
 
   const isEndActive = rounds.some(r => r.status !== 'not started');
-  const effectiveTournamentStarted = isTournamentStarted || isEndActive;
+  const hasAnyMatches = matches && matches.length > 0;
+  const effectiveTournamentStarted = isTournamentStarted || (isEndActive && hasAnyMatches);
   const isMaximizedFullBracket = activeTab === 'bracket' && bracketView === 'full' && effectiveTournamentStarted && tournamentConfig.formatType !== 'group';
 
   return (

@@ -876,8 +876,9 @@ async function startServer() {
               state.rounds = mappedRounds;
 
               const anyActiveOrEnded = mappedRounds.some((r: any) => r.status !== 'not started');
-              state.isTournamentStarted = anyActiveOrEnded;
-              console.log(`[Supabase DB Sync] Rounds synced. Any active/ended: ${anyActiveOrEnded}. Synced isTournamentStarted to ${anyActiveOrEnded}`);
+              const hasAnyMatches = state.matches && state.matches.length > 0;
+              state.isTournamentStarted = state.isTournamentStarted || (anyActiveOrEnded && hasAnyMatches);
+              console.log(`[Supabase DB Sync] Rounds synced. Any active/ended: ${anyActiveOrEnded}. hasAnyMatches: ${hasAnyMatches}. Synced isTournamentStarted to ${state.isTournamentStarted}`);
             }
           } catch (rErr) {
             console.log('[Supabase DB Sync] Error syncing rounds:', rErr);
