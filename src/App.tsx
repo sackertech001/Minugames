@@ -475,19 +475,14 @@ export default function App() {
   };
 
   const saveStateToServer = async (patch: any) => {
-    let succeeded = false;
-    try {
-      const res = await fetch('/api/state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch)
-      });
-      if (res.ok) {
-        succeeded = true;
-      }
-    } catch (e) {
+    // Perform local/server sync asynchronously to avoid blocking direct database operations
+    fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).catch((e) => {
       console.warn('Could not sync state to server:', e);
-    }
+    });
 
     // Direct Client-side Supabase updates - Unconditional if Supabase is configured
     const supabase = getSupabase();
@@ -530,6 +525,25 @@ export default function App() {
           try {
             for (const player of patch.players) {
               if (!isUUID(player.id)) continue; // Only process valid UUIDs
+
+              // Optimisation: check if this player actually changed compared to the current React state to prevent massive sequential DB writes
+              const oldPlayer = players.find(p => p.id === player.id);
+              const hasChanged = !oldPlayer || 
+                oldPlayer.name !== player.name ||
+                (oldPlayer.nickname || '') !== (player.nickname || '') ||
+                (oldPlayer.club || '') !== (player.club || '') ||
+                oldPlayer.photoUrl !== player.photoUrl ||
+                oldPlayer.seed !== player.seed ||
+                oldPlayer.matchesPlayed !== player.matchesPlayed ||
+                oldPlayer.matchesWon !== player.matchesWon ||
+                oldPlayer.totalPoints !== player.totalPoints ||
+                oldPlayer.highestBreak !== player.highestBreak ||
+                oldPlayer.status !== player.status ||
+                (oldPlayer.tournamentType || '') !== (player.tournamentType || '');
+
+              if (!hasChanged) {
+                continue; // Skip database write for unchanged players!
+              }
 
               let currentPhotoUrl = player.photoUrl;
 
