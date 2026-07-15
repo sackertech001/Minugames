@@ -431,6 +431,7 @@ export default function App() {
     prizes: {
       first: '₦500,000',
       second: '₦150,000',
+      third: '₦75,000',
     },
     tournamentTypes: ['Soccer', 'Snooker', 'Table Tennis'],
     selectedTournamentType: 'Snooker'
@@ -1341,8 +1342,8 @@ export default function App() {
             delete parsed.prizes.highestBreak;
             changed = true;
           }
-          if ('third' in parsed.prizes) {
-            delete parsed.prizes.third;
+          if (!('third' in parsed.prizes)) {
+            parsed.prizes.third = '₦75,000';
             changed = true;
           }
         }
@@ -3233,6 +3234,7 @@ export default function App() {
       prizes: {
         first: '₦500,000',
         second: '₦150,000',
+        third: '₦75,000',
       },
       tournamentTypes: ['Soccer', 'Snooker', 'Table Tennis'],
       selectedTournamentType: 'Snooker'

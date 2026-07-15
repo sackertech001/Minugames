@@ -87,6 +87,17 @@ export default function TournamentInfo({ config }: TournamentInfoProps) {
               <p className="text-base font-black text-slate-100">{config.prizes.second || "₦150,000"}</p>
             </div>
           </div>
+
+          {/* 3rd Place */}
+          <div className="flex items-center gap-4 bg-orange-500/5 border border-orange-500/10 p-3 rounded-xl hover:bg-orange-500/10 transition-all duration-200">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-600 via-orange-500 to-amber-800 flex items-center justify-center font-sans font-black text-white text-lg shadow-[0_0_10px_rgba(249,115,22,0.15)] shrink-0">
+              3
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">3rd Place</p>
+              <p className="text-base font-black text-slate-100">{config.prizes.third || "₦75,000"}</p>
+            </div>
+          </div>
         </div>
       </div>
 

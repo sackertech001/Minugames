@@ -394,7 +394,8 @@ const DEFAULT_STATE: TournamentState = {
     setsToPlay: 3,
     prizes: {
       first: "₦500,000",
-      second: "₦150,000"
+      second: "₦150,000",
+      third: "₦75,000"
     }
   },
   systemUsers: [],
@@ -461,8 +462,8 @@ function readState(): TournamentState {
           delete state.tournamentConfig.prizes.highestBreak;
           changed = true;
         }
-        if ("third" in state.tournamentConfig.prizes) {
-          delete state.tournamentConfig.prizes.third;
+        if (!("third" in state.tournamentConfig.prizes)) {
+          state.tournamentConfig.prizes.third = "₦75,000";
           changed = true;
         }
       }

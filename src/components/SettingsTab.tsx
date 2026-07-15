@@ -92,6 +92,7 @@ export default function SettingsTab({
   const [tourneyDuration, setTourneyDuration] = useState(config.durationDays);
   const [prize1, setPrize1] = useState(config.prizes.first);
   const [prize2, setPrize2] = useState(config.prizes.second);
+  const [prize3, setPrize3] = useState(config.prizes.third || '₦75,000');
 
   // Dynamic configuration states
   const [playersCount, setPlayersCount] = useState(config.playersCount);
@@ -248,6 +249,7 @@ export default function SettingsTab({
       prizes: {
         first: prize1,
         second: prize2,
+        third: prize3,
       }
     };
 
@@ -949,7 +951,7 @@ export default function SettingsTab({
               {/* Prizes setup */}
               <div className="space-y-3.5 pt-2">
                 <p className="text-[10px] font-sans font-black text-rose-500 uppercase tracking-widest">PODIUM PRIZES</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
                       1st Place Champion
@@ -969,6 +971,17 @@ export default function SettingsTab({
                       type="text"
                       value={prize2}
                       onChange={(e) => setPrize2(e.target.value)}
+                      className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-sans font-black text-text-muted uppercase tracking-widest">
+                      3rd Place
+                    </label>
+                    <input
+                      type="text"
+                      value={prize3}
+                      onChange={(e) => setPrize3(e.target.value)}
                       className="bg-bg-primary border border-rose-500/15 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-none w-full transition-all font-sans font-bold"
                     />
                   </div>
