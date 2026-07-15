@@ -141,7 +141,7 @@ const getPlayersTableColumns = async (supabase: any): Promise<string[]> => {
   return ['id', 'profile_id', 'created_at', 'name'];
 };
 
-const insertPlayerToSupabase = async (supabase: any, playerOrProfile: any) => {
+async function insertPlayerToSupabase(supabase: any, playerOrProfile: any) {
   const pid = playerOrProfile.id || playerOrProfile.profile_id;
   if (!pid) return false;
 
@@ -204,6 +204,17 @@ const insertPlayerToSupabase = async (supabase: any, playerOrProfile: any) => {
       const fullErrorText = `${errMsg} ${errDetails}`;
       console.warn(`[Supabase Self-Healing Insert] Attempt ${attemptCount} failed: "${fullErrorText}"`);
 
+      const isDuplicateKey = 
+        error.code === '23505' || 
+        fullErrorText.toLowerCase().includes('duplicate key') || 
+        fullErrorText.toLowerCase().includes('already exists') || 
+        fullErrorText.toLowerCase().includes('unique constraint');
+
+      if (isDuplicateKey) {
+        console.log(`[Supabase Self-Healing Insert] Player already exists (duplicate key). Falling back to update...`);
+        return await updatePlayerInSupabase(supabase, playerOrProfile, photoUrl);
+      }
+
       let missingColumn: string | null = null;
       const match1 = fullErrorText.match(/Could not find the '([^']+)' column/i);
       if (match1) {
@@ -251,9 +262,9 @@ const insertPlayerToSupabase = async (supabase: any, playerOrProfile: any) => {
   };
 
   return await attemptInsert(payload, 1);
-};
+}
 
-const updatePlayerInSupabase = async (supabase: any, player: any, currentPhotoUrl: string | null) => {
+async function updatePlayerInSupabase(supabase: any, player: any, currentPhotoUrl: string | null) {
   const pid = player.id || player.profile_id;
   if (!pid) return false;
 
@@ -365,7 +376,7 @@ const updatePlayerInSupabase = async (supabase: any, player: any, currentPhotoUr
   };
 
   return await attemptUpdate(payload, 1);
-};
+}
 
 export default function App() {
   const [players, setPlayers] = useState<Player[]>([]);

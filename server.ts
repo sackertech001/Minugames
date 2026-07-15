@@ -138,6 +138,17 @@ async function insertPlayerToSupabase(supabase: any, playerOrProfile: any) {
       const fullErrorText = `${errMsg} ${errDetails}`;
       console.warn(`[Supabase DB Sync] Attempt ${attemptCount} failed: "${fullErrorText}"`);
 
+      const isDuplicateKey = 
+        error.code === '23505' || 
+        fullErrorText.toLowerCase().includes('duplicate key') || 
+        fullErrorText.toLowerCase().includes('already exists') || 
+        fullErrorText.toLowerCase().includes('unique constraint');
+
+      if (isDuplicateKey) {
+        console.log(`[Supabase DB Sync] Player already exists (duplicate key). Falling back to update...`);
+        return await updatePlayerInSupabase(supabase, playerOrProfile, photoUrl);
+      }
+
       let missingColumn: string | null = null;
       const match1 = fullErrorText.match(/Could not find the '([^']+)' column/i);
       if (match1) {
